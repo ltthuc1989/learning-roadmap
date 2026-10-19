@@ -1,0 +1,8 @@
+.DS_Store
+# Anki CSV được sinh lại bằng: python3 -I tools/make_anki.py
+anki/
+# build output của project luyện review
+samples/**/build/
+samples/**/.gradle/
+samples/**/.kotlin/
+.idea/
