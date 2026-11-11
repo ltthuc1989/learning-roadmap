@@ -1,0 +1,28 @@
+# AGENTS.md
+<!-- File dùng chung cho mọi coding agent: Claude Code (import qua @AGENTS.md), Codex, Cursor, Copilot, Gemini in Android Studio. Giữ trung lập công cụ. -->
+
+## Setup
+- JDK 17+, Android SDK, Xcode (cho iOS). Copy `local.properties.example` thành `local.properties`.
+
+## Build và test
+- `./gradlew :composeApp:assembleDebug`
+- `./gradlew test` (toàn bộ), `./gradlew :core:<module>:testDebugUnitTest` (1 module)
+- `./gradlew detekt`
+
+## Kiến trúc
+- KMP: code chung trong `commonMain`, platform trong `androidMain` / `iosMain`.
+- Layer: UI (Compose) -> ViewModel (StateFlow) -> UseCase -> Repository -> datasource (Room, Ktor).
+- Module rule: `feature/*` chỉ phụ thuộc `core/*`.
+
+## Quy tắc code
+- Kotlin style theo detekt config `config/detekt.yml`.
+- Không catch `CancellationException`. Không `GlobalScope`. Không `!!` trong code mới.
+- Mỗi PR: test cho logic mới, không đổi public API của `core/*` khi không được yêu cầu.
+
+## Bảo mật
+- Không đọc/ghi: `local.properties`, `*.jks`, `*.keystore`, `google-services.json`, `.env*`.
+- Không thêm dependency mới khi chưa được duyệt; nếu cần, nêu tên + version + lý do.
+
+## PR
+- Commit message: Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`).
+- PR description: Why / What / How tested / Risk. Gắn nhãn `ai-assisted` khi agent viết > 50% diff.

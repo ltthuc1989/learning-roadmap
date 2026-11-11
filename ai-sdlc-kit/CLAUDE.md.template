@@ -1,0 +1,32 @@
+# CLAUDE.md (template cho repo Android / KMP)
+<!-- Giữ file < 200 dòng. Chỉ ghi điều Claude KHÔNG tự đọc ra được từ code. Luật "không bao giờ" đặt ở hooks/deny rules, không đặt ở đây. -->
+
+@AGENTS.md
+
+## Project
+- App: <tên app>, Kotlin Multiplatform + Compose Multiplatform, targets Android + iOS.
+- Namespace: `<me.example.app>`. Module graph: `composeApp` -> `feature/*` -> `core/*`. `feature` không phụ thuộc `feature` khác.
+- Product docs: `docs/README.md`. Đọc trước khi làm feature mới.
+
+## Commands (Claude chạy được, cho kết quả pass/fail)
+- Build Android: `./gradlew :composeApp:assembleDebug`
+- Unit test 1 module: `./gradlew :core:<module>:testDebugUnitTest` (nhanh, ưu tiên dùng)
+- Toàn bộ test: `./gradlew test`
+- Lint: `./gradlew detekt` (sửa tự động: `./gradlew detekt --auto-correct`)
+- iOS framework (chậm, chỉ chạy khi đụng iosMain): `./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64`
+
+## Definition of done cho mọi task
+1. Code compile, test của module bị đụng pass, detekt sạch.
+2. Có test mới cho logic mới (ViewModel: Turbine; repository: fake, không mock DB).
+3. Báo cáo cuối: file đã đổi, lệnh đã chạy và output thật (không ghi "tests pass" nếu chưa chạy).
+
+## Conventions không suy ra được từ code
+- UI state: `StateFlow<UiState>` với `stateIn(viewModelScope, WhileSubscribed(5_000), initial)`.
+- DI: Koin, module khai báo trong `<module>/di/`. Không dùng Hilt trong commonMain.
+- Room KMP chỉ ở `core:datasource`. Migration bắt buộc khi đổi schema (không dùng destructive ở release).
+- Secrets đi qua BuildKonfig từ `local.properties`; không hard-code.
+- Strings: thêm vào `composeResources/values/strings.xml` và `values-vi/strings.xml` cùng lúc.
+
+## Khi không chắc
+- Hỏi lại thay vì đoán API. Với API Android/Compose mới, đọc docs qua MCP/WebFetch trước khi viết.
+- Thay đổi > 5 file hoặc đổi kiến trúc: dùng plan mode, trình plan trước.

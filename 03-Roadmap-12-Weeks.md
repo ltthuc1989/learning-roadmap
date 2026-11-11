@@ -159,7 +159,7 @@ Quy ước xuyên suốt: DSA theo lịch trong `13`, tiếng Anh theo `23`, dri
 
 ## 9. Tuần 9 (14/12 - 20/12): AI cho mobile lead; Mock 3
 
-**Đọc:** `10` toàn bộ; `18` ôn lại. Chip Huyen ch. 1-6. ML Kit GenAI docs, Firebase AI Logic (hybrid inference), Android Studio Gemini features.
+**Đọc:** `10` mục 1-2 (AI trong sản phẩm; phần workflow đã học ở track AI-SDLC tuần 5-8, xem mục 12b); `18` ôn lại. Chip Huyen ch. 1-6. ML Kit GenAI docs, Firebase AI Logic (hybrid inference), Android Studio Gemini features.
 
 **Bài tập:**
 - Side project: 1 AI feature hybrid (ví dụ tóm tắt/gợi ý trả lời): ML Kit GenAI Prompt API on-device nếu device hỗ trợ, fallback Firebase AI Logic cloud; streaming vào Compose; cancel theo lifecycle; App Check; log cost/latency; 10 test case eval tay.
@@ -230,6 +230,19 @@ Quy ước xuyên suốt: DSA theo lịch trong `13`, tiếng Anh theo `23`, dri
 - [ ] Bảng lương sàn/mục tiêu/trần
 - [ ] Skill matrix lần 3: không ô nào < 2
 - [ ] Kết luận trong `PROGRESS.md`: sẵn sàng onsite
+
+## 12b. Track AI-SDLC song song tuần 5-8 (16/11 - 13/12), 30% thời gian
+
+Bổ sung từ 11/11/2026: AI trong quy trình phát triển phần mềm chiếm 30% thời gian học trong 4 tuần, chạy song song với tuần 5-8 ở trên (khoảng 1 giờ/ngày trong tuần + 1 buổi cuối tuần). Chi tiết từng buổi và 21 bài lab ở `24-AI-SDLC-1-Month.md` mục 11; quy trình của các công ty lớn ở `25-AI-SDLC-Company-Playbooks.md`; đáp án tham khảo ở `ai-sdlc-kit/` (chỉ mở sau khi tự làm lab).
+
+| Tuần | Track chính (70%) | Track AI-SDLC (30%) | Mức AI đạt |
+|---|---|---|---|
+| 5 (16/11) | Network | Nền tảng: agent loop, context file, permissions, verify loop | L2 |
+| 6 (23/11) | Security | Skill, subagent, hook, MCP, worktree; AI qua từng pha SDLC | L3 |
+| 7 (30/11) | System design 1 | Workflow automation: headless, CI, agent loop Kotlin | L4 |
+| 8 (7/12) | System design 2, backend, bắt đầu apply | Đo lường, bảo mật, governance, playbook công ty, đóng gói phỏng vấn | L5 |
+
+Tuần 9 vẫn giữ AI nhưng chuyển trọng tâm sang **AI trong sản phẩm** (`10` mục 2: Gemini Nano, ML Kit GenAI, Firebase AI Logic) và Mock 3, vì phần AI trong quy trình đã xong ở tuần 5-8.
 
 ## 13. Nghi thức review cuối tuần (30 phút, Chủ nhật)
 1. Mở `PROGRESS.md`, tick việc đã xong, ghi điểm mock, ghi 3 điểm yếu.

@@ -1,0 +1,35 @@
+# Gõ "@claude ..." trong issue hoặc review comment để giao việc cho Claude Code.
+# Chỉ người có quyền write trên repo mới kích hoạt được (kiểm tra author_association) để tránh prompt injection từ người ngoài.
+name: Claude on mention
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  claude:
+    if: >-
+      contains(github.event.comment.body, '@claude') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v5
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: '--max-turns 40 --allowedTools "Read,Edit,Write,Glob,Grep,Bash(./gradlew test*),Bash(./gradlew detekt*),Bash(git *)"'

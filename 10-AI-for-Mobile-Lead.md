@@ -865,6 +865,8 @@ Câu chuyện kể trong phỏng vấn (60 giây): bài toán, vì sao hybrid, v
 
 ## 3. AI trong workflow: coding agent cho team mobile
 
+> Mục này là bản tóm tắt. Phần học sâu (cơ chế, cách tự thiết kế skill/hook/subagent, workflow automation, đo lường, bảo mật, quy trình của các công ty lớn, 20 lab, 40 Q&A) nằm ở `24-AI-SDLC-1-Month.md` và `25-AI-SDLC-Company-Playbooks.md`. Facts về Claude Code ở đó mới hơn (kiểm tra 11/11/2026).
+
 Đây là phần JD đòi nhiều nhất (UPLIVE, DatVietVAC, Digital Unicorn, OCB, GoTymeX). Interviewer không hỏi "bạn có dùng AI không"; họ hỏi "quy trình của bạn là gì, bạn bắt lỗi AI thế nào, bạn đo thế nào, junior của bạn còn học được không". Bạn có lợi thế thật: hai repo build bằng Claude Code. Hãy biến nó thành câu chuyện có quy trình.
 
 ### 3.1 Claude Code: những thứ phải biết tên và biết dùng

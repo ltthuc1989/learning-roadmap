@@ -1,0 +1,35 @@
+# Khi push tag v*, Claude soạn release notes (store EN/VI + changelog nội bộ) và tạo GitHub Release dạng draft.
+# Người vẫn duyệt và publish bằng tay: AI soạn, người chịu trách nhiệm.
+name: AI release notes
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Write RELEASE_NOTES.md for tag ${{ github.ref_name }}.
+            Range: previous tag (git describe --tags --abbrev=0 ${{ github.ref_name }}^) to ${{ github.ref_name }}.
+            Sections: "Store notes (en-US)", "Store notes (vi-VN)" (each at most 500 characters, user benefit wording),
+            "Changelog" (all commits grouped by Conventional Commit type, with short hashes),
+            "Risk / needs QA" (billing, auth, migrations, analytics).
+            Only use facts from git log. Do not invent features.
+          claude_args: '--max-turns 12 --allowedTools "Bash(git log*),Bash(git describe*),Bash(git tag*),Read,Write"'
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s RELEASE_NOTES.md
+          gh release create "${{ github.ref_name }}" --draft --title "${{ github.ref_name }}" --notes-file RELEASE_NOTES.md

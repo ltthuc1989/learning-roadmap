@@ -1,0 +1,58 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew test*)",
+      "Bash(./gradlew :*:testDebugUnitTest*)",
+      "Bash(./gradlew detekt*)",
+      "Bash(./gradlew :composeApp:assembleDebug*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(gh pr view*)",
+      "Bash(gh issue view*)"
+    ],
+    "ask": [
+      "Bash(git push*)",
+      "Bash(git commit*)",
+      "Bash(./gradlew publish*)",
+      "Bash(gh pr create*)"
+    ],
+    "deny": [
+      "Read(./local.properties)",
+      "Read(./**/*.jks)",
+      "Read(./**/*.keystore)",
+      "Read(./**/google-services.json)",
+      "Read(./**/GoogleService-Info.plist)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Bash(rm -rf*)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/block_secrets.py\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/format_kotlin.py\"", "timeout": 60 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/log_session.py\"" }
+        ]
+      }
+    ]
+  }
+}

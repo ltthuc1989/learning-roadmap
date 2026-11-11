@@ -47,6 +47,9 @@
 | `21-UI-UX-Design-Adaptive.md` | Material 3, design tokens và design system, Figma, adaptive/foldable/large screen, accessibility, i18n, UX cho engineer | Tuần 2, 8, 10 | dài |
 | `22-Product-Metrics-Compliance.md` | Android vitals, analytics, A/B, GDPR/Nghị định 13/Play Data safety/COPPA/PCI, licensing, cost, docs/ADR/RFC, ASO | Tuần 11 | trung |
 | `23-English-for-Tech-Interviews.md` | 3 cấu trúc trả lời, 150 cụm từ theo vòng, 60 từ hay phát âm sai, luyện với AI voice, rubric | Tuần 1 trở đi | trung |
+| `24-AI-SDLC-1-Month.md` | Lộ trình 1 tháng AI trong quy trình phát triển: cách học AI, agent loop, context engineering, permissions/hooks, skill/subagent/MCP, AI qua từng pha SDLC, workflow automation, đo lường, bảo mật, 21 lab, 40 Q&A | Tuần 5-8 (30% thời gian) | dài |
+| `25-AI-SDLC-Company-Playbooks.md` | Quy trình AI-SDLC của Google, Amazon, GitHub, Meta, Uber, Airbnb, Spotify, Stripe, Grab...; sự cố công khai; quy trình chuẩn 7 pha; áp dụng theo quy mô; rollout 30 ngày | Tuần 8 | trung |
+| `ai-sdlc-kit/` | Đáp án tham khảo cho các lab: AGENTS.md/CLAUDE.md, settings + hooks, 3 subagent, 5 skill, 3 GitHub Actions, 2 script headless, agent loop Kotlin; README giải thích vì sao từng file được thiết kế như vậy | Sau khi tự làm lab | |
 | `PROGRESS.md` | Nhật ký tuần, câu hỏi thật gặp khi phỏng vấn | Mỗi tuần | |
 | `tools/make_anki.py` | Sinh thẻ Anki từ mọi Q&A | Chủ nhật | |
 | `samples/review-exercise/` | Project Kotlin có 28 lỗi cố ý để luyện vòng "review & refactor" (đáp án trong `ANSWERS.md`) | Tuần 12 | |

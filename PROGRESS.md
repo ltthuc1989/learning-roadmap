@@ -50,6 +50,15 @@ Trọng tâm: CI/CD (`20` phần B) + Performance + Build/R8 + Android 16/17; Mo
 Điểm yếu phát hiện: 
 Việc chuyển sang tuần sau: 
 
+## Track AI-SDLC (tuần 5-8, 30% thời gian, chi tiết ở `24`)
+Tự chấm thang L0-L5 (`24` mục 0.1): đầu tháng ___ / cuối tháng ___
+- [ ] Tuần 5 (L2): Lab 1.1 context file, 1.2 permissions, 1.3 năm task có đo, 1.4 thí nghiệm context
+- [ ] Tuần 6 (L3): Lab 2.1-2.2 ba skill tự viết, 2.3 hai subagent + thí nghiệm 3 bug cấy, 2.4 hai hook, 2.5 MCP + worktree, 2.6 quy trình 8 bước, 2.7 so 2 công cụ
+- [ ] Tuần 7 (L4): Lab 3.1 script headless, 3.2 AI PR review, 3.3 @claude, 3.4 agent loop Kotlin tự viết, 3.5 caching/routing, 3.6 release notes workflow
+- [ ] Tuần 8 (L5): Lab 4.1 bảng số đo + thí nghiệm 6 task, 4.2 threat model, 4.3 policy + rollout 30 ngày, 4.4 demo 2 phút + bài viết
+- [ ] Learning log (`docs/ai-learning-log.md` trong repo) có ≥ 15 entry
+Số đo cuối tháng: rework rate ___ → ___ ; số vòng sửa trung bình ___ → ___ ; chi phí/tuần ___
+
 ## Tuần 5 (16/11 - 22/11)
 Trọng tâm: Network (`07`)
 - [ ] 

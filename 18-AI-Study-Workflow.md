@@ -2,6 +2,8 @@
 
 > Vấn đề: code của bạn được Claude Code viết, nên trong phỏng vấn bạn phải chứng minh mình hiểu nó hơn cả AI. Giải pháp: đảo vai. AI hỏi, bạn trả lời, AI chấm. Mọi prompt dưới đây dán thẳng vào Claude Code (mở trong thư mục repo tương ứng). Quy trình này cũng chính là câu chuyện "AI-SDLC" để kể ở vòng leadership.
 
+> Liên quan: cách học AI hiệu quả và lộ trình đi sâu ở `24-AI-SDLC-1-Month.md` mục 1.
+
 ## 1. Ba quy tắc
 
 1. **AI-off khi trả lời.** Lúc trả lời câu hỏi, đóng mọi AI. Chỉ mở lại để chấm.
