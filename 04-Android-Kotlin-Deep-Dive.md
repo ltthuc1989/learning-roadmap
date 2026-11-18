@@ -59,7 +59,7 @@ Interviewer hỏi gì ở mảng này (tổng hợp từ pattern Grab/Agoda/bank
 
 ## 1. Kotlin 2.4
 
-Trạng thái: Kotlin 2.4.21 (8/10/2026). 2.4.0 (3/6/2026) đưa context parameters, explicit backing fields và UUID API lên stable. 2.4.20 thêm coroutine stack-trace recovery và tự sinh `Package.swift`. K2 là compiler mặc định từ 2.0. Repo `kmp-template-impl` của bạn đang ở Kotlin 2.3.10 và đã bật `-Xexplicit-backing-fields` trong `build-logic/src/main/kotlin/primitive/KmpCommonPlugin.kt`; khi lên 2.4 flag này không còn cần nữa.
+Trạng thái: Kotlin 2.4.21 (8/10/2026). 2.4.0 (3/6/2026) đưa context parameters, explicit backing fields và UUID API lên stable. 2.4.20 (7/9/2026) thêm interface `StackTraceRecoverable` trong stdlib cho coroutine stack-trace recovery (xem đầu phần 2) và task `assembleSharedXCFramework` tự sinh `Package.swift` (https://kotlinlang.org/docs/whatsnew2420.html). K2 là compiler mặc định từ 2.0. Repo `kmp-template-impl` của bạn đang ở Kotlin 2.3.10 và đã bật `-Xexplicit-backing-fields` trong `build-logic/src/main/kotlin/primitive/KmpCommonPlugin.kt`; khi lên 2.4 flag này không còn cần nữa.
 
 ### 1.1 K2 compiler: cái gì đổi và vì sao bạn phải biết
 
@@ -67,18 +67,18 @@ K2 thay frontend cũ (PSI-based, lớn dần suốt 10 năm) bằng FIR (Fronten
 - Compile nhanh hơn. JetBrains công bố số liệu theo từng project, không có con số chung; với project của bạn hãy đo bằng Gradle build scan trước và sau khi lên K2 rồi dùng số đó khi phỏng vấn.
 - Smart cast thông minh hơn: smart cast qua biến local `val`, qua `||`, qua inline lambda, qua `when` subject phức tạp.
 - Compose compiler plugin được gộp vào repo Kotlin từ 2.0 (`org.jetbrains.kotlin.plugin.compose`), hết cảnh chờ "compose compiler tương thích với Kotlin x.y".
-- kapt chạy ở chế độ K1 fallback cho tới khi bạn chuyển sang KSP; đây là lý do kỹ thuật nữa để bỏ kapt (xem 5.6).
+- kapt: từ Kotlin 2.1.20, bản kapt chạy trên K2 là mặc định cho mọi project (trước đó là opt-in từ 1.9.20; tắt tạm bằng `kapt.use.k2=false` trong `gradle.properties`). Nhưng kapt đang ở maintenance mode và vẫn phải sinh Java stub, nên lý do bỏ kapt sang KSP là tốc độ và Room 3 bắt buộc KSP (xem 5.6). Nguồn: https://kotlinlang.org/docs/whatsnew2120.html#new-default-kapt-plugin (kiểm tra 18/11/2026).
 - IDE: Android Studio dùng K2 mode cho analysis, nên cảm nhận "IDE nhanh hơn" là thật nhưng khó dẫn số.
 
 Những gì interviewer có thể hỏi tiếp: "K2 phá gì ở project cũ?" Trả lời thật: một số code dựa vào bug resolve cũ bị báo lỗi, một số thư viện annotation processor cần bản mới, và compiler plugin tự viết phải port sang FIR API.
 
 **Lỗi hay gặp / trade-off**
 - Nâng Kotlin mà không nâng KSP đúng cặp version; KSP 2.x gắn với Kotlin version (repo bạn: `ksp = "2.3.4"` đi với `kotlin = "2.3.10"`).
-- Giữ `kotlin-android` plugin cũ khi AGP 9 đã có built-in Kotlin (xem 8.1), dẫn tới cảnh báo hoặc conflict.
+- Giữ `kotlin-android` plugin cũ khi AGP 9 đã bật built-in Kotlin (xem 8.1): build fail với `Cannot add extension with name 'kotlin', as there is an extension already registered with that name`.
 
 **Đọc thêm:**
 - https://kotlinlang.org/docs/k2-compiler-migration-guide.html
-- https://blog.jetbrains.com/kotlin/
+- https://blog.jetbrains.com/kotlin/2024/05/celebrating-kotlin-2-0-fast-smart-and-multiplatform/ (bài công bố Kotlin 2.0 / K2 stable)
 - https://kotlinlang.org/docs/whatsnew24.html
 
 ### 1.2 Context parameters
@@ -169,7 +169,7 @@ Giá trị thật trong app tài chính: `transfer(from: AccountId, to: AccountI
 
 **Lỗi hay gặp / trade-off**
 - Dùng với Gson/Moshi reflection: serializer thấy class wrapper hoặc underlying tuỳ thư viện; kotlinx.serialization hỗ trợ value class đúng. Nếu dùng Retrofit + Gson ở project cũ, viết TypeAdapter hoặc tránh value class ở DTO.
-- Room 2.x không hỗ trợ value class làm column trực tiếp (cần `TypeConverter`); với Room 3 cần kiểm tra tại https://developer.android.com/jetpack/androidx/releases/room.
+- Room: từ 2.6.0 (alpha01, 3/2023) value class trong `@Entity` được hỗ trợ khi dùng KSP với Kotlin codegen (`room.generateKotlin`, mặc định từ 2.7.0); với kapt thì không, vì trong Java stub và bytecode value class đã bị thay bằng kiểu underlying, phải dùng `TypeConverter`. Room 3 chỉ có KSP nên hỗ trợ sẵn. Nguồn: https://developer.android.com/jetpack/androidx/releases/room#2.6.0-alpha01 (kiểm tra 18/11/2026).
 - `==` so sánh underlying; `===` trên value class là lỗi compile ở nhiều ngữ cảnh.
 
 **Đọc thêm:**
@@ -363,7 +363,7 @@ Cách khoá biên:
 
 Annotation Kotlin cho Java caller: `@JvmStatic` (companion thành static), `@JvmField` (bỏ getter/setter), `@JvmOverloads` (sinh overload cho default args), `@JvmName` (đổi tên hoặc gỡ clash do erasure), `@Throws` (checked exception cho Java), `fun interface` (SAM conversion cho interface Kotlin). Kotlin gọi Java SAM tự động; Java gọi Kotlin lambda phải qua `Function1`.
 
-Suspend function từ Java: signature có thêm `Continuation` cuối cùng; thực tế Java không gọi trực tiếp, bạn cung cấp wrapper `fun fooAsync(): CompletableFuture` qua `kotlinx-coroutines-jdk8` hoặc callback.
+Suspend function từ Java: signature có thêm `Continuation` cuối cùng; thực tế Java không gọi trực tiếp, bạn cung cấp wrapper `fun fooAsync(): CompletableFuture<T> = scope.future { foo() }` (builder `future` nằm trong `kotlinx-coroutines-core` từ 1.7.0, khi artifact `kotlinx-coroutines-jdk8` được gộp vào core; nguồn: https://github.com/Kotlin/kotlinx.coroutines/blob/master/CHANGES.md mục Version 1.7.0) hoặc callback.
 
 **Lỗi hay gặp / trade-off**
 - `lateinit` để né null check rồi crash `UninitializedPropertyAccessException`; dùng `lateinit` chỉ khi lifecycle đảm bảo (Hilt field injection, test setup).
@@ -376,7 +376,7 @@ Suspend function từ Java: signature có thêm `Continuation` cuối cùng; th�
 
 ## 2. Coroutines & Flow internals
 
-Trạng thái: kotlinx.coroutines 1.11.0 (repo bạn cũng ở 1.11.0). Kotlin 2.4.20 thêm coroutine stack-trace recovery ở compiler level; trước đó stack trace recovery chỉ ở debug mode của thư viện (`-ea` hoặc `kotlinx.coroutines.debug`). Chi tiết cần kiểm tra tại https://kotlinlang.org/docs/whatsnew24.html.
+Trạng thái: kotlinx.coroutines 1.11.0 (repo bạn cũng ở 1.11.0). Stack-trace recovery vẫn là tính năng của thư viện kotlinx.coroutines trên JVM, bật khi ở debug mode (`-ea` hoặc system property `kotlinx.coroutines.debug`): thư viện tạo bản sao exception có thêm frame coroutine khi exception bị rethrow ở coroutine khác. Kotlin 2.4.20 (7/9/2026) thêm interface `kotlin.coroutines.debug.StackTraceRecoverable` vào stdlib (Experimental, opt-in `@OptIn(ExperimentalStdlibCoroutineSupportApi::class)`): exception có constructor đặc biệt (thêm `line`, `errorCode`...) override `copyForStackTraceRecovery()` để thư viện copy đúng; exception chỉ có constructor `(message)`, `(cause)`, `(message, cause)` hoặc rỗng thì được copy tự động. Nguồn: https://kotlinlang.org/docs/whatsnew2420.html#support-for-coroutine-stack-trace-recovery và https://kotlinlang.org/docs/coroutines-debugging.html#stack-trace-recovery (kiểm tra 18/11/2026).
 
 ### 2.1 Suspend machinery: continuation và state machine
 
@@ -546,7 +546,7 @@ Quy tắc:
 - `finally` chạy khi huỷ; trong `finally` không được suspend trừ khi bọc `NonCancellable`.
 - `yield()` vừa kiểm tra huỷ vừa nhường thread; `ensureActive()` chỉ kiểm tra; `isActive` để tự quyết định cleanup.
 - Timeout: `withTimeout` ném `TimeoutCancellationException` (là CancellationException con), `withTimeoutOrNull` trả null.
-- Kotlin 2.4.20 coroutine stack-trace recovery giúp stack trace của exception đi qua suspension point đầy đủ hơn; trước đó phải bật debug agent.
+- Stack-trace recovery (debug mode của kotlinx.coroutines trên JVM) giúp stack trace của exception bị rethrow qua coroutine khác đầy đủ hơn; Kotlin 2.4.20 thêm `StackTraceRecoverable` để exception có constructor tuỳ biến cũng được copy đúng (xem đầu phần 2).
 
 **Đọc thêm:**
 - https://kotlinlang.org/docs/cancellation-and-timeouts.html
@@ -633,6 +633,32 @@ fun ConnectivityManager.isOnline(): Flow<Boolean> = callbackFlow {
 
 `buffer(capacity, onBufferOverflow)`, `conflate()` (= `buffer(CONFLATED)`), `collectLatest` là ba công cụ xử lý consumer chậm. `StateFlow` tự conflate nên `collect` trên StateFlow có thể bỏ qua giá trị trung gian: đừng dùng StateFlow để đếm sự kiện.
 
+Theo API docs, `MutableStateFlow(initial)` hành xử y hệt một SharedFlow cấu hình như sau rồi áp `distinctUntilChanged()`; đây là cách nhanh nhất để giải thích khác biệt khi phỏng vấn:
+
+```kotlin
+// kotlinx.coroutines 1.11: chữ ký mặc định
+// fun <T> MutableSharedFlow(replay: Int = 0, extraBufferCapacity: Int = 0,
+//                           onBufferOverflow: BufferOverflow = BufferOverflow.SUSPEND)
+val shared = MutableSharedFlow<UiState>(
+    replay = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST,
+)
+shared.tryEmit(UiState())                       // giá trị ban đầu
+val stateLike = shared.distinctUntilChanged()   // = hành vi StateFlow
+
+// tryEmit trên MutableSharedFlow() mặc định (không buffer): trả true chỉ khi KHÔNG có
+// subscriber (giá trị mất ngay), có subscriber thì trả false. Muốn tryEmit giao được giá trị,
+// cần extraBufferCapacity > 0 hoặc onBufferOverflow = DROP_*.
+```
+
+`onBufferOverflow` chỉ có tác dụng khi có buffer (`replay + extraBufferCapacity > 0`); `DROP_OLDEST`/`DROP_LATEST` biến `emit` thành không bao giờ suspend.
+
+**Đọc thêm (kiểm tra 18/11/2026):**
+- https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-mutable-shared-flow.html (chữ ký và giá trị mặc định)
+- https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-shared-flow/ (mục "Replay cache and buffer", "Concurrency")
+- https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-state-flow/ (mục "StateFlow vs SharedFlow", equality-based conflation)
+- https://developer.android.com/kotlin/flow/stateflow-and-sharedflow
+
 ### 2.8 stateIn / shareIn và WhileSubscribed(5000)
 
 Đây là đoạn trong `feature/home/.../HomeViewModel.kt` của bạn:
@@ -659,7 +685,7 @@ Bạn phải giải thích được:
 - Phía UI dùng `collectAsStateWithLifecycle()` (dừng collect ở STOPPED), nên "subscriber rời" đúng nghĩa khi app vào background.
 - `Eagerly` chạy ngay khi ViewModel tạo, không dừng; `Lazily` chạy khi có subscriber đầu và không dừng. Cả hai dùng khi upstream rẻ và cần giữ giá trị.
 - `initialValue` là thứ UI thấy trước khi upstream phát; `Loading()` hợp lý. Nếu upstream là Room và bạn không muốn nháy Loading khi quay lại màn hình, giá trị cuối vẫn còn trong StateFlow trong 5 giây, sau đó sẽ lại thấy giá trị cũ cho tới khi query xong (không về Loading).
-- `.catch` đặt trước `stateIn` để lỗi biến thành state, nếu không exception sẽ huỷ `viewModelScope` chia sẻ. Lưu ý: sau `catch` emit `Error`, flow kết thúc; muốn retry phải có trigger mới (ví dụ `retryWhen` hoặc `flatMapLatest` từ một `MutableStateFlow` refresh).
+- `.catch` đặt trước `stateIn` để lỗi biến thành state. Nếu thiếu, exception làm chết coroutine chia sẻ mà `stateIn` launch trong `viewModelScope`: vì `viewModelScope` là `SupervisorJob() + Dispatchers.Main.immediate`, scope không bị huỷ, nhưng exception không có ai bắt nên đi tới uncaught exception handler của main thread, tức là app crash; StateFlow kẹt ở giá trị cuối. Lưu ý: sau `catch` emit `Error`, flow kết thúc; muốn retry phải có trigger mới (ví dụ `retryWhen` hoặc `flatMapLatest` từ một `MutableStateFlow` refresh).
 
 `shareIn` là bản SharedFlow (không có `value`, có `replay`). Dùng khi nguồn là event (location updates) chứ không phải state.
 
@@ -736,7 +762,7 @@ fun LoginScreen(viewModel: LoginViewModel, onLoggedIn: () -> Unit) {
 7. `MutableStateFlow<List<T>>` rồi `list.add()` (mutable list cùng instance): StateFlow không phát vì `equals` bằng nhau. Sửa: `update { it + item }` với list bất biến.
 8. Truyền `Dispatchers.Main` cứng vào class dùng trong unit test: inject dispatcher qua constructor (`AppDispatchers`) để test thay bằng `StandardTestDispatcher` (xem `19-Testing-Deep-Dive.md`).
 9. `SharedFlow` cho navigation event: mất event khi rotate.
-10. `launch` trong `init` của ViewModel gọi API không có `catch`: exception huỷ `viewModelScope`; mọi `launch` sau đó bị bỏ qua im lặng vì scope đã cancel.
+10. `launch` trong `init` của ViewModel gọi API không có `catch`: `viewModelScope` dùng `SupervisorJob` nên lỗi của một con không huỷ scope hay các `launch` khác, nhưng exception là uncaught, đi tới `Thread.uncaughtExceptionHandler` của main thread, tức là app crash (không có `CoroutineExceptionHandler` mặc định). Sửa: bắt lỗi cụ thể trong coroutine và chuyển thành state, hoặc inject scope có handler để log non-fatal. Nguồn: https://kotlinlang.org/docs/exception-handling.html#supervision-job và tài liệu `viewModelScope` tại https://developer.android.com/reference/kotlin/androidx/lifecycle/package-summary (kiểm tra 18/11/2026).
 
 **Đọc thêm:**
 - https://developer.android.com/kotlin/coroutines/coroutines-best-practices
@@ -789,8 +815,11 @@ object DatabaseHolder {
 
 Double-checked locking cần `@Volatile`, nếu không thread khác có thể thấy reference non-null trỏ tới object chưa khởi tạo xong (reorder). `by lazy` làm đúng việc này, nên trong code mới hãy dùng `lazy`.
 
-**Đọc thêm:**
-- https://kotlinlang.org/docs/native-concurrency.html (phần cho KMP)
+Với KMP: memory manager hiện tại của Kotlin/Native giống JVM ở điểm "object nằm trong shared heap, truy cập được từ mọi thread" và dùng tracing GC; model cũ (freeze, `@SharedImmutable`, `InvalidMutabilityException`) đã bỏ. Nghĩa là trên iOS bạn cũng có data race như JVM và cũng phải dùng `@Volatile` (`kotlin.concurrent.Volatile`), atomicfu hoặc `Mutex`.
+
+**Đọc thêm (kiểm tra 18/11/2026):**
+- https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5 (JLS §17.4.5 Happens-before Order: unlock trước lock sau, volatile write trước read sau, `Thread.start()`, `join()`)
+- https://kotlinlang.org/docs/native-memory-manager.html (Kotlin/Native memory manager: shared heap, GC)
 - Java Concurrency in Practice (Goetz), chương 2-3 và 16 (JMM)
 
 ### 3.3 RxJava (legacy ở app bank) và Flow
@@ -895,7 +924,7 @@ composeCompiler {
 }
 ```
 
-Tên option `stabilityConfigurationFiles` (số nhiều) có từ Kotlin 2.0.20; bản cũ là `stabilityConfigurationFile`. Cần kiểm tra tại https://developer.android.com/develop/ui/compose/compiler.
+API reference của Compose compiler Gradle plugin hiện có cả `stabilityConfigurationFile: RegularFileProperty` (một file, dạng cũ) và `stabilityConfigurationFiles: ListProperty<RegularFile>` (nhiều file); docs Android dùng dạng số nhiều: `stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("stability_config.conf"))`. Version Kotlin đầu tiên có dạng số nhiều thì chưa tìm được nguồn chính thức, đừng nêu con số khi phỏng vấn. Nguồn: https://developer.android.com/develop/ui/compose/compiler và https://kotlinlang.org/api/kotlin-gradle-plugin/compose-compiler-gradle-plugin/org.jetbrains.kotlin.compose.compiler.gradle/-compose-compiler-gradle-plugin-extension/ (kiểm tra 18/11/2026).
 
 **Lỗi hay gặp / trade-off**
 - Đánh `@Stable` lên class có `var` không phải `MutableState`: Compose bỏ qua thay đổi, UI không cập nhật. Đây là bug khó debug nhất của Compose.
@@ -985,9 +1014,32 @@ Hệ quả thực tế:
 - `snapshotFlow` hoạt động bằng cách ghi lại state đọc trong lambda và nghe apply notification.
 - Đây cũng là cơ chế `derivedStateOf` và read tracking của recomposition.
 
-**Đọc thêm:**
-- Jetpack Compose Internals, chương "State snapshot system"
-- https://developer.android.com/develop/ui/compose/state#state-in-compose (phần snapshot)
+Ghi nhiều state "atomic" từ background thread bằng `Snapshot.withMutableSnapshot` (compose-runtime, có từ 1.0.0):
+
+```kotlin
+class ProfileHolder {
+    val name = mutableStateOf("")
+    val age = mutableIntStateOf(0)
+
+    suspend fun load(api: ProfileApi) {
+        val p = withContext(Dispatchers.IO) { api.fetch() }   // suspend NGOÀI block
+        Snapshot.withMutableSnapshot {
+            // Trước khi block return, thread khác chưa thấy hai giá trị mới
+            name.value = p.name
+            age.intValue = p.age
+        } // apply() ở đây: observer (snapshotFlow, recomposition) thấy cả hai cùng lúc;
+          // nếu không merge được thì ném SnapshotApplyConflictException
+    }
+}
+```
+
+Theo API reference: block không được suspend khi gọi từ suspend function, và thay đổi chỉ hiện ra cho thread khác sau khi `withMutableSnapshot` return thành công.
+
+**Đọc thêm (kiểm tra 18/11/2026):**
+- https://developer.android.com/reference/kotlin/androidx/compose/runtime/snapshots/Snapshot (API `Snapshot`: `takeMutableSnapshot`, `withMutableSnapshot`, `sendApplyNotifications`)
+- https://blog.zachklipp.com/introduction-to-the-compose-snapshot-system/ (Zach Klippenstein, người làm Compose runtime ở Google: giải thích MVCC của snapshot)
+- Jetpack Compose Internals (Jorge Castillo), chương "State snapshot system"
+- https://developer.android.com/develop/ui/compose/state#state-in-compose
 
 ### 4.6 Ba phase và việc trì hoãn đọc state
 
@@ -1080,15 +1132,15 @@ LazyColumn(state = listState) {
 
 ### 4.10 Compose First và thái độ của lead
 
-Từ 19/5/2026 Google tuyên bố Views, Fragments, RecyclerView, ViewPager vào maintenance mode: vẫn được sửa bug, không có tính năng mới. Điều này thay đổi cách bạn trả lời câu "có nên migrate XML sang Compose": câu trả lời không còn là "tuỳ", mà là "có lộ trình, ưu tiên màn hình mới và màn hình thay đổi nhiều, giữ XML cho màn hình ổn định cho tới khi có lý do chạm vào". Chi tiết plan ở mục 11.
+Ngày 19/5/2026, bài "Android UI Development is Compose First" trên Android Developers Blog tuyên bố: các View component mà Compose thay thế (package `android.widget`) vào maintenance mode, không deprecate, không gỡ, vẫn sửa bug nghiêm trọng nhưng không có tính năng mới; các thư viện Jetpack dựa trên View như Fragments, RecyclerView, ViewPager được coi là "complete", chỉ nhận bản sửa lỗi nghiêm trọng; tool mới của Android Studio (Layout Editor, Navigation Editor cũ vào maintenance) chỉ làm cho Compose (kiểm tra 18/11/2026). Điều này thay đổi cách bạn trả lời câu "có nên migrate XML sang Compose": câu trả lời không còn là "tuỳ", mà là "có lộ trình, ưu tiên màn hình mới và màn hình thay đổi nhiều, giữ XML cho màn hình ổn định cho tới khi có lý do chạm vào". Chi tiết plan ở mục 11.
 
 **Đọc thêm:**
-- https://android-developers.googleblog.com (bài "Compose First", 5/2026)
+- https://android-developers.googleblog.com/2026/05/android-ui-development-is-compose-first.html
 - https://developer.android.com/develop/ui/compose/migrate
 
 ### 4.11 Navigation 3
 
-Navigation 3 (stable 19/11/2025, có bản Compose Multiplatform) đảo ngược mô hình Navigation 2: bạn sở hữu back stack (một `List<NavKey>` dạng snapshot state), `NavDisplay` chỉ render. Không còn `NavController`, `NavGraph`, route string.
+Navigation 3 (1.0.0 stable 19/11/2025, bản stable mới nhất 1.2.1 ngày 4/11/2026, có bản Compose Multiplatform) đảo ngược mô hình Navigation 2: bạn sở hữu back stack (một `List<NavKey>` dạng snapshot state), `NavDisplay` chỉ render. Không còn `NavController`, `NavGraph`, route string.
 
 ```kotlin
 @Serializable
@@ -1104,8 +1156,8 @@ fun AppNav() {
         backStack = backStack,
         onBack = { backStack.removeLastOrNull() },
         entryDecorators = listOf(
-            rememberSavedStateNavEntryDecorator(),
-            rememberViewModelStoreNavEntryDecorator(),
+            rememberSaveableStateHolderNavEntryDecorator(), // tên từ 1.0.0-alpha11
+            rememberViewModelStoreNavEntryDecorator(),      // lifecycle-viewmodel-navigation3
         ),
         entryProvider = entryProvider {
             entry<Destination.Home> {
@@ -1117,11 +1169,11 @@ fun AppNav() {
 }
 ```
 
-Trong `kmp-template-impl`, `composeApp/.../AppNavHost.kt` làm đúng mô hình này: `rememberNavBackStack(Destination.config, *startDestinations.toTypedArray())`, bọc back stack bằng `rememberSilencingNavBackStack` (dừng audio ngay khi pop), `entryProvider { homeEntry(); paywallEntry(); ... }` với mỗi feature expose một extension `EntryProviderScope<NavKey>.homeEntry()` trong `HomeNavigation.kt`. Tên `EntryProviderScope` là theo version alpha của CMP mà repo dùng; tên và tham số `entryDecorators` cần kiểm tra theo version tại https://developer.android.com/guide/navigation/navigation-3.
+Trong `kmp-template-impl`, `composeApp/.../AppNavHost.kt` làm đúng mô hình này: `rememberNavBackStack(Destination.config, *startDestinations.toTypedArray())`, bọc back stack bằng `rememberSilencingNavBackStack` (dừng audio ngay khi pop), `entryProvider { homeEntry(); paywallEntry(); ... }` với mỗi feature expose một extension `EntryProviderScope<NavKey>.homeEntry()` trong `HomeNavigation.kt`. Tên API đã đổi trong giai đoạn alpha, nên đọc code cũ phải biết: 1.0.0-alpha11 (8/10/2025) đổi `EntryProviderBuilder` thành `EntryProviderScope` và `SavedStateNavEntryDecorator` thành `SaveableStateHolderNavEntryDecorator` (hàm `rememberSaveableStateHolderNavEntryDecorator()`); 1.2.0 cho `NavDisplay` nhận `List<SceneStrategy>` thay cho một strategy nối bằng `then`. Nguồn: https://developer.android.com/jetpack/androidx/releases/navigation3 và https://developer.android.com/guide/navigation/navigation-3/save-state#scoping-viewmodels (kiểm tra 18/11/2026).
 
 Điểm interviewer đào:
 - Scenes API: `SceneStrategy` quyết định nhiều entry hiển thị cùng lúc (list-detail trên tablet, dialog). Đây là cách Nav3 giải quyết adaptive layout mà Nav2 không làm được; chi tiết adaptive ở `21-UI-UX-Design-Adaptive.md`.
-- ViewModel scope theo entry: `rememberViewModelStoreNavEntryDecorator` cho mỗi entry một `ViewModelStore`, huỷ khi entry rời back stack. Không có decorator này, `viewModel()` trong entry sẽ gắn vào Activity.
+- ViewModel scope theo entry: `rememberViewModelStoreNavEntryDecorator` (artifact `androidx.lifecycle:lifecycle-viewmodel-navigation3`, đặt sau `rememberSaveableStateHolderNavEntryDecorator()` trong list) cho mỗi entry một `ViewModelStore`, huỷ khi entry rời back stack. Không có decorator này, `viewModel()` trong entry sẽ gắn vào Activity.
 - Saved state: `NavKey` phải `@Serializable` để back stack sống qua process death.
 - Multi-module: mỗi feature định nghĩa `NavKey` của mình trong module `api` hoặc trong `core:ui` (repo bạn chọn `core/ui/screen/Destination`), app module ghép entryProvider. Trade-off: mọi feature phụ thuộc `core:ui` để biết key của nhau; cách khác là mỗi feature có module `:feature:x:api` chỉ chứa key (xem 5.4).
 - Predictive back: `NavDisplay` hỗ trợ `predictivePopTransitionSpec`; repo bạn có cấu hình này. Android 16 bật predictive back mặc định (mục 9).
@@ -1230,11 +1282,36 @@ Quy tắc dependency graph:
 - Core module thấp (`model`, `common`) không phụ thuộc Android framework nếu có thể, để test JVM nhanh và dùng được cho iOS.
 - Mọi module Compose phụ thuộc `core:ui` cho theme; `core:ui` không biết nghiệp vụ.
 
-Kiểm tra bằng Gradle: task `:feature:home:dependencies --configuration commonMainImplementation` (tên configuration tuỳ KMP); hoặc dùng plugin kiểm tra graph trong CI (ví dụ `dependency-analysis-gradle-plugin` của autonomousapps). Nếu dùng, cần kiểm tra tên plugin tại https://github.com/autonomousapps/dependency-analysis-gradle-plugin.
+Kiểm tra bằng Gradle: task `:feature:home:dependencies --configuration commonMainImplementation` (tên configuration tuỳ KMP); hoặc dùng plugin kiểm tra graph trong CI: Dependency Analysis Gradle Plugin của autonomousapps (plugin id `com.autonomousapps.dependency-analysis`, apply ở root, chạy `./gradlew buildHealth` để báo dependency thừa, thiếu, hoặc khai `implementation` mà đáng ra là `api`). Nguồn: https://github.com/autonomousapps/dependency-analysis-gradle-plugin và https://plugins.gradle.org/plugin/com.autonomousapps.dependency-analysis.
+
+Guide chính thức của Google chia module theo loại: data module, feature module, app module, common (core) module, test module; nguyên tắc "high cohesion, low coupling", và mục best practices nói rõ: cấu hình nhất quán (convention plugin), "expose as little as possible" (`internal`, `implementation` thay vì `api`), ưu tiên module Kotlin/Java thuần khi không cần Android. Nguồn (kiểm tra 18/11/2026):
+- https://developer.android.com/topic/modularization
+- https://developer.android.com/topic/modularization/patterns#types-of-modules
+- https://developer.android.com/topic/modularization/patterns#best-practices
 
 ### 5.4 api / impl split
 
-Khi feature A cần gọi feature B (ví dụ `feature:billing` cần biết user đã onboarding), tách `:feature:b:api` (interface + model + NavKey) và `:feature:b:impl`. A phụ thuộc `b:api`; app phụ thuộc `b:impl` và bind qua DI. Lợi: đổi impl của B không rebuild A (compile avoidance thật sự vì ABI của api không đổi). Chi phí: gấp đôi số module, cần kỷ luật đặt code đúng chỗ. Ngưỡng hợp lý: làm khi feature có hơn một consumer hoặc build time module đó đáng kể; app một người như template của bạn thì chưa cần, nhưng phải nói được điều kiện.
+Khi feature A cần gọi feature B (ví dụ `feature:billing` cần biết user đã onboarding), tách `:feature:b:api` (interface + model + NavKey) và `:feature:b:impl`. A phụ thuộc `b:api`; app phụ thuộc `b:impl` và bind qua DI. Lợi: đổi impl của B không rebuild A (compile avoidance thật sự vì ABI của api không đổi). Chi phí: gấp đôi số module, cần kỷ luật đặt code đúng chỗ. Ngưỡng hợp lý: làm khi feature có hơn một consumer hoặc build time module đó đáng kể; app một người như template của bạn thì chưa cần, nhưng phải nói được điều kiện. Google gọi đây là dependency inversion giữa module và liệt kê đúng các trường hợp nên tách: nhiều implementation (ví dụ billing Play và billing nội bộ), nhiều app dùng chung capability, nhiều team độc lập, codebase lớn: https://developer.android.com/topic/modularization/patterns#when_to_separate (kiểm tra 18/11/2026).
+
+```kotlin
+// feature/onboarding/api/build.gradle.kts: chỉ interface, model, NavKey
+plugins { id("kmp.library") }   // convention plugin trong build-logic, id tuỳ repo
+dependencies { implementation(projects.core.model) }
+
+// feature/onboarding/impl/build.gradle.kts
+dependencies {
+    api(projects.feature.onboarding.api)       // consumer của impl thấy luôn api
+    implementation(projects.core.datasource)   // chi tiết, không lộ ra ngoài
+}
+
+// feature/billing/build.gradle.kts: chỉ biết hợp đồng
+dependencies { implementation(projects.feature.onboarding.api) }
+
+// app/build.gradle.kts: nơi duy nhất thấy impl, bind interface -> impl trong DI
+dependencies { implementation(projects.feature.onboarding.impl) }
+```
+
+Dùng `implementation` cho mọi thứ trừ khi kiểu của dependency xuất hiện trong public API của module (lúc đó mới `api`): `implementation` giữ dependency khỏi compile classpath của consumer, nên đổi nó không làm consumer recompile. Nguồn: https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_separation
 
 ### 5.5 Convention plugins trong build-logic
 
@@ -1273,7 +1350,7 @@ Những gì có tác dụng, theo thứ tự đo được:
 2. Build cache (`org.gradle.caching=true`, đã bật): tái dùng output task theo input hash; remote cache cho CI và team (Develocity hoặc HTTP cache server).
 3. Parallel (`org.gradle.parallel=true`, đã bật) và module nhỏ, ít phụ thuộc chuỗi.
 4. KSP thay kapt: kapt phải sinh Java stub cho mọi file Kotlin rồi chạy javac annotation processing; KSP đọc trực tiếp Kotlin symbols, không stub. Google và JetBrains đều công bố KSP nhanh hơn kapt đáng kể; con số thực phụ thuộc project, bạn nên đo trên `compose-template` (Hilt kapt vs KSP) và dùng số đó.
-5. JVM args hợp lý (`-Xmx6g` trong repo bạn), tắt Jetifier nếu không còn lib support cũ, `android.nonTransitiveRClass=true`.
+5. JVM args hợp lý (`-Xmx6g` trong repo bạn), tắt Jetifier nếu không còn lib support cũ. `android.nonTransitiveRClass=true` (R class chỉ chứa resource của module đó) đã là mặc định từ AGP 8.0 cùng với `nonFinalResIds` và R8 full mode; chỉ cần xoá dòng `=false` nếu project cũ còn giữ. Nguồn: https://developer.android.com/build/releases/past-releases/agp-8-0-0-release-notes#default-changes
 6. Đo: `--scan` (Build Scan) hoặc `--profile`, nhìn "configuration time", "task execution critical path", "cache hit rate". Không nói "build nhanh hơn" mà nói "clean build từ X phút xuống Y, incremental từ A giây xuống B".
 
 Monorepo nhiều app (template + nhiều app seed từ template): cân nhắc included build cho shared core, ownership theo thư mục (CODEOWNERS), CI chỉ build module ảnh hưởng (so sánh git diff với graph), version catalog chung. Chi tiết CI ở `20-Git-CICD.md`.
@@ -1290,15 +1367,37 @@ Monorepo nhiều app (template + nhiều app seed từ template): cân nhắc in
 | | Hilt (Dagger) | Koin 4.x | Manual (AppContainer) |
 |---|---|---|---|
 | Resolve | compile-time, sinh code | runtime, DSL Kotlin | tay |
-| Lỗi thiếu binding | lỗi compile | runtime (`NoDefinitionFoundException`), giảm bằng `verify()` trong test | compile |
-| Build time | annotation processing (KSP từ Dagger 2.48) | không sinh code (trừ Koin Annotations) | không |
+| Lỗi thiếu binding | lỗi compile | runtime (`NoDefinitionFoundException`), giảm bằng `Module.verify()` (koin-test, JVM) trong unit test hoặc Koin Compiler Plugin kiểm tra lúc build | compile |
+| Build time | annotation processing; KSP có từ Dagger 2.48 (alpha), stable từ Dagger 2.60 + KSP 2.3.9 | không sinh code (trừ Koin Annotations / Koin Compiler Plugin) | không |
 | Scope | `@Singleton`, `@ActivityRetainedScoped`, `@ViewModelScoped`, `@ActivityScoped`, `@FragmentScoped` gắn Android component | `single`, `factory`, `scope<T>`, `viewModel` | tự quản |
 | KMP | không (Dagger là JVM, không có Native) | có, commonMain | có |
 | Compose | `hiltViewModel()` | `koinViewModel()`, `koinInject()` | truyền tay / CompositionLocal |
 | Test | `@HiltAndroidTest`, `@TestInstallIn`, `@UninstallModules` | `startKoin` với module test, `declareMock` | constructor |
 | Startup cost | gần 0 (code sinh sẵn) | đọc DSL, lazy tạo; nhỏ nhưng đo được với vài trăm definition | 0 |
 
-Alternatives compile-time cho KMP: `kotlin-inject` (KSP, Dagger-like), `Metro` (compiler plugin). Nếu nhắc trong phỏng vấn, nói "đã khảo sát" và cần kiểm tra trạng thái hiện tại tại repo GitHub của từng dự án.
+Alternatives compile-time cho KMP: `kotlin-inject` (KSP, Dagger-like, bản mới nhất v0.9.0 ngày 7/1/2026, https://github.com/evant/kotlin-inject), `Metro` (Kotlin compiler plugin của Zac Sweers, bản 1.6.0 ngày 16/11/2026, https://github.com/ZacSweers/metro). Koin bản stable mới nhất trên GitHub là 4.2.2 (15/6/2026). Nếu nhắc trong phỏng vấn, nói "đã khảo sát" kèm lý do chọn/không chọn (kiểm tra 18/11/2026).
+
+Test graph Koin (koin-test, JVM): `verify()` đọc constructor của từng definition và kiểm tra mọi tham số có definition, không chạy definition nào, không cần mock:
+
+```kotlin
+import org.koin.test.verify.verify
+
+class KoinGraphTest {
+    @Test fun appModule_isComplete() {
+        // Context, SavedStateHandle do platform cấp nên khai báo là extraTypes
+        appModule.verify(extraTypes = listOf(Context::class, SavedStateHandle::class))
+    }
+}
+// Thiếu binding: MissingKoinDefinitionException; vòng phụ thuộc: CircularInjectionException.
+// Nhiều module không nối bằng includes(): listOf(dataModule, uiModule).verifyAll()
+```
+
+`verify()` không kiểm tra qualifier và `get()` viết tay trong lambda; `checkModules()` cũ đã deprecated.
+
+**Đọc thêm (kiểm tra 18/11/2026):**
+- https://dagger.dev/dev-guide/ksp.html (Dagger/Hilt với KSP: stable từ Dagger 2.60+ và KSP 2.3.9+)
+- https://developer.android.com/training/dependency-injection/hilt-android
+- https://insert-koin.io/docs/reference/koin-test/verify/ (`verify()`, `verifyAll()`, `extraTypes`)
 
 ### 6.2 Giải thích chọn Koin trong kmp-template-impl
 
@@ -1324,7 +1423,7 @@ class ModulesTest {
 }
 ```
 
-`verify()` nằm trong `koin-test`; cần kiểm tra API tại https://insert-koin.io/docs/reference/koin-test/verify.
+`verify()` là extension trên `Module` trong `koin-test` (JVM), import `org.koin.test.verify.verify`; xem ví dụ ở mục 6.1 và https://insert-koin.io/docs/reference/koin-test/verify/ (kiểm tra 18/11/2026).
 
 ### 6.3 Hilt: scope và ViewModel
 
@@ -1403,13 +1502,78 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
 
 Chọn: config nhỏ, cần đọc sync lúc khởi động (theme trước khi vẽ frame đầu) thì vẫn có thể giữ SharedPreferences hoặc đọc DataStore trong splash với `runBlocking` có timeout rất ngắn (tranh cãi, nói rõ trade-off); mọi thứ khác dùng DataStore. Dữ liệu nhạy cảm (token) không để ở cả hai, dùng `EncryptedSharedPreferences` đã deprecated, nên mã hoá bằng Keystore rồi lưu (xem `08-Security.md`).
 
+Ba quy tắc "Use DataStore correctly" trong docs chính thức: không bao giờ tạo hơn một instance DataStore cho cùng một file trong một process (sẽ `IllegalStateException`), kiểu `T` của `DataStore<T>` phải immutable, không trộn `SingleProcessDataStore` và `MultiProcessDataStore` cho cùng file. Delegate `preferencesDataStore` ở top-level giải quyết quy tắc đầu.
+
+```kotlin
+// androidx.datastore:datastore-preferences 1.x (Android)
+private const val LEGACY_PREFS = "settings_prefs"
+val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(
+    name = "settings",
+    // Chạy một lần trước lần đọc/ghi đầu tiên; xong thì xoá key cũ khỏi SharedPreferences
+    produceMigrations = { ctx -> listOf(SharedPreferencesMigration(ctx, LEGACY_PREFS)) },
+)
+
+private val DARK_MODE = booleanPreferencesKey("dark_mode")
+
+// Extension property không có initializer, phải dùng getter
+val Context.darkMode: Flow<Boolean>
+    get() = settingsStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[DARK_MODE] ?: false }
+
+suspend fun Context.setDarkMode(on: Boolean) {
+    settingsStore.edit { prefs -> prefs[DARK_MODE] = on }  // read-modify-write atomic
+}
+```
+
+Lưu ý: `darkMode` là extension property có getter nên mỗi lần gọi tạo Flow mới, không sao vì DataStore instance vẫn là một (delegate giữ singleton). Chỉ các kiểu cơ bản của SharedPreferences được migrate.
+
+**Đọc thêm (kiểm tra 18/11/2026):**
+- https://developer.android.com/topic/libraries/architecture/datastore#correct_usage
+- https://developer.android.com/topic/libraries/architecture/datastore#write (`updateData` / `edit` là transaction)
+- https://developer.android.com/reference/kotlin/androidx/datastore/preferences/package-summary (chữ ký `preferencesDataStore`, `SharedPreferencesMigration`)
+
 ### 7.4 Paging 3
 
 - `PagingSource<Key, Value>`: `load(params)` trả `LoadResult.Page(data, prevKey, nextKey)`; Room sinh sẵn `PagingSource` cho DAO trả `PagingSource<Int, Entity>`.
 - `Pager(PagingConfig(pageSize = 20, prefetchDistance = 40, enablePlaceholders = false))` tạo `Flow<PagingData<T>>`; `cachedIn(viewModelScope)` bắt buộc để sống qua rotation và share giữa collector.
 - `RemoteMediator`: network -> DB, UI đọc DB qua PagingSource (single source of truth); `RemoteKeys` table lưu con trỏ trang.
 - Compose: `collectAsLazyPagingItems()` (`paging-compose`), `LoadState` cho header/footer loading/error, `retry()`, `refresh()`.
-- KMP: `paging-common` đã hỗ trợ multiplatform từ 3.3; `paging-compose` trong Compose Multiplatform cần kiểm tra tại https://developer.android.com/jetpack/androidx/releases/paging.
+- KMP: `paging-common` đã hỗ trợ multiplatform từ 3.3; từ 3.4.0-alpha03 (27/8/2025) cả `paging-common`, `paging-testing` và `paging-compose` có target JVM (Android, Desktop), Native (iOS, macOS, watchOS, tvOS, Linux, MinGW) và Web (JS, WasmJS). Bản stable hiện tại là 3.5.3 (12/10/2026). Nguồn: https://developer.android.com/jetpack/androidx/releases/paging#3.4.0-alpha03 (kiểm tra 18/11/2026).
+
+```kotlin
+// paging 3.5: PagingSource tự viết cho API dùng page number
+class OrdersPagingSource(private val api: OrderApi) : PagingSource<Int, OrderDto>() {
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, OrderDto> {
+        val page = params.key ?: 1
+        return try {
+            val items = api.orders(page = page, size = params.loadSize)
+            LoadResult.Page(
+                data = items,
+                prevKey = if (page == 1) null else page - 1,
+                nextKey = if (items.isEmpty()) null else page + 1,
+            )
+        } catch (e: IOException) {
+            LoadResult.Error(e)          // không ném: Paging đưa vào LoadState.Error
+        }
+    }
+    // Key để load lại khi invalidate (pull-to-refresh), quanh vị trí user đang xem
+    override fun getRefreshKey(state: PagingState<Int, OrderDto>): Int? =
+        state.anchorPosition?.let { pos ->
+            state.closestPageToPosition(pos)?.let { it.prevKey?.plus(1) ?: it.nextKey?.minus(1) }
+        }
+}
+
+val orders: Flow<PagingData<OrderUi>> = Pager(PagingConfig(pageSize = 20)) { OrdersPagingSource(api) }
+    .flow.map { data -> data.map(OrderDto::toUi) }
+    .cachedIn(viewModelScope)
+```
+
+`RemoteMediator.load(loadType, state)` (REFRESH / PREPEND / APPEND) gọi network, ghi vào Room trong `withTransaction`, trả `MediatorResult.Success(endOfPaginationReached)`; UI vẫn đọc `PagingSource` do Room sinh, nên Room là single source of truth. Chi tiết và code đầy đủ: https://developer.android.com/topic/libraries/architecture/paging/v3-network-db.
+
+**Đọc thêm:**
+- https://developer.android.com/topic/libraries/architecture/paging/v3-paged-data
+- https://developer.android.com/topic/libraries/architecture/paging/v3-network-db
 
 ### 7.5 Repository và single source of truth
 
@@ -1443,9 +1607,29 @@ class DefaultLevelRepository(
 
 ### 8.1 AGP 9.x và Gradle
 
-AGP 9.4.0 stable (9/2026), Gradle 9.6, JDK 17. Điểm cần nói được:
-- Built-in Kotlin: AGP tự cấu hình Kotlin compile cho Android module, không cần apply `org.jetbrains.kotlin.android` riêng; `kotlinOptions` cũ thay bằng `kotlin { compilerOptions { } }` trong `android` block. Module KMP (như repo bạn) vẫn dùng KMP plugin với Android target, không dùng built-in Kotlin.
-- Variant API mới (`androidComponents { onVariants { variant -> } }`, `beforeVariants`, artifact API) thay cho `applicationVariants.all`; AGP 10 bắt buộc. Plugin cũ (một số Firebase/Crashlytics/third-party cũ) phải nâng.
+AGP: 9.4.0 ra 1/9/2026, bản stable mới nhất là 9.5.1 (9.5.0 ngày 28/10/2026, 9.5.1 ngày 5/11/2026); AGP 9.5 cần Gradle tối thiểu 9.6.0, JDK 17, hỗ trợ tới API 37. Nguồn: https://developer.android.com/build/releases/gradle-plugin (kiểm tra 18/11/2026). Điểm cần nói được:
+- Built-in Kotlin (bật mặc định từ AGP 9.0): AGP tự compile Kotlin cho mọi module apply AGP, bỏ `org.jetbrains.kotlin.android`. Các bước migrate theo guide: (1) gỡ plugin `kotlin-android` ở module và root; (2) `kotlin-kapt` không tương thích, chuyển sang KSP, nếu chưa được thì thay bằng `com.android.legacy-kapt` cùng version AGP; (3) `android { kotlinOptions { } }` chuyển thành block top-level `kotlin { compilerOptions { } }` (không còn nằm trong `android`), `jvmTarget` mặc định lấy theo `android.compileOptions.targetCompatibility`; (4) thư mục source Kotlin thêm chỉ qua `android.sourceSets { kotlin.directories += ... }`. Tạm tắt bằng `android.builtInKotlin=false` (kèm `android.newDsl=false`), nhưng AGP 10 không cho tắt nữa; migrate từng module bằng plugin `com.android.built-in-kotlin`; module không có Kotlin thì đặt `android { enableKotlin = false }`. Nguồn: https://developer.android.com/build/migrate-to-built-in-kotlin#migration-steps
+- KMP: built-in Kotlin chỉ thay `kotlin-android`. Module KMP library phải dùng `org.jetbrains.kotlin.multiplatform` + `com.android.kotlin.multiplatform.library` (cần AGP ≥ 8.10.0, KGP ≥ 2.0.0); kết hợp KMP plugin với `com.android.library` hoặc `com.android.application` không còn được phép khi built-in Kotlin bật. Plugin này single-variant (không build type, flavor, `BuildConfig`), test host/device tắt mặc định (`withHostTest {}`, `withDeviceTest {}`), Android resources phải bật (`androidResources { enable = true }`), cấu hình trong `kotlin { android { } }` (từ AGP 8.12; `androidLibrary {}` deprecated từ 9.1.0-alpha09). Không có thay thế cho KMP + `com.android.application`: phải tách app Android ra module riêng, việc này ảnh hưởng trực tiếp `composeApp` của `kmp-template-impl`. Nguồn: https://developer.android.com/kotlin/multiplatform/plugin#migrate
+
+```kotlin
+// shared/build.gradle.kts, AGP 9.5 + Kotlin 2.4
+plugins {
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kotlin.multiplatform.library) // com.android.kotlin.multiplatform.library
+}
+kotlin {
+    android {
+        namespace = "com.example.shared"
+        compileSdk = 36
+        minSdk = 24
+        withHostTest { isIncludeAndroidResources = true }  // src/androidHostTest
+        androidResources { enable = true }                 // chỉ khi có src/androidMain/res
+    }
+    iosArm64(); iosSimulatorArm64()
+}
+```
+
+- Variant API mới (`androidComponents { onVariants { variant -> } }`, `beforeVariants`, artifact API) thay cho `applicationVariants.all`; các API DSL cũ bị loại trong AGP 10 theo roadmap (https://developer.android.com/build/releases/gradle-plugin-roadmap). Plugin cũ (một số Firebase/Crashlytics/third-party cũ) phải nâng.
 - Gradle: hai phase configuration/execution; task input/output lazy (`Provider`, `Property`); `libs.versions.toml`; `gradle.properties` flags; `settings.gradle.kts` quản plugin và repo (`FAIL_ON_PROJECT_REPOS` như repo bạn).
 
 ### 8.2 R8 pipeline
@@ -1482,7 +1666,7 @@ flowchart LR
 
 - `@Keep` (androidx.annotation) cho class/method cụ thể, rõ ràng hơn rule file.
 - kotlinx.serialization và Room sinh code không dùng reflection theo tên, ít cần rule; Gson/Moshi reflection cần; Retrofit cần rule có sẵn trong artifact.
-- `-dontwarn` chỉ cho package thật sự không có trên Android (ví dụ `-dontwarn com.amazon.**` trong `proguard-rules.pro` của repo bạn để bỏ qua RevenueCat Amazon store); không dùng `-dontwarn **`.
+- `-dontwarn` chỉ cho package thật sự không có trên classpath lúc build; không dùng `-dontwarn **`. Repo bạn (`composeApp/proguard-rules.pro`) có cả hai dòng `-dontwarn com.amazon.**` và `-keep class com.amazon.** { *; }`: đây là rule consumer của `com.revenuecat.purchases:purchases-store-amazon` được khai lại trong app, bỏ đi `-dontoptimize` của thư viện (rule thư viện bị tắt trong `release.optimization`). `-dontwarn` làm im cảnh báo class Amazon SDK thiếu, `-keep` giữ nguyên class Amazon vì SDK đó dùng reflection; hai việc khác nhau nên không mâu thuẫn. Câu hỏi review hợp lý là `-keep ... { *; }` có thu hẹp được không (Checklist mục 8).
 - `missing_rules.txt` trong `build/outputs/mapping/<variant>/` liệt kê rule R8 gợi ý khi thiếu class; đọc nó thay vì đoán.
 - `-dontobfuscate`/`-dontoptimize` là tắt một nửa lợi ích; chỉ chấp nhận tạm thời khi debug.
 
@@ -1501,7 +1685,7 @@ Quy trình:
 - `isShrinkResources = true` chỉ chạy khi minify bật: R8 báo resource nào còn được reference từ code; resource không dùng bị thay bằng bản rỗng nhỏ. `res/raw/keep.xml` với `tools:keep`/`tools:discard`/`tools:shrinkMode="strict"` cho resource load bằng tên (`getIdentifier`).
 - APK Analyzer trong Studio: so sánh hai APK, xem dex method count, resource lớn nhất, native lib theo ABI. Dùng để nói chuyện bằng số: "bật R8 full giảm dex từ X MB xuống Y".
 - AAB: Play sinh split APK theo ABI, density, language; `bundletool build-apks --mode=universal` để test local; `--local-testing` để test dynamic feature. Download size trên Play thường bằng khoảng một nửa đến hai phần ba universal APK vì split và compression, nhưng con số thực lấy từ Play Console.
-- 16 KB page size: app có native code target 35+ phải build với AGP 8.5.1+ và NDK r28+ để `.so` align 16 KB; kiểm tra bằng APK Analyzer (alignment) hoặc script trong docs. Lưu ý Play chặn update không hỗ trợ từ 1/2/2027 (theo trang chính thức, mục 9).
+- 16 KB page size: app có native code target 35+ phải build với AGP 8.5.1+ và NDK r28+ để `.so` align 16 KB; kiểm tra bằng APK Analyzer (alignment), `zipalign -c -P 16 -v 4` hoặc `check_elf_alignment.sh`. Play chặn release update không hỗ trợ từ 1/2/2027: https://developer.android.com/guide/practices/page-sizes#google-play-compatibility-requirement (chi tiết ở mục 9.3).
 
 **Đọc thêm (mục 8):**
 - https://developer.android.com/build/shrink-code
@@ -1512,7 +1696,7 @@ Quy trình:
 
 ## 9. Android 16/17 behavior changes và Play policies
 
-Chỉ dùng các fact đã verify (19/10/2026). Khi phỏng vấn, nói kèm "theo behavior-changes page", đừng thêm chi tiết bạn không chắc.
+Chỉ dùng các fact đã verify (19/10/2026, phần Android 17 và 16 KB kiểm tra lại 18/11/2026). Khi phỏng vấn, nói kèm "theo behavior-changes page", đừng thêm chi tiết bạn không chắc.
 
 ### 9.1 Android 16 (API 36)
 
@@ -1524,21 +1708,28 @@ Chỉ dùng các fact đã verify (19/10/2026). Khi phỏng vấn, nói kèm "th
 
 ### 9.2 Android 17 (API 37)
 
-Khi target 37:
-- Lock-free `MessageQueue`: reflection vào `MessageQueue` vỡ (mục 3.1).
-- Không sửa `static final` qua reflection/JNI: thư viện mock/hook hoặc SDK anti-tamper cũ làm việc này sẽ hỏng.
-- Bỏ hẳn opt-out orientation/resizability trên large screen.
+Bản stable phát hành ngày 16/6/2026 ("Android 17 is here", https://android-developers.googleblog.com/2026/06/Android-17.html). Kiểm tra lại với hai trang chính thức ngày 18/11/2026. Chỉ liệt kê những mục có trên trang; mỗi mục kèm anchor.
 
-Mọi app trên Android 17 bất kể target:
-- Per-app memory limit theo RAM thiết bị: app nặng ảnh/video phải quản bitmap cache theo `ActivityManager.getMemoryClass()` và `onTrimMemory`, không giả định heap cố định.
-- Keystore key caps: giới hạn số key; app tạo key mới mỗi lần login hoặc mỗi device binding phải dọn key cũ (quan trọng cho bank, xem `08-Security.md`).
-- Contacts picker session-only: quyền chọn contact chỉ cho session, không còn truy cập lâu dài qua picker.
-- Background audio restrictions: app audio (như template học tiếng Anh của bạn có `core:audio`) cần foreground service đúng loại hoặc chấp nhận bị dừng khi vào background.
+Khi target 37 (https://developer.android.com/about/versions/17/behavior-changes-17):
+- Lock-free `MessageQueue` (`#lock-free-messagequeue`): nhanh hơn, ít mất frame, nhưng code reflection vào field/method private của `MessageQueue` sẽ vỡ (mục 3.1).
+- `static final` không sửa được (`#static-final-fields`): sửa qua reflection ném `IllegalAccessException`, qua JNI (`SetStaticLongField()`...) thì crash. Thư viện mock/hook hoặc SDK anti-tamper cũ làm việc này sẽ hỏng.
+- Bỏ hẳn opt-out orientation/resizability/aspect-ratio trên màn hình sw ≥ 600dp (`#large-screen-ignore-constraints`).
+- Background audio hardening (`#bg-audio`): app tương tác audio (phát, xin audio focus, đổi volume) khi ở background phải có foreground service, và service đó phải có while-in-use capability (trừ app có quyền exact alarm dùng stream `USAGE_ALARM`).
+- Widget: tổng bộ nhớ bitmap trong `RemoteViews` bị giới hạn `6 * width * height` byte theo màn hình hiện tại; vượt là `IllegalArgumentException` (`#memory-limit-widget`).
+- Bảo mật/riêng tư: Certificate Transparency bật mặc định (`#ct-default`), Encrypted Client Hello dùng cho TLS nếu thư viện mạng hỗ trợ (`#ech-by-default`), `ACCESS_LOCAL_NETWORK` bắt buộc cho truy cập LAN (`#local-network-protection-permission`), SMS thường chứa OTP bị giữ 3 giờ với đa số app (`#sms-otp-protection`, dùng SMS Retriever / User Consent), native lib nạp bằng `System.load()` phải read-only (`#safer-dcl`), `setContentCaptureEnabled(false)` không còn tác dụng, phải dùng `FLAG_SECURE` (`#deprecate-setcontentcaptureenabled`). Các mục này quan trọng cho app bank (xem `08-Security.md`).
+
+Mọi app chạy trên Android 17, bất kể target (https://developer.android.com/about/versions/17/behavior-changes-all):
+- App memory limits theo tổng RAM thiết bị (`#app-memory-limits`): app bị giết vì vượt giới hạn có `ApplicationExitInfo` với reason `REASON_OTHER` và description chứa `"MemoryLimiter:AnonSwap"`; test bằng `adb shell am memory-limiter status|manual <pid> <MB>|ignore <uid>`. App nặng ảnh/video phải quản bitmap cache theo `ActivityManager.getMemoryClass()` và `onTrimMemory`.
+- Per-app Keystore limit (`#per-app-keystore-limits`): 50.000 key cho app không phải system app target 37+, 200.000 key cho các app khác; vượt thì `KeyStoreException` (`ERROR_TOO_MANY_KEYS` khi target 37+). App tạo key mới mỗi lần login hoặc mỗi device binding phải dọn key cũ.
+- Background audio hardening cũng áp dụng cho mọi app ở mức nhẹ hơn: gọi audio API sai lifecycle thì playback và volume fail im lặng, audio focus trả `AUDIOFOCUS_REQUEST_FAILED` (`#bg-audio`). App audio như `core:audio` của template phải dùng foreground service đúng loại.
+- Sau rotation không tự khôi phục trạng thái hiện IME nếu app không tự xử lý config change (`#ime-rotate`); chặn loopback traffic giữa các profile (`#block-cross-profile-loopback`).
+
+Contact Picker của Android 17 là tính năng mới (https://developer.android.com/about/versions/17/features#contact-picker): user chọn contact và trường dữ liệu cụ thể, app chỉ được đọc phần được chọn, thay cho `READ_CONTACTS`. Nó không nằm trong trang behavior changes; chi tiết "session-only" ở bản trước chưa có nguồn chính thức, không dùng khi phỏng vấn.
 
 ### 9.3 Google Play
 
 - Target API: app mới và update phải target 36 từ 31/8/2026 (có thể xin gia hạn tới 1/11/2026). App cũ cần target ít nhất 35 để hiện với user mới.
-- 16 KB page size: app target 35+ có native code cần AGP 8.5.1+ và NDK r28+; trang chính thức ghi Play chặn update không hỗ trợ từ 1/2/2027.
+- 16 KB page size: mọi app target 35+ phải hỗ trợ 16 KB trên thiết bị 64-bit; từ 1/2/2027 update không hỗ trợ sẽ không release được. App chỉ có Kotlin/Java đã hỗ trợ sẵn; app có native code (kể cả qua SDK) cần AGP 8.5.1+ (`.so` không nén, zip-align 16 KB) và NDK r28+ (compile 16 KB-aligned mặc định; r27 trở xuống thêm `-Wl,-z,max-page-size=16384`). Kiểm tra bằng APK Analyzer (cột Alignment), `zipalign -c -P 16 -v 4 app.apk`, script `check_elf_alignment.sh`; test trên emulator 16 KB và `adb shell getconf PAGE_SIZE` phải ra `16384`. Nguồn: https://developer.android.com/guide/practices/page-sizes#google-play-compatibility-requirement (kiểm tra 18/11/2026).
 - Developer verification: bắt đầu 30/9/2026 ở Brazil, Indonesia, Singapore, Thailand; toàn cầu 2027. Ảnh hưởng cả app phân phối ngoài Play; với công ty cần xác minh tổ chức sớm, tránh kẹt release. Chi tiết compliance ở `22-Product-Metrics-Compliance.md`.
 
 Câu lead cần sẵn: "Checklist nâng target: đọc behavior-changes page, grep code và SDK cho API bị ảnh hưởng, chạy trên emulator API mới với `adb shell am compat enable <CHANGE_ID> <package>` để bật từng change trước khi đổi target, chạy regression trên foldable, theo dõi crash-free theo OS version sau rollout."
@@ -1553,7 +1744,7 @@ Câu lead cần sẵn: "Checklist nâng target: đọc behavior-changes page, gr
 
 ### 10.1 App startup
 
-- Cold start: process mới, `Application.onCreate`, Activity tạo, frame đầu. Warm: process còn, Activity tạo lại. Hot: Activity còn, chỉ resume. Metric: TTID (time to initial display, frame đầu) và TTFD (`reportFullyDrawn()`, nội dung thật sự sẵn sàng). Play vitals có ngưỡng cold start theo percent user; số cụ thể lấy từ Play Console.
+- Cold start: process mới, `Application.onCreate`, Activity tạo, frame đầu. Warm: process còn, Activity tạo lại. Hot: Activity còn, chỉ resume. Metric: TTID (time to initial display, frame đầu, framework tự báo qua dòng logcat `Displayed ...: +3s534ms`) và TTFD (chỉ có khi app gọi `reportFullyDrawn()`, logcat `Fully drawn ...`). Android vitals coi startup là excessive khi cold ≥ 5 giây, warm ≥ 2 giây, hot ≥ 1,5 giây, đo bằng TTID. Nguồn: https://developer.android.com/google/play/vitals/launch-time và https://developer.android.com/topic/performance/vitals/launch-time#time-full (kiểm tra 18/11/2026).
 - Nguồn chậm thường gặp: nhiều `ContentProvider` của SDK tự khởi tạo (mỗi cái chạy trước `Application.onCreate`), DI graph lớn eager, đọc SharedPreferences/DataStore sync, khởi tạo Firebase/ads/analytics đồng bộ, layout đầu quá sâu, font load.
 - App Startup (`androidx.startup`): một `InitializationProvider` duy nhất chạy các `Initializer<T>` theo `dependencies()`; bỏ provider riêng của từng SDK bằng `tools:node="remove"`; lazy init bằng `AppInitializer.getInstance(ctx).initializeComponent()`.
 - Thực hành: splash dùng `SplashScreen` API, trì hoãn init không cần cho frame đầu sang `Dispatchers.Default` sau frame đầu (`Choreographer.postFrameCallback` hoặc `IdleHandler`), đo bằng `adb shell am start -W` và Macrobenchmark `StartupTimingMetric` với `StartupMode.COLD`.
@@ -1565,13 +1756,26 @@ class AnalyticsInitializer : Initializer<Analytics> {
 }
 ```
 
+Báo TTFD trong Compose (activity-compose): `reportFullyDrawn` chỉ được gọi khi mọi `ReportDrawn*` trong composition đã thoả; gọi trước frame đầu thì hệ thống báo TTFD = TTID.
+
+```kotlin
+@Composable
+fun HomeRoute(viewModel: HomeViewModel) {
+    val state by viewModel.screenState.collectAsStateWithLifecycle()
+    // Chỉ coi là "fully drawn" khi danh sách level thật đã có dữ liệu
+    ReportDrawnWhen { state is ScreenState.Idle }
+    HomeScreen(state)
+}
+// Việc nền không gắn với UI: activity.fullyDrawnReporter.addReporter() / removeReporter()
+```
+
 ### 10.2 Baseline Profiles và Macrobenchmark
 
 - Baseline Profile: file liệt kê method/class "hot" đi kèm APK/AAB (`assets/dexopt/baseline.prof`); khi cài, ART AOT compile các method đó ngay (thay vì chờ JIT và background dexopt), giảm cold start và jank lần chạy đầu. Google công bố cải thiện startup khoảng 30% ở một số app; số của bạn phải tự đo.
 - Startup profile (DEX layout optimization): sắp class dùng lúc startup vào dex đầu, giảm page fault.
-- Cách tạo: module `:baselineprofile` với plugin `androidx.baselineprofile`, test `BaselineProfileRule.collect(packageName) { startActivityAndWait(); /* scroll, navigate */ }` chạy trên device/emulator rooted hoặc AOSP userdebug; file sinh vào `src/release/generated/baselineProfiles/`. `ProfileInstaller` library cài profile khi app chạy lần đầu nếu Play chưa cài.
+- Cách tạo: module `:baselineprofile` với plugin `androidx.baselineprofile`, test `BaselineProfileRule.collect(packageName) { startActivityAndWait(); /* scroll, navigate */ }` chạy trên thiết bị Android 13 (API 33) trở lên không cần root (từ Macrobenchmark 1.2.0-alpha06), hoặc thiết bị/emulator rooted, hoặc Gradle Managed Device với `systemImageSource = "aosp"` (image AOSP có root); chạy bằng task `:app:generateBaselineProfile`, file được copy vào `src/<variant>/generated/baselineProfiles/baseline-prof.txt` (variant release). Profile chỉ được cài cho release build. Nguồn: https://developer.android.com/topic/performance/baselineprofiles/create-baselineprofile (kiểm tra 18/11/2026). `ProfileInstaller` library cài profile khi app chạy lần đầu nếu Play chưa cài.
 - Macrobenchmark: module riêng, `MacrobenchmarkRule.measureRepeated(packageName, metrics = listOf(StartupTimingMetric(), FrameTimingMetric()), compilationMode = CompilationMode.Partial(BaselineProfileMode.Require), startupMode = StartupMode.COLD, iterations = 10)`. So sánh `CompilationMode.None` vs `Partial` để chứng minh profile có tác dụng.
-- Benchmark 1.4.1 thêm `ArtMetric` (đo hoạt động của ART trong lúc đo như JIT/class init; chi tiết cần kiểm tra tại https://developer.android.com/jetpack/androidx/releases/benchmark); 1.5.0-beta có baseline profile cho KMP, liên quan trực tiếp tới `kmp-template-impl`.
+- `ArtMetric` có từ Benchmark 1.4.0-alpha03 (10/2024): đếm số lần và tổng thời gian JIT, class init (nếu có) và class verification trong lúc đo, dùng để xem profile phủ đủ chưa. Benchmark 1.5.0 (stable 9/9/2026) hỗ trợ consumer Baseline Profile cho module KMP dùng `com.android.kotlin.multiplatform.library` qua plugin `androidx.baselineprofile.consumer` và extension `baselineProfile { }` (từ 1.5.0-alpha02), liên quan trực tiếp tới `kmp-template-impl`. Nguồn: https://developer.android.com/jetpack/androidx/releases/benchmark (kiểm tra 18/11/2026).
 - Chạy ở CI trên device thật hoặc Firebase Test Lab; emulator cho số không ổn định.
 
 ### 10.3 Jank và frame timing
@@ -1583,10 +1787,27 @@ class AnalyticsInitializer : Initializer<Analytics> {
 
 ### 10.4 ANR
 
-- Ngưỡng: input dispatch 5 giây; BroadcastReceiver 10 giây foreground (60 giây background); Service 20 giây foreground (200 giây background); ContentProvider cũng có timeout riêng. Kiểm tra con số tại https://developer.android.com/topic/performance/vitals/anr.
+- Điều kiện ANR theo docs chính thức: input event không được xử lý trong 5 giây; `startForegroundService()` mà service không gọi `startForeground()` trong 5 giây; `BroadcastReceiver` chưa xong trong 10 giây khi app có activity foreground; `Service.onCreate/onStartCommand/onBind` hoặc `JobService.onStartJob/onStopJob` không xong "within a few seconds" (docs không ghi số; trong source AOSP hiện tại là 20 giây cho service foreground, 200 giây background, 60 giây cho broadcast background: là hằng số implementation, có thể đổi). Từ Android 14 (target 34+), ANR của JobService được báo cho app. Nguồn: https://developer.android.com/topic/performance/vitals/anr (kiểm tra 18/11/2026).
 - Nguyên nhân thường gặp: I/O trên main (SharedPreferences `commit`, file, DB không qua Room suspend), `runBlocking`, lock contention (main chờ lock mà background giữ trong lúc I/O), binder call chậm (`PackageManager`, `getSystemService` lần đầu), `Looper` bị ngập message (layout quá nặng), deadlock, `Thread.sleep` do copy code.
 - Chẩn đoán: Play vitals ANR cluster với stack main thread; `ApplicationExitInfo` (`REASON_ANR`) để lấy trace sau khi app chết; file `/data/anr/` trên device debug; Perfetto để thấy main thread chờ gì (lock, binder, I/O). Trong trace, nhìn "waiting on lock held by thread X" rồi tìm X làm gì.
-- Ngưỡng Play "bad behavior": user-perceived ANR rate 0.47%, user-perceived crash rate 1.09%; vượt là bị giảm hiển thị. Chi tiết ở `22-Product-Metrics-Compliance.md`.
+- Ngưỡng Play "bad behavior" (core vitals, trung bình 28 ngày): user-perceived ANR rate 0,47% overall và 8% theo từng phone model; user-perceived crash rate 1,09% overall và 8% theo phone model; excessive partial wake locks 5%. Vượt thì Play có thể giảm hiển thị và hiện cảnh báo trên store listing. Từ 2/2027 memory usage, bitmap memory usage và DEX code optimization cũng có thể ảnh hưởng hiển thị. Nguồn: https://developer.android.com/google/play/vitals#core-vitals. Chi tiết ở `22-Product-Metrics-Compliance.md`.
+
+Đọc lý do chết của lần chạy trước bằng `ApplicationExitInfo` (API 30+), gửi trace ANR lên backend của bạn:
+
+```kotlin
+fun reportPreviousAnrs(context: Context, log: (String, String?) -> Unit) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+    val am = context.getSystemService(ActivityManager::class.java)
+    am.getHistoricalProcessExitReasons(context.packageName, /* pid = */ 0, /* max = */ 5)
+        .filter { it.reason == ApplicationExitInfo.REASON_ANR }
+        .forEach { info ->
+            // Với ANR, traceInputStream chứa dump stack mọi thread lúc ANR
+            val trace = info.traceInputStream?.bufferedReader()?.use { it.readText() }
+            log("ANR at ${info.timestamp}: ${info.description}", trace)
+        }
+}
+// Lưu timestamp đã gửi để không báo trùng; chạy trên background thread.
+```
 - ANR do SDK bên thứ ba (ads, analytics) là phổ biến; lead cần "SDK budget": đo ANR theo stack chứa package SDK, có kế hoạch loại bỏ hoặc lazy init.
 
 ### 10.5 Memory
@@ -1602,7 +1823,7 @@ class AnalyticsInitializer : Initializer<Analytics> {
 - ART (từ Android 5) thay Dalvik; từ Android 7 có JIT + profile-guided AOT: lần chạy đầu interpret và JIT, ghi profile method hot, khi sạc và rảnh thì `dex2oat` compile AOT theo profile (`speed-profile`). Android 9+ có cloud profile (Play gom profile từ user, cài kèm); Baseline Profile là cách bạn chủ động cung cấp profile.
 - GC: concurrent copying collector (Android 8+) với region-based heap, generational từ Android 10 (young/old) giảm pause; pause chủ yếu khi flip và khi allocation rate cao; "GC for alloc" trong logcat là dấu hiệu allocation quá nhanh.
 - Lệnh hữu ích: `adb shell cmd package compile -m speed-profile -f <pkg>` ép compile theo profile; `-m verify` để về trạng thái chưa compile khi test; `adb shell dumpsys package <pkg> | grep status` xem trạng thái dexopt.
-- Class verification, class loading lần đầu, `static init` nặng là chi phí startup thường bị bỏ qua; `ArtMetric` của Benchmark 1.4.1 giúp đo phần này.
+- Class verification, class loading lần đầu, `static init` nặng là chi phí startup thường bị bỏ qua; `ArtMetric` (Benchmark 1.4.0+) giúp đo phần này.
 
 ### 10.7 Perfetto / systrace
 
@@ -1613,8 +1834,19 @@ class AnalyticsInitializer : Initializer<Analytics> {
 
 ### 10.8 Battery và background work
 
-- Doze và App Standby Buckets giới hạn job/alarm/network khi app không dùng; WorkManager tôn trọng ràng buộc này; `setExpedited` cho việc gấp (có quota); foreground service với type cụ thể (Android 14+) cho việc user thấy được; exact alarm cần `SCHEDULE_EXACT_ALARM` hoặc `USE_EXACT_ALARM` (chỉ app alarm/calendar).
-- Android 17 background audio restrictions (mục 9) ảnh hưởng app phát audio nền.
+- Doze và App Standby Buckets (Android 9+) giới hạn job/alarm/network khi máy chạy pin; WorkManager dùng JobScheduler nên chịu cùng quota. Giới hạn xấp xỉ theo docs (không phải cam kết, có thể đổi):
+
+| Bucket | Regular jobs | Expedited jobs | Alarms | Network |
+|---|---|---|---|---|
+| Active | tới 20 phút / 60 phút (từ Android 16) | tới 30 phút / 24h | không giới hạn | có |
+| Working set | 10 phút / 4h | 15 phút / 24h | 10 / giờ | có |
+| Frequent | 10 phút / 12h | 10 phút / 24h | 2 / giờ | có |
+| Rare | 10 phút / 24h | 10 phút / 24h | 1 / giờ | tắt |
+| Restricted | 1 lần/ngày, tối đa 10 phút | 5 phút / 24h | 1 / ngày | tắt |
+
+  Khi sạc thì không giới hạn (trừ bucket restricted); trong Doze, alarm `*AllowWhileIdle` giới hạn 7 lần/giờ; từ Android 13 app không dùng 8 ngày bị đưa vào restricted. Xem bucket bằng `adb shell am get-standby-bucket <pkg>`. Nguồn: https://developer.android.com/topic/performance/power/power-details#app-stdby-bucket và https://developer.android.com/topic/performance/appstandby#restricted-bucket (kiểm tra 18/11/2026).
+- `setExpedited` cho việc gấp (có quota riêng như bảng trên, hết quota thì chạy như job thường nếu đặt `OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST`); foreground service với type cụ thể (Android 14+) cho việc user thấy được; exact alarm cần `SCHEDULE_EXACT_ALARM` hoặc `USE_EXACT_ALARM` (chỉ app alarm/calendar).
+- Android 17 background audio hardening (mục 9.2) ảnh hưởng app phát audio nền: cần foreground service có while-in-use capability.
 - Đo: Battery Historian (cũ nhưng vẫn dùng), Play vitals "excessive wakeups", "stuck partial wake locks", Perfetto power track trên device hỗ trợ, Macrobenchmark `PowerMetric`.
 - Network là nguồn tốn pin lớn nhất ngoài màn hình: batching, cache, không polling; chi tiết ở `07-Network.md`.
 
@@ -1634,6 +1866,13 @@ class AnalyticsInitializer : Initializer<Analytics> {
 - Thứ tự: model/util trước (ít rủi ro), rồi data layer, rồi UI. Convert bằng IDE rồi sửa tay nullability (không chấp nhận `!!` hàng loạt).
 - Giữ API public cho Java caller bằng `@JvmStatic`/`@JvmOverloads` tới khi caller cũng là Kotlin.
 - Đo: % file Kotlin, số `!!`, số warning platform type; mục tiêu rõ theo quý.
+- Công cụ chính chủ: Android Studio `Code > Convert Java File to Kotlin File` (hoặc dán code Java vào file `.kt`); sau convert phải duyệt lại nullability vì converter suy ra từ annotation và luồng code, không biết ý định. Phía Java caller, theo Kotlin-Java interop guide: annotate nullability cho mọi API public của Java, không dùng tên trùng hard keyword của Kotlin (`in`, `is`, `object`...) làm tên method/field, lambda cuối là SAM để Kotlin gọi bằng trailing lambda.
+
+**Nguồn (kiểm tra 18/11/2026):**
+- https://developer.android.com/kotlin/add-kotlin (thêm Kotlin vào app Java, convert, chú ý nullability)
+- https://developer.android.com/kotlin/interop (Kotlin-Java interop guide của Android)
+- https://developer.android.com/codelabs/java-to-kotlin (codelab convert từng bước)
+- https://kotlinlang.org/docs/mixing-java-kotlin-intellij.html
 
 ### 11.2 XML/Fragment sang Compose (strangler pattern)
 
@@ -1652,9 +1891,29 @@ class AnalyticsInitializer : Initializer<Analytics> {
 5. Đo sau mỗi mốc; đặt rule graph trong CI để không thoái lui.
 6. Rollback: vì chỉ di chuyển code, rollback là revert PR; rủi ro thật là R8 keep rule bị lệch khi code đổi package, nên test release build mỗi bước.
 
+**Nguồn (kiểm tra 18/11/2026):**
+- https://developer.android.com/topic/modularization (lợi ích, chi phí, khi nào nên modularize)
+- https://developer.android.com/topic/modularization/patterns#types-of-modules (data/feature/app/common/test module, dependency inversion)
+- https://github.com/android/nowinandroid/blob/main/docs/ModularizationLearningJourney.md (Now in Android: graph module thật, lý do từng module)
+
 ### 11.4 RxJava sang Flow
 
 Xem 3.3. Thêm cho lead: đặt lint rule cấm import `io.reactivex` trong module mới; dashboard đếm số usage theo module mỗi tuần; chọn 1 màn hình pilot có test tốt; sau pilot viết guideline nội bộ với mapping table và các bẫy (CancellationException, SharedFlow mất event).
+
+Cầu nối chính thức là module `kotlinx-coroutines-rx3` (hoặc `-rx2`): `ObservableSource.asFlow()`, `Flow.asObservable()` / `asFlowable()`, `SingleSource.await()`, `MaybeSource.awaitSingleOrNull()`, `CompletableSource.await()`, và builder `rxSingle { }` / `rxObservable { }` để code Rx cũ gọi được suspend function mới. Nhờ đó migrate được từng tầng (repository trước, UI sau) mà không đổi hết một lần.
+
+```kotlin
+// Tầng mới (suspend/Flow) dùng lại API Rx cũ
+suspend fun loadProfile(): Profile = legacyApi.profileSingle().await()
+fun observeBalance(): Flow<Money> = legacyRepo.balanceObservable().asFlow()
+
+// Code Rx cũ gọi repository mới mà chưa phải sửa
+fun legacyCompatProfile(): Single<Profile> = rxSingle { newRepo.profile() }
+```
+
+**Nguồn (kiểm tra 18/11/2026):**
+- https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-rx3/ (bảng đầy đủ các hàm chuyển đổi)
+- https://developer.android.com/kotlin/flow
 
 ### 11.5 Kế hoạch migration có metric và rollback
 
@@ -1668,6 +1927,7 @@ Khung chung bạn dùng cho mọi câu "bạn migrate X thế nào":
 
 **Đọc thêm (mục 11):**
 - https://developer.android.com/develop/ui/compose/migrate
+- https://developer.android.com/develop/ui/compose/migrate/strategy (thứ tự chính thức: màn hình mới bằng Compose, xây thư viện component chung, thay màn hình cũ từ đơn giản tới hỗn hợp, cuối cùng gỡ Fragment)
 - https://developer.android.com/develop/ui/compose/migrate/interoperability-apis
 - https://martinfowler.com/bliki/StranglerFigApplication.html
 
@@ -1689,7 +1949,7 @@ Khung chung bạn dùng cho mọi câu "bạn migrate X thế nào":
 Cách dùng: che phần A, trả lời thành tiếng trong 60-90 giây, rồi so. Follow-ups là thứ interviewer dùng để phân biệt Senior và Staff; hãy chuẩn bị cả chúng.
 
 ### Q1. What did the K2 compiler change, and what did it mean for a real project you maintain?
-**A:** K2 replaced the old PSI-based frontend with FIR, a single semantic tree that all phases share. For us it meant three practical things. Compile time dropped, which I measured with build scans rather than quoting a general number. Smart casts got stronger, for example through local `val`s and `||` conditions, so some `!!` and explicit casts became warnings I could delete. And the Compose compiler moved into the Kotlin repository, so I no longer wait for a matching compiler release when bumping Kotlin. The costs were a KSP version bump that must match the Kotlin version, and kapt running in a fallback mode, which pushed us to finish moving annotation processors to KSP.
+**A:** K2 replaced the old PSI-based frontend with FIR, a single semantic tree that all phases share. For us it meant three practical things. Compile time dropped, which I measured with build scans rather than quoting a general number. Smart casts got stronger, for example through local `val`s and `||` conditions, so some `!!` and explicit casts became warnings I could delete. And the Compose compiler moved into the Kotlin repository, so I no longer wait for a matching compiler release when bumping Kotlin. The costs were a KSP version bump that must match the Kotlin version, and kapt, which since Kotlin 2.1.20 runs on K2 by default but is in maintenance mode and still generates Java stubs, so we finished moving annotation processors to KSP.
 **Follow-ups:** What broke when you moved to K2? How do you keep Kotlin, KSP and Compose versions aligned across modules? What is FIR?
 **Điểm interviewer muốn nghe:** Có số liệu tự đo, biết cặp version Kotlin/KSP, biết lý do bỏ kapt.
 
@@ -1794,9 +2054,9 @@ Cách dùng: che phần A, trả lời thành tiếng trong 60-90 giây, rồi s
 **Điểm interviewer muốn nghe:** Nêu đúng equality dedup, conflation, mất event khi không có subscriber.
 
 ### Q22. Explain `stateIn` with `WhileSubscribed(5000)`. Why 5000?
-**A:** `stateIn` turns a cold upstream into a StateFlow shared in a scope, so several collectors run one upstream. `WhileSubscribed(5000)` starts the upstream on the first subscriber and stops it five seconds after the last one leaves. The five seconds cover a configuration change, where the Activity is recreated in well under a second, so we do not restart a Room query or network observation and do not flash a loading state, while still stopping work when the app goes to the background and the UI unsubscribes through `collectAsStateWithLifecycle`. The number is a convention from Google's samples, not a library constant; a shorter timeout risks restarts, a longer one wastes resources in the background. In my `HomeViewModel` the `.catch` sits before `stateIn` so an error becomes state instead of cancelling the shared scope.
+**A:** `stateIn` turns a cold upstream into a StateFlow shared in a scope, so several collectors run one upstream. `WhileSubscribed(5000)` starts the upstream on the first subscriber and stops it five seconds after the last one leaves. The five seconds cover a configuration change, where the Activity is recreated in well under a second, so we do not restart a Room query or network observation and do not flash a loading state, while still stopping work when the app goes to the background and the UI unsubscribes through `collectAsStateWithLifecycle`. The number is a convention from Google's samples, not a library constant; a shorter timeout risks restarts, a longer one wastes resources in the background. In my `HomeViewModel` the `.catch` sits before `stateIn` so an error becomes state. Without it, the sharing coroutine dies with an uncaught exception: `viewModelScope` uses a `SupervisorJob`, so the scope itself survives, but the exception reaches the main thread's uncaught exception handler and the app crashes.
 **Follow-ups:** What does `Eagerly` change? What happens to the last value when the upstream stops? How do you retry after `catch` has emitted an error?
-**Điểm interviewer muốn nghe:** Giải thích con số bằng config change và background, biết thứ tự `catch`.
+**Điểm interviewer muốn nghe:** Giải thích con số bằng config change và background, biết thứ tự `catch`, biết thiếu `catch` thì crash (SupervisorJob không huỷ scope nhưng cũng không nuốt lỗi).
 
 ### Q23. How does backpressure work in Flow, and when do you use buffer, conflate, or collectLatest?
 **A:** Flow has no explicit backpressure protocol because the producer and consumer are suspend calls in the same coroutine by default: `emit` does not return until the collector finishes, so the producer is naturally slowed. When the collector is slower than you want, `buffer(n)` runs the producer in a separate coroutine with a channel of size n; `conflate()` keeps only the latest value for a slow collector; `collectLatest` cancels the in-flight processing when a new value arrives. I pick buffer when every value matters and latency is acceptable, conflate for state-like streams, and collectLatest for UI rendering where only the newest matters. `flowOn` also introduces a buffer because it crosses dispatchers through a channel.
@@ -1824,7 +2084,7 @@ Cách dùng: che phần A, trả lời thành tiếng trong 60-90 giây, rồi s
 **Điểm interviewer muốn nghe:** Nêu đủ ba cách và lý do chọn.
 
 ### Q28. What coroutine bugs do you see most in code review?
-**A:** Swallowing `CancellationException` with broad catches; `GlobalScope` in repositories; launching a never-ending `collect` on every refresh and leaking collectors; `runBlocking` on the main thread to read preferences; blocking I/O on `Dispatchers.Default`; a ViewModel `init` that launches a network call without `catch`, so the first failure cancels `viewModelScope` and every later `launch` silently does nothing; mutating a list inside a `MutableStateFlow` so no emission happens; and hardcoding `Dispatchers.Main` so unit tests need Robolectric. I address them with a short internal guideline, detekt rules where possible, and `AppDispatchers` injected through DI.
+**A:** Swallowing `CancellationException` with broad catches; `GlobalScope` in repositories; launching a never-ending `collect` on every refresh and leaking collectors; `runBlocking` on the main thread to read preferences; blocking I/O on `Dispatchers.Default`; a ViewModel `init` that launches a network call without `catch`, so the first failure is an uncaught exception that crashes the app (`viewModelScope` is a `SupervisorJob` scope, so siblings are not cancelled, but there is no default handler either); mutating a list inside a `MutableStateFlow` so no emission happens; and hardcoding `Dispatchers.Main` so unit tests need Robolectric. I address them with a short internal guideline, detekt rules where possible, and `AppDispatchers` injected through DI.
 **Follow-ups:** Which of these can you catch with static analysis? How do you enforce dispatcher injection? What is the fix for the `init` case?
 **Điểm interviewer muốn nghe:** Liệt kê cụ thể và có cách phòng ở cấp team.
 
@@ -1979,7 +2239,7 @@ Cách dùng: che phần A, trả lời thành tiếng trong 60-90 giây, rồi s
 **Điểm interviewer muốn nghe:** Có phương pháp đo, biết từng biện pháp làm gì.
 
 ### Q59. KSP versus kapt.
-**A:** kapt runs Java annotation processors by first generating Java stubs for all Kotlin sources, then running javac processing, then compiling Kotlin; the stub phase is the cost and it runs in a K1 fallback under K2. KSP exposes Kotlin symbols directly to processors, understands nullability and Kotlin-specific constructs, has no stub phase and supports incremental processing better, so it is faster and the only option for Room 3, and Hilt and Dagger support it. Migration is mostly swapping the plugin and dependency configurations, then checking generated code paths and any custom processors.
+**A:** kapt runs Java annotation processors by first generating Java stubs for all Kotlin sources, then running javac processing, then compiling Kotlin; the stub phase is the cost. Since Kotlin 2.1.20 the K2 implementation of kapt is the default (opt out with `kapt.use.k2=false`), but kapt is in maintenance mode with no new features. KSP exposes Kotlin symbols directly to processors, understands nullability and Kotlin-specific constructs, has no stub phase and supports incremental processing better, so it is faster and the only option for Room 3, and Hilt and Dagger support it. Migration is mostly swapping the plugin and dependency configurations, then checking generated code paths and any custom processors.
 **Follow-ups:** Which processors still lack KSP support? How does KSP interact with KMP source sets? What does Room 3 require?
 **Điểm interviewer muốn nghe:** Giải thích cơ chế stub, biết Room 3 bắt buộc KSP.
 
@@ -2029,7 +2289,7 @@ Cách dùng: che phần A, trả lời thành tiếng trong 60-90 giây, rồi s
 **Điểm interviewer muốn nghe:** UI chỉ đọc từ một nguồn, network ghi vào đó; chi tiết `06-Mobile-System-Design.md`.
 
 ### Q69. AGP 9: what are built-in Kotlin and the new Variant API?
-**A:** With AGP 9 the Android plugin configures Kotlin compilation itself for Android modules, so you no longer apply the separate Kotlin Android plugin and the old `kotlinOptions` block is replaced by compiler options under the `android` extension; KMP modules keep using the multiplatform plugin with an Android target. The Variant API is the lazy, typed way to customise builds, `androidComponents { onVariants { } }` and artifact transforms, replacing the old `applicationVariants` iteration; AGP 10 removes the old API, so third-party plugins must be upgraded. The current stable is 9.4 with Gradle 9.6 and JDK 17. For a lead the job is to audit plugins against the new API before the forced migration.
+**A:** With AGP 9 the Android plugin configures Kotlin compilation itself for Android modules, so you no longer apply the separate Kotlin Android plugin (keeping it fails the build), `android.kotlinOptions` moves to the top-level `kotlin { compilerOptions { } }` block, and `kotlin-kapt` must become KSP or `com.android.legacy-kapt`. KMP library modules now pair the multiplatform plugin with `com.android.kotlin.multiplatform.library`, a single-variant plugin configured in `kotlin { android { } }`; combining the multiplatform plugin with `com.android.library` or `com.android.application` is no longer allowed, so a KMP app needs a separate Android app module. The Variant API is the lazy, typed way to customise builds, `androidComponents { onVariants { } }` and artifact transforms, replacing the old `applicationVariants` iteration; AGP 10 removes the old API, so third-party plugins must be upgraded. The current stable is 9.5.1 (November 2026), which needs Gradle 9.6.0 and JDK 17; built-in Kotlin can be switched off with `android.builtInKotlin=false` in AGP 9 but not in AGP 10. For a lead the job is to audit plugins against the new API before the forced migration.
 **Follow-ups:** How do you add a generated source directory with the new API? How do you read `BuildConfig` fields now? What is the AGP to Gradle compatibility rule?
 **Điểm interviewer muốn nghe:** Biết hai thay đổi chính và tác động tới plugin bên thứ ba.
 
@@ -2059,7 +2319,7 @@ Cách dùng: che phần A, trả lời thành tiếng trong 60-90 giây, rồi s
 **Điểm interviewer muốn nghe:** Đúng fact, có ví dụ xử lý trong repo.
 
 ### Q75. What is new in Android 17 and what does targeting API 37 require?
-**A:** For apps targeting 37: the main-thread MessageQueue is lock-free and reflection into it breaks; modifying `static final` fields through reflection or JNI is no longer allowed, which affects some test and hooking libraries; and the large-screen orientation and resizability opt-out is gone. Regardless of target, on Android 17 devices there is a per-app memory limit scaled to device RAM, caps on Keystore keys, a session-only contacts picker, and background audio restrictions. For my audio-based learning app the audio restriction matters most; for a bank app the Keystore cap and the memory limit do. Android 17 went stable in June 2026 and I rely on the behavior changes page for exact details.
+**A:** For apps targeting 37: the main-thread MessageQueue is lock-free and reflection into it breaks; modifying `static final` fields through reflection or JNI is no longer allowed, which affects some test and hooking libraries; and the large-screen orientation and resizability opt-out is gone. Background audio is hardened: an app that plays audio, requests focus or changes volume from the background needs a foreground service with while-in-use capability. Targeting 37 also turns on Certificate Transparency by default, requires `ACCESS_LOCAL_NETWORK` for LAN access and delays plain SMS OTPs by three hours for most apps. Regardless of target, Android 17 devices enforce app memory limits scaled to total RAM (the kill shows up in `ApplicationExitInfo` as `REASON_OTHER` with `MemoryLimiter:AnonSwap`), a per-app Keystore limit of 50,000 keys for non-system apps targeting 37 and 200,000 otherwise, and a softer form of the audio restrictions where calls fail silently. The new contact picker is a feature, not a behavior change. For my audio-based learning app the audio restriction matters most; for a bank app the Keystore limit, CT and SMS OTP changes do. I quote these from the two behavior-changes pages rather than from memory.
 **Follow-ups:** How do you clean up Keystore keys safely? What does the memory limit mean for image caching? How do you stage a target bump?
 **Điểm interviewer muốn nghe:** Phân biệt "khi target 37" và "mọi app", liên hệ tới loại app.
 
@@ -2069,17 +2329,17 @@ Cách dùng: che phần A, trả lời thành tiếng trong 60-90 giây, rồi s
 **Điểm interviewer muốn nghe:** Ngày tháng đúng, có chủ sở hữu và lịch.
 
 ### Q77. How do you optimise cold start?
-**A:** I measure first: `adb shell am start -W` for a quick number, then a Macrobenchmark with `StartupTimingMetric` in cold mode on a release build, reporting time to initial display and time to fully drawn with `reportFullyDrawn`. Typical wins: collapse SDK content providers into App Startup initializers and make non-critical ones lazy, keep `Application.onCreate` free of synchronous I/O and heavy DI graphs, move analytics and ads initialization after the first frame, avoid reading preferences synchronously, keep the first screen shallow, and ship a baseline profile so the startup path is AOT compiled on install. Then I check class loading and verification cost in the trace. I keep the benchmark in CI on a real device so regressions are caught.
+**A:** I measure first: `adb shell am start -W` for a quick number, then a Macrobenchmark with `StartupTimingMetric` in cold mode on a release build, reporting time to initial display and time to fully drawn with `reportFullyDrawn` (in Compose, `ReportDrawnWhen`). Android vitals flags cold starts of 5 seconds or more, warm of 2 seconds and hot of 1.5 seconds, measured on TTID. Typical wins: collapse SDK content providers into App Startup initializers and make non-critical ones lazy, keep `Application.onCreate` free of synchronous I/O and heavy DI graphs, move analytics and ads initialization after the first frame, avoid reading preferences synchronously, keep the first screen shallow, and ship a baseline profile so the startup path is AOT compiled on install. Then I check class loading and verification cost in the trace. I keep the benchmark in CI on a real device so regressions are caught.
 **Follow-ups:** What is the difference between TTID and TTFD? How does a baseline profile change startup? What did a content provider cost in your trace?
 **Điểm interviewer muốn nghe:** Đo trước, danh sách biện pháp có thứ tự, baseline profile.
 
 ### Q78. How do Baseline Profiles work and how do you generate them?
-**A:** A baseline profile is a list of hot classes and methods shipped in the APK or AAB. On install ART compiles those ahead of time instead of interpreting and JIT-compiling them on first run, and Play's cloud profiles complement it later. A startup profile additionally orders classes in the dex for locality. I generate it with a benchmark module using the baseline profile Gradle plugin and `BaselineProfileRule`, driving the app through startup and the main journeys on a device that allows profile collection; the output lands in the app's generated profile directory and `ProfileInstaller` installs it on first run if needed. I prove the effect with Macrobenchmark comparing no compilation against partial compilation requiring the profile. Benchmark 1.5 adds Kotlin Multiplatform support for profiles, which is relevant to my template.
+**A:** A baseline profile is a list of hot classes and methods shipped in the APK or AAB. On install ART compiles those ahead of time instead of interpreting and JIT-compiling them on first run, and Play's cloud profiles complement it later. A startup profile additionally orders classes in the dex for locality. I generate it with a benchmark module using the baseline profile Gradle plugin and `BaselineProfileRule`, driving the app through startup and the main journeys on an Android 13+ device (no root needed since Macrobenchmark 1.2.0-alpha06), a rooted device, or a Gradle Managed Device with an AOSP image; the output lands in the app's generated profile directory and `ProfileInstaller` installs it on first run if needed. I prove the effect with Macrobenchmark comparing no compilation against partial compilation requiring the profile. Benchmark 1.5 lets KMP library modules consume profiles through the `androidx.baselineprofile.consumer` plugin, which is relevant to my template.
 **Follow-ups:** How often do you regenerate the profile? What happens on devices where Play already installed a cloud profile? What does `ArtMetric` report?
 **Điểm interviewer muốn nghe:** Cơ chế AOT theo profile, quy trình tạo và chứng minh.
 
 ### Q79. How do you diagnose an ANR?
-**A:** An ANR means the main thread missed a deadline: about five seconds for input, ten for a foreground broadcast, twenty for a foreground service. I start from the Play vitals cluster or Crashlytics ANR report and read the main thread stack: blocking I/O, a `runBlocking`, a lock held by another thread, a slow binder call, or a flooded queue from heavy layout. For a lock, I find the thread holding it and what it was doing. `ApplicationExitInfo` gives traces after the fact, and a Perfetto trace shows whether the thread was sleeping on I/O, waiting for a lock, or starved of CPU. Third-party SDKs are frequent causes, so I tag ANRs by the package in the stack. Play's bad behaviour threshold for user-perceived ANR rate is 0.47 percent, which I track per release.
+**A:** An ANR means the main thread missed a deadline: five seconds for an input event, five seconds for a foreground service to call `startForeground`, ten seconds for a broadcast receiver while the app has a foreground activity, and "a few seconds" for service and job callbacks, which AOSP currently sets at twenty seconds for a foreground service. I start from the Play vitals cluster or Crashlytics ANR report and read the main thread stack: blocking I/O, a `runBlocking`, a lock held by another thread, a slow binder call, or a flooded queue from heavy layout. For a lock, I find the thread holding it and what it was doing. `ApplicationExitInfo` gives traces after the fact, and a Perfetto trace shows whether the thread was sleeping on I/O, waiting for a lock, or starved of CPU. Third-party SDKs are frequent causes, so I tag ANRs by the package in the stack. Play's bad behaviour threshold for user-perceived ANR rate is 0.47 percent overall and 8 percent on any single phone model, over a 28-day window, which I track per release.
 **Follow-ups:** How do you reproduce an ANR locally? What is `StrictMode` good for here? How do you decide whether an SDK must go?
 **Điểm interviewer muốn nghe:** Ngưỡng, cách đọc trace, biết nguyên nhân phổ biến.
 
@@ -2104,7 +2364,7 @@ Cách dùng: che phần A, trả lời thành tiếng trong 60-90 giây, rồi s
 **Điểm interviewer muốn nghe:** Biết đọc thread state, có quy trình lưu trace.
 
 ### Q84. How do you design background work for battery?
-**A:** Deferrable work goes to WorkManager with constraints like unmetered network and charging, so Doze and standby buckets batch it with other apps; urgent work uses expedited jobs with their quota; user-visible long work uses a foreground service with the correct type. Exact alarms are reserved for alarm and calendar use cases because they need a special permission. Network is the biggest battery cost after the screen, so I batch requests, cache, and never poll. On Android 17 background audio restrictions apply to apps like my learning template, so audio continues only through a proper foreground service. I verify with Play vitals wake lock and wakeup metrics and, when needed, Macrobenchmark power metrics.
+**A:** Deferrable work goes to WorkManager with constraints like unmetered network and charging, so Doze and standby buckets batch it with other apps; urgent work uses expedited jobs with their quota; the standby bucket sets the budget, for example regular jobs get about 10 minutes per 4 hours in the working set bucket and 10 minutes per 24 hours in the rare bucket, where network is also disabled; user-visible long work uses a foreground service with the correct type. Exact alarms are reserved for alarm and calendar use cases because they need a special permission. Network is the biggest battery cost after the screen, so I batch requests, cache, and never poll. On Android 17 background audio is hardened for apps like my learning template: when targeting 37, audio from the background needs a foreground service with while-in-use capability. I verify with Play vitals wake lock and wakeup metrics and, when needed, Macrobenchmark power metrics.
 **Follow-ups:** What is a standby bucket? How do you test Doze behaviour? When is a foreground service rejected by the system?
 **Điểm interviewer muốn nghe:** Biết WorkManager ràng buộc, foreground service type, hạn chế Android 17.
 
@@ -2147,7 +2407,7 @@ Làm trên chính repo của bạn. Mỗi bài có đầu ra cụ thể để b�
 ### Bài 3. Bug catching CancellationException (1 giờ)
 1. Trong một ViewModel của `feature/learningpath`, bọc tạm một `launch` bằng `try { ... } catch (e: Exception) { log }` và thêm `delay(3000)` trước một state update.
 2. Mở màn hình, thoát ngay. Quan sát state update vẫn chạy sau khi ViewModel cleared (thêm log trong `onCleared`).
-3. Sửa bằng `suspendRunCatching` ở mục 2.2. Viết một detekt rule hoặc tìm rule có sẵn cấm catch `Exception` rộng trong coroutine (cần kiểm tra tại https://detekt.dev/docs/rules/coroutines).
+3. Sửa bằng `suspendRunCatching` ở mục 2.2. Bật rule có sẵn `SuspendFunSwallowedCancellation` trong ruleset coroutines của detekt (báo khi gọi suspend function trong `runCatching`, vì nó nuốt `CancellationException`): https://detekt.dev/docs/rules/coroutines. Với `catch (e: Exception)` rộng thì kết hợp rule `TooGenericExceptionCaught` hoặc viết custom rule.
 Đầu ra: PR nhỏ với rule và fix.
 
 ### Bài 4. Compose compiler report cho feature:home (2 giờ)
@@ -2158,16 +2418,23 @@ Làm trên chính repo của bạn. Mỗi bài có đầu ra cụ thể để b�
 Đầu ra: bảng 5 dòng "composable, trước, sau, cách sửa".
 
 ### Bài 5. Macrobenchmark + Baseline Profile cho composeApp (4 giờ, cuối tuần)
-1. Thêm module `benchmark` với plugin `androidx.baselineprofile` (Android target của `composeApp`). Nếu plugin chưa hỗ trợ KMP module trong version bạn dùng, kiểm tra Benchmark 1.5.0-beta tại https://developer.android.com/jetpack/androidx/releases/benchmark.
+1. Thêm module `benchmark` với plugin `androidx.baselineprofile` (Android target của `composeApp`). Lưu ý: `composeApp` là module KMP; với module `com.android.kotlin.multiplatform.library` dùng Benchmark 1.5.0+ với plugin `androidx.baselineprofile.consumer` và khai dependency qua extension `baselineProfile { }` (không qua `androidMain.dependencies`), theo release notes 1.5.0-alpha02: https://developer.android.com/jetpack/androidx/releases/benchmark.
 2. Viết `BaselineProfileRule.collect` đi qua Home -> Unit list -> Lesson map.
 3. Chạy `StartupTimingMetric` với `CompilationMode.None` và `CompilationMode.Partial(BaselineProfileMode.Require)` trên device thật, 10 iterations.
 4. Ghi TTID/TTFD median hai trường hợp.
 Đầu ra: hai con số bạn dùng cho Q77/Q78.
 
 ### Bài 6. R8 drill (2 giờ)
-1. Trong `composeApp/build.gradle.kts` release đã có `isMinifyEnabled = true`. Tạm thêm một class dùng reflection theo tên (ví dụ `Class.forName("me.ltthuc.kmp.Probe")`) và gọi nó ở Settings.
-2. Build release, chạy, nhận `ClassNotFoundException` obfuscated. Retrace bằng `mapping.txt` trong `composeApp/build/outputs/mapping/release/`.
-3. Đọc `missing_rules.txt`, thêm `@Keep` thay vì rule rộng. Build lại, xác nhận.
+1. Trong `composeApp/build.gradle.kts` release đã có `isMinifyEnabled = true`. Tạm thêm class `me.ltthuc.kmp.Probe` không được code nào reference trực tiếp, và load nó bằng tên lắp lúc runtime ở Settings:
+   ```kotlin
+   // KHÔNG viết Class.forName("me.ltthuc.kmp.Probe"): R8 nhận ra Class.forName với hằng số
+   // (giữ class và đổi luôn chuỗi khi obfuscate), nên drill có thể không crash.
+   val name = listOf("me", "ltthuc", "kmp", "Probe").joinToString(".")  // R8 không suy ra được
+   val probe = Class.forName(name).getDeclaredConstructor().newInstance()
+   ```
+   Docs chính thức nói rõ: "R8 cannot detect classes that are loaded in this manner, and might remove the classes it considers unused" (https://developer.android.com/topic/performance/app-optimization/keep-rule-examples#reflection-with-classes-loaded-by-name).
+2. Build release, chạy, nhận `ClassNotFoundException` (class đã bị shrink). Retrace bằng `mapping.txt` trong `composeApp/build/outputs/mapping/release/`.
+3. Đọc `missing_rules.txt` (chủ yếu cho class thiếu khi compile, không gợi ý cho reflection kiểu này), rồi sửa hẹp nhất: `@Keep` trên `Probe` hoặc `-keep class me.ltthuc.kmp.Probe { <init>(); }`. Build lại, xác nhận. Thử thêm biến thể: chỉ `-keepnames` thì class vẫn bị xoá nếu không reachable, vì `-keepnames` không ngăn shrink.
 4. So sánh dex size trước/sau khi bật `isMinifyEnabled` bằng APK Analyzer.
 Đầu ra: ba con số (dex size debug, release không minify, release minify) và quy trình retrace bạn thuộc.
 

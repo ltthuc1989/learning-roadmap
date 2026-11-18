@@ -370,7 +370,7 @@ Khung trả lời: STAR, 2 phút, kết thúc bằng kết quả có số và b�
 
 ### 2.7 Culture fit / values (30-45 phút, Grab-style)
 
-**Mục đích của họ:** kiểm tra hành vi của bạn có khớp giá trị công bố không. Grab công bố 4 giá trị "4H": Heart, Hunger, Honour, Humility (kiểm tra lại trên trang careers của Grab trước khi phỏng vấn vì cách diễn đạt có thể đổi). Công ty khác có bộ riêng (Agoda, Shopee, Tyme đều đăng trên trang careers). Cách chuẩn bị: với mỗi giá trị, có 1-2 story.
+**Mục đích của họ:** kiểm tra hành vi của bạn có khớp giá trị công bố không. Grab công bố 4 giá trị "4H": Heart, Hunger, Honour, Humility ("The Grab Way" trên https://www.grab.careers/en/life-at-grab/ , kiểm tra 18/11/2026). Công ty khác có bộ riêng (Agoda, Shopee, Tyme đều đăng trên trang careers). Cách chuẩn bị: với mỗi giá trị, có 1-2 story.
 
 **Cách mở đầu (EN):** "I read your values before this call. Shall I share examples against them, or would you prefer to drive with questions?"
 
@@ -420,7 +420,7 @@ Chung:
 
 **Đọc thêm:**
 - `12-Behavioral-STAR-Bank.md` (40 câu behavioral, 20 story template)
-- https://grab.careers/ (giá trị và quy trình tuyển dụng; kiểm tra lại trước khi phỏng vấn)
+- https://www.grab.careers/en/life-at-grab/ ("The Grab Way", 4H: Heart, Hunger, Honour, Humility)
 
 ### 2.8 Bar-raiser style (60 phút)
 
@@ -743,7 +743,13 @@ Cách dùng số: nếu bạn đang ở mức median, mục tiêu hợp lý khi 
 
 ### 6.2 Gross và net ở Việt Nam
 
-Người lao động đóng từ lương gross: bảo hiểm xã hội 8%, bảo hiểm y tế 1.5%, bảo hiểm thất nghiệp 1% (có trần đóng theo lương cơ sở và lương tối thiểu vùng). Sau bảo hiểm và giảm trừ gia cảnh (bản thân và người phụ thuộc; mức giảm trừ được điều chỉnh từ kỳ tính thuế 2026, cần kiểm tra lại con số hiện hành tại https://thuvienphapluat.vn hoặc https://www.gdt.gov.vn), thu nhập chịu thuế tính thuế TNCN lũy tiến 7 bậc từ 5% tới 35%. Ở mức 50-100 triệu gross, net thường vào khoảng 75-82% gross tùy người phụ thuộc. Dùng máy tính gross-net trên các trang tuyển dụng (ITviec, TopDev, VietnamWorks có sẵn) và kiểm tra lại với HR trước khi ký.
+Người lao động đóng từ lương gross: bảo hiểm xã hội 8%, bảo hiểm y tế 1.5%, bảo hiểm thất nghiệp 1% (có trần đóng theo lương cơ sở và lương tối thiểu vùng). Thuế TNCN từ tiền lương, theo luật hiện hành (kiểm tra 18/11/2026):
+- **Giảm trừ gia cảnh:** bản thân **15,5 triệu/tháng**, mỗi người phụ thuộc **6,2 triệu/tháng** (trước đó 11 triệu và 4,4 triệu). Nguồn: Nghị quyết 110/2025/UBTVQH15 (17/10/2025), hiệu lực 1/1/2026, áp dụng từ kỳ tính thuế 2026, thay Nghị quyết 954/2020/UBTVQH14; mức này được đưa vào Luật Thuế TNCN số 109/2025/QH15.
+- **Biểu thuế lũy tiến 5 bậc** (Luật 109/2025/QH15, Quốc hội thông qua 10/12/2025, hiệu lực 1/7/2026; phần tiền lương của cá nhân cư trú áp dụng cho kỳ tính thuế 2026), tính trên thu nhập tính thuế mỗi tháng: đến 10 triệu 5%; trên 10 đến 30 triệu 10%; trên 30 đến 60 triệu 20%; trên 60 đến 100 triệu 30%; trên 100 triệu 35%. Biểu cũ 7 bậc (5% tới 35%, bậc 35% từ trên 80 triệu) không còn dùng cho năm 2026.
+- **Nguồn:** EY Việt Nam tóm tắt Luật 109/2025/QH15 https://www.ey.com/vi_vn/technical/tax/tax-and-law-updates/luat-thue-thu-nhap-ca-nhan-109-2025-qh15 ; báo Đại biểu Nhân dân (cơ quan của Quốc hội) https://daibieunhandan.vn/luat-quan-ly-thue-thu-nhap-ca-nhan-sua-doi-bao-dam-quyen-loi-ich-chinh-dang-cua-nguoi-nop-thue-10411582.html ; Nghị quyết 110 https://luatvietnam.vn/tin-van-ban-moi/chinh-thuc-nang-muc-giam-tru-gia-canh-len-155-trieu-thang-ap-dung-tu-ky-tinh-thue-2026-186-104778-article.html . Toàn văn luật tra ở https://thuvienphapluat.vn (trang chặn truy cập tự động nên chưa đối chiếu được số điều).
+- **Ví dụ** (40 triệu gross, đóng bảo hiểm trên full gross, không người phụ thuộc): bảo hiểm 10.5% = 4,2 triệu; thu nhập tính thuế = 40 − 4,2 − 15,5 = 20,3 triệu; thuế = 10 × 5% + 10,3 × 10% = 1,53 triệu; net ≈ 34,27 triệu, khoảng 86% gross.
+
+Ở mức 50-100 triệu gross và không người phụ thuộc, net theo biểu mới vào khoảng 80-85% gross (cao hơn nếu có người phụ thuộc; trần đóng bảo hiểm làm tỷ lệ lệch thêm chút). Dùng máy tính gross-net trên các trang tuyển dụng (ITviec, TopDev, VietnamWorks), xác nhận máy tính đã cập nhật biểu 5 bậc và giảm trừ 15,5 triệu, rồi kiểm tra lại với HR trước khi ký.
 
 Những điểm phải hỏi HR bằng văn bản:
 - Lương ghi trong hợp đồng là gross hay net; có phần "phụ cấp" nào không đóng bảo hiểm không (ảnh hưởng tới lương hưu và trợ cấp thất nghiệp).

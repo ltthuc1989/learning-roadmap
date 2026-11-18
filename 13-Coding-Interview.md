@@ -70,7 +70,9 @@ mindmap
 | Công ty nước ngoài tuyển remote (Úc, Singapore, EU) | HackerRank hoặc Codility: Android MCQ 15-25 câu + 2 bài code, 60-90 phút | Easy-Medium | Codility chấm cả correctness và performance (test ẩn với n lớn). Mục 7 |
 | Ngân hàng, fintech VN (Techcombank, OCB, Timo, Tyme) | 1 bài Easy/Medium trên màn hình chia sẻ, hoặc hỏi miệng độ phức tạp, hoặc bài Android nhỏ | Easy | Họ quan tâm Android deep-dive hơn, nhưng vẫn có thể hỏi "reverse linked list" để lọc |
 | Outsourcing lớn (FPT, NashTech, KMS) | Thường không DSA, thay bằng bài Android take-home hoặc live coding Compose | Không | Mục 6 |
-| Meta, Canva, Atlassian (remote/global) | Coding round cho dùng AI (Copilot/Claude) có giám sát; chấm cách bạn chỉ đạo AI và kiểm chứng | Medium | Mục 8 |
+| Meta, Canva, Atlassian (remote/global) | Coding round cho dùng AI (Copilot/Claude) có giám sát; chấm cách bạn chỉ đạo AI và kiểm chứng | Medium | Mục 8. Canva có blog chính chủ; Meta chỉ có tin báo chí được Meta xác nhận; Atlassian chỉ có kể lại của ứng viên |
+
+**Nguồn của bảng.** Các hàng Grab, Agoda, online test, bank lấy từ `01-Market-Research-2026.md` mục 12 (Grab: bài kinh nghiệm cộng đồng trên viblo 2025; Agoda và online test: kinh nghiệm ứng viên tổng hợp), tức là **nguồn thứ cấp, không phải công ty công bố**. Hàng outsourcing là quan sát chung, chưa có nguồn công khai. Hàng AI round xem nguồn ở mục 8. Trước mỗi vòng, hỏi recruiter format chính xác; đó là nguồn đáng tin nhất.
 
 ### 1.2 Quy trình 6 bước (30 phút cho 1 bài Medium)
 
@@ -2845,7 +2847,15 @@ Câu thêm hay gặp (tự trả lời, kiểm tra trong `04`): `SupervisorJob` 
 
 ## 8. Vòng coding cho phép dùng AI (Meta, Canva style)
 
-Từ 2025 một số công ty cho dùng AI assistant (Copilot, Claude, Cursor) trong coding round, có giám sát. Họ không chấm "có gõ ra đáp án không" mà chấm cách bạn làm việc với AI. Theo JD trong `01-Market-Research-2026.md`, kỹ năng này cũng được hỏi ở vòng Android (DatVietVAC "AI Native Engineer", OCB "AI-SDLC").
+Từ 2025 một số công ty cho dùng AI assistant (Copilot, Claude, Cursor) trong coding round, có giám sát. Họ không chấm "có gõ ra đáp án không" mà chấm cách bạn làm việc với AI. Mức độ kiểm chứng của từng công ty (kiểm tra 18/11/2026):
+
+| Công ty | Đã công bố gì | Nguồn |
+|---|---|---|
+| Canva | Blog chính chủ của Simon Newton (11/6/2025): vòng "AI-Assisted Coding" thay vòng Computer Science Fundamentals cho backend và frontend; ứng viên được báo trước và **được kỳ vọng** dùng Copilot, Cursor, Claude. Đề "complex, ambiguous, and realistic", không giải được bằng một prompt (ví dụ: hệ thống điều phối cất/hạ cánh ở sân bay đông). Tiêu chí họ nêu: "Do they understand when and how to leverage AI effectively?", "Can they identify and fix issues in AI-generated code?", "Can they ensure AI-generated solutions meet production standards?" | https://www.canva.dev/blog/engineering/yes-you-can-use-ai-in-our-interviews/ |
+| Meta | Tin nội bộ do 404 Media đăng 29/7/2025: một số ứng viên coding được dùng AI assistant, nhân viên được mời làm "mock AI-enabled interview"; Meta xác nhận với Business Insider. Format chi tiết (60 phút, CoderPad có AI) chỉ có từ blog luyện thi, **chưa có trang chính thức của Meta** | https://www.404media.co/meta-is-going-to-let-job-candidates-use-ai-during-coding-tests/ , https://www.businessinsider.com/meta-job-candidates-use-ai-coding-interviews-2025-7 |
+| Atlassian | **Chưa kiểm chứng**: chỉ có kể lại của ứng viên (Glassdoor, Blind) về vòng sửa bug bằng coding agent năm 2026; không tìm thấy bài chính chủ | Hỏi recruiter |
+
+Bảng tiêu chí 8.2 dưới đây là tổng hợp của tài liệu này, bám tiêu chí Canva công bố, không phải rubric chính thức của Meta hay Atlassian. Theo JD trong `01-Market-Research-2026.md`, kỹ năng này cũng được hỏi ở vòng Android (DatVietVAC "AI Native Engineer", OCB "AI-SDLC").
 
 ### 8.1 Chiến lược
 
@@ -2873,6 +2883,7 @@ Red flag: dùng AI mà không bật screen share đúng cửa sổ; copy code c�
 
 **Đọc thêm (mục 8):**
 - https://survey.stackoverflow.co/ (Developer Survey, phần AI tools; số liệu 2026 trong `01`)
+- https://www.canva.dev/blog/engineering/yes-you-can-use-ai-in-our-interviews/ (Canva: vì sao và chấm gì trong vòng AI-Assisted Coding)
 - https://www.anthropic.com/engineering (bài về cách dùng coding agent hiệu quả; chọn bài mới nhất)
 - https://github.com/kaushikb9/em-interviews (góc nhìn hiring manager khi chấm)
 

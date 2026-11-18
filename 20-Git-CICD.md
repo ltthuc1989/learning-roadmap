@@ -424,7 +424,12 @@ Revert merge commit có bẫy: sau này muốn merge lại branch đó, Git ngh�
 
 ### 4.4 `reflog`: lưới an toàn
 
-Reflog ghi lại mọi vị trí HEAD và branch từng trỏ tới trong ~90 ngày, kể cả commit "đã mất" sau reset/rebase.
+Reflog ghi lại mọi vị trí HEAD và branch từng trỏ tới, kể cả commit "đã mất" sau reset/rebase. Thời hạn mặc định có hai mức (git-gc, kiểm tra 18/11/2026):
+
+- `gc.reflogExpire` = 90 ngày cho entry còn reachable từ tip hiện tại của ref.
+- `gc.reflogExpireUnreachable` = 30 ngày cho entry không còn reachable, đúng loại commit sinh ra bởi `commit --amend` hoặc `rebase`, tức thứ bạn hay cần cứu nhất.
+
+Vậy commit bị mất do reset/rebase nên cứu trong vòng 30 ngày (và trước khi `git gc` chạy). Muốn giữ lâu hơn trên máy mình: `git config gc.reflogExpireUnreachable 90.days`. Nguồn: https://git-scm.com/docs/git-gc#Documentation/git-gc.txt-gcreflogExpireUnreachable và https://git-scm.com/docs/git-reflog
 
 ```bash
 git reflog                       # HEAD@{0}: commit: ..., HEAD@{1}: reset: moving to ...
@@ -582,6 +587,8 @@ Golden screenshot PNG: nhị phân, không merge được. Lấy một phía r�
 
 ## 6. Collaboration: PR, conventional commits, branching strategy
 
+> Chuẩn đầy đủ có link đúng mục, rule, ví dụ xấu → tốt và rubric: commit message `27` chủ đề 5, pull request `27` chủ đề 6, code review `27` chủ đề 7, CI pipeline `27` chủ đề 8, release `27` chủ đề 9. Mục 6-7 dưới đây là tóm tắt thao tác.
+
 ### 6.1 PR workflow trên GitHub
 
 1. Tạo branch từ `main` mới nhất.
@@ -595,7 +602,7 @@ Golden screenshot PNG: nhị phân, không merge được. Lấy một phía r�
 Review etiquette, hai chiều:
 
 - Author: PR nhỏ, tự review diff trước khi xin review, mô tả "vì sao" không chỉ "cái gì", không trộn refactor với feature.
-- Reviewer: trả lời trong 1 ngày làm việc; phân biệt "blocking" và "nit"; comment vào code không vào người; đề xuất thay vì ra lệnh ("Có thể dùng fake ở đây để test ổn định hơn?"); khen điểm tốt; approve khi "đủ tốt" không phải "như tôi sẽ viết".
+- Reviewer: trả lời trong 1 ngày làm việc (Google eng-practices "Speed of Code Reviews": "One business day is the maximum time it should take to respond", chi tiết ở `27` chủ đề 7); phân biệt "blocking" và "nit"; comment vào code không vào người; đề xuất thay vì ra lệnh ("Có thể dùng fake ở đây để test ổn định hơn?"); khen điểm tốt; approve khi "đủ tốt" không phải "như tôi sẽ viết".
 
 ### 6.2 Conventional Commits
 
@@ -623,6 +630,12 @@ Commit hygiene: một commit = một thay đổi logic có thể build; message 
 | Release branches | `main` + `release/1.4` tồn tại tới khi 1.4 ra production, hotfix vào release rồi merge về main | Mobile có giai đoạn staged rollout dài 1-2 tuần | Phải nhớ merge ngược; cherry-pick hai chiều |
 
 Khuyến nghị cho mobile 2026: trunk-based + release branch ngắn hạn + feature flag. Lý do: store review và staged rollout kéo dài, cần nơi để hotfix bản đang rollout trong khi `main` đi tiếp.
+
+Nguồn chính chủ cho từng lựa chọn (kiểm tra 18/11/2026):
+
+- GitFlow: chính tác giả Vincent Driessen thêm "Note of reflection (March 5, 2020)" vào đầu bài gốc: với team continuous delivery "I would suggest to adopt a much simpler workflow (like GitHub flow) instead of trying to shoehorn git-flow into your team"; còn nếu phần mềm "explicitly versioned" hoặc phải hỗ trợ nhiều version song song thì git-flow vẫn hợp. App mobile nằm giữa: có version trên store nhưng chỉ hỗ trợ một bản mới nhất, nên dùng release branch ngắn thay vì `develop` sống mãi. https://nvie.com/posts/a-successful-git-branching-model/
+- GitHub flow: tạo branch, commit, mở PR, review, merge, xoá branch. https://docs.github.com/en/get-started/using-github/github-flow
+- Trunk-based: DORA xếp là một capability; phân tích dữ liệu 2016-2017 gắn ba thực hành sau với hiệu năng delivery cao hơn: "Have three or fewer active branches", "Merge branches to trunk at least once a day", "Don't have code freezes and don't have integration phases". https://dora.dev/capabilities/trunk-based-development/
 
 ### 6.4 Hotfix flow cho một bản mobile đang rollout
 
@@ -687,6 +700,20 @@ Trên GitHub: Settings > Branches (hoặc Rules > Rulesets, cách mới). Bật 
 - Require signed commits (nếu team đã setup ký).
 - Áp cho admin (không có ngoại lệ, kể cả bạn).
 
+Rulesets (cách mới, Settings > Rules > Rulesets) khác branch protection cũ ở ba điểm: nhiều ruleset cùng áp lên một branch, rule được gộp lại và "the most restrictive version of the rule applies" (branch protection chỉ có một rule áp cho một branch); bật/tắt bằng enforcement status (`Active`/`Disabled`) mà không phải xoá; có bypass list rõ ràng (https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets). Rule có sẵn cho branch/tag (tên đúng như docs): Restrict creations, Restrict updates, Restrict deletions, Require linear history, Require deployments to succeed before merging, Require signed commits, Require a pull request before merging (kèm required approvals, dismiss stale, code owner review), Require status checks to pass before merging, Block force pushes, Require code scanning results. Push ruleset thêm Restrict file paths / file path length / file extensions / file size (chặn ví dụ `*.jks`, file > 100 MB ngay lúc push). Nguồn: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets
+
+Bypass list: "users with certain roles, specific teams, or GitHub Apps" (cùng trang). Lead nên để trống, hoặc chỉ một GitHub App release bot cần tạo tag; không cho cả nhóm admin bypass.
+
+Merge queue (rule "Require merge queue"): GitHub tạo một branch tạm gộp PR với base mới nhất và các PR xếp trước, chạy lại required check trên đó rồi mới merge, nên không cần bật "require branches to be up to date" và rebase tay. Điều kiện bắt buộc: workflow tạo ra required check phải nghe event `merge_group`, nếu không check không bao giờ được report và merge fail. Docs ghi: "You **must** use the `merge_group` event to trigger your GitHub Actions workflow when a pull request is added to a merge queue."
+
+```yaml
+on:
+  pull_request:
+  merge_group:
+```
+
+Nguồn: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue (kiểm tra 18/11/2026).
+
 ### 7.2 CODEOWNERS
 
 File `.github/CODEOWNERS`, dòng sau ghi đè dòng trước:
@@ -707,7 +734,23 @@ Kết hợp "Require review from Code Owners" thì PR đụng `core/billing` b�
 
 ### 7.3 Required status checks và tên job
 
-Tên job trong workflow là thứ GitHub dùng để match. Đặt tên ổn định (`unit-tests`, không `Unit tests (ubuntu-latest, 17)` sinh ra từ matrix). Với matrix, thêm một job tổng hợp `ci-passed` phụ thuộc mọi job, và chỉ require job đó.
+Tên check mà GitHub match là `name:` của job (nếu không có `name` thì là job id); job matrix sinh tên kiểu `unit-tests (ubuntu-latest, 17)`, đổi matrix là tên đổi và rule cũ chờ một check không còn tồn tại. Đặt tên ổn định (`unit-tests`). Với matrix, thêm một job tổng hợp `ci-passed` phụ thuộc mọi job, và chỉ require job đó.
+
+Ba bẫy chính chủ trong "Troubleshooting required status checks" (https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/troubleshooting-required-status-checks, kiểm tra 18/11/2026):
+
+1. Workflow bị skip bởi path filtering, branch filtering hoặc commit message (`[skip ci]`): "Associated checks stay in a "Pending" state and block merging" (PR hiện "Waiting for status to be reported"). Cách tránh: "Avoid requiring workflows that can be skipped". Nghĩa là workflow chứa `ci-passed` không được có `paths`/`paths-ignore`; muốn bỏ việc nặng cho PR docs thì lọc ở cấp job/step (ví dụ `dorny/paths-filter` rồi `if:`), job tổng hợp vẫn chạy.
+2. Job bị skip do `if:` thì "The job reports "Success"", nên một job bị skip vẫn làm check xanh. Job phụ thuộc một job fail cũng bị skip và "may not block merging": job tổng hợp phải có `if: always()` và tự kiểm `needs.*.result` (như `ci-passed` ở mục 10.9).
+3. Check và commit status trùng tên: "both must pass when that name is required".
+
+```yaml
+ci-passed:
+  needs: [static-analysis, unit-tests]
+  if: always()
+  runs-on: ubuntu-latest
+  steps:
+    - run: |
+        [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "false" ] || exit 1
+```
 
 ### 7.4 PR template
 
@@ -749,6 +792,17 @@ git commit -S -m "..."     # -S không cần nếu đã bật commit.gpgsign
 git log --show-signature -1
 ```
 
+Bẫy hay gặp: `git log --show-signature` / `git verify-commit` với chữ ký SSH báo lỗi nếu chưa cấu hình `gpg.ssh.allowedSignersFile`. git-config ghi: SSH không có trust level như gpg; nếu public key có trong file này thì trust là `fully`, "Otherwise the trust level is `undefined` and git verify-commit/tag will fail." Định dạng mỗi dòng: `<principal> <key-type> <public-key>` (xem ssh-keygen(1) "ALLOWED SIGNERS").
+
+```bash
+mkdir -p ~/.config/git
+echo "$(git config user.email) $(cat ~/.ssh/id_ed25519.pub)" >> ~/.config/git/allowed_signers
+git config --global gpg.ssh.allowedSignersFile ~/.config/git/allowed_signers
+git verify-commit HEAD
+```
+
+Repo chỉ cho phép commit ký có thể commit file này vào repo (đường dẫn tương đối từ gốc working tree), để chỉ người đã có key hợp lệ mới thêm key mới. Badge "Verified" trên GitHub thì GitHub tự kiểm bằng signing key bạn đã upload, không cần file này. Nguồn: https://git-scm.com/docs/git-config#Documentation/git-config.txt-gpgsshallowedSignersFile và https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification (kiểm tra 18/11/2026).
+
 Bank/fintech hay yêu cầu "Verified" badge trên mọi commit vào main. Nếu team dùng AI agent commit hộ, agent vẫn commit dưới key của dev (dev chịu trách nhiệm).
 
 ### 7.6 Release tagging policy
@@ -772,7 +826,7 @@ git commit -m "chore: move audio to LFS"
 git lfs ls-files
 ```
 
-Cân nhắc: GitHub LFS có hạn mức storage và bandwidth (gói free có hạn, trả thêm theo gói; kiểm tra docs.github.com cho con số hiện tại), CI clone phải `lfs: true` (actions/checkout) tốn bandwidth mỗi lần build; chuyển file đã có trong lịch sử sang LFS cần rewrite history (`git lfs migrate import`). Với asset được sinh từ pipeline riêng (như `GeminiGenerator` của bạn), cách khác là không commit asset vào repo app mà tải từ bucket lúc build hoặc runtime (content pack, đúng như `ContentPackDownloader` đang làm).
+Cân nhắc: GitHub LFS có hạn mức storage và bandwidth mỗi tháng: Free/Pro/Free for organizations 10 GiB storage + 10 GiB bandwidth, Team/Enterprise Cloud 250 GiB + 250 GiB, vượt thì tính tiền (https://docs.github.com/en/billing/concepts/product-billing/git-lfs, kiểm tra 18/11/2026), CI clone phải `lfs: true` (actions/checkout) tốn bandwidth mỗi lần build; chuyển file đã có trong lịch sử sang LFS cần rewrite history (`git lfs migrate import`). Với asset được sinh từ pipeline riêng (như `GeminiGenerator` của bạn), cách khác là không commit asset vào repo app mà tải từ bucket lúc build hoặc runtime (content pack, đúng như `ContentPackDownloader` đang làm).
 
 **Lỗi hay gặp / trade-off**
 - Bật "require branches up to date" mà không có merge queue: team xếp hàng rebase cả ngày.
@@ -1072,7 +1126,7 @@ jobs:
   hello:                         # job id (dùng cho needs và required check)
     runs-on: ubuntu-latest       # runner
     steps:
-      - uses: actions/checkout@v4          # "uses": gọi một action có sẵn
+      - uses: actions/checkout@v7          # "uses": gọi một action có sẵn
       - name: Print Java version
         run: java -version                 # "run": chạy shell
       - name: Multi-line script
@@ -1112,27 +1166,42 @@ on:
 
 | Action | Việc | Ghi chú |
 |---|---|---|
-| `actions/checkout@v4` | Clone repo | `with: fetch-depth: 0` khi cần toàn bộ lịch sử (tính versionCode từ commit count), `lfs: true` nếu dùng LFS |
-| `actions/setup-java@v4` | Cài JDK | `distribution: temurin`, `java-version: "17"` |
-| `gradle/actions/setup-gradle@v4` | Cache Gradle, validate wrapper, build scan, job summary | Thay cho `actions/cache` thủ công |
-| `actions/upload-artifact@v4` / `download-artifact@v4` | Lưu và lấy artifact giữa job | Artifact v4 không tương thích v3 |
-| `android-actions/setup-android@v3` | Cài SDK/NDK khi runner thiếu | `ubuntu-latest` đã có SDK cơ bản |
-| `reactivecircus/android-emulator-runner@v2` | Emulator cho instrumented test | Cần KVM |
+| `actions/checkout@v7` | Clone repo | `with: fetch-depth: 0` khi cần toàn bộ lịch sử (tính versionCode từ commit count), `lfs: true` nếu dùng LFS |
+| `actions/setup-java@v6` | Cài JDK | `distribution: temurin`, `java-version: "17"` |
+| `gradle/actions/setup-gradle@v6` | Cache Gradle, validate wrapper, build scan, job summary | Thay cho `actions/cache` thủ công |
+| `actions/upload-artifact@v7` / `actions/download-artifact@v8` | Lưu và lấy artifact giữa job | Từ v4 trở đi dùng backend mới, không trộn với v3; upload và download phải cùng thế hệ (v4+) |
+| `android-actions/setup-android@v4` | Cài SDK/NDK khi runner thiếu | `ubuntu-latest` đã có SDK cơ bản |
+| `reactivecircus/android-emulator-runner@v2` | Emulator cho instrumented test | Cần KVM; bản hiện tại v2.38.0 |
 | `r0adkll/upload-google-play@v1` | Upload AAB lên Play | Dùng trong ví dụ bên dưới |
 | `ruby/setup-ruby@v1` | Ruby cho fastlane | iOS hoặc nếu chọn fastlane thay r0adkll |
 
-Ghim version: major tag (`@v4`) tự nhận bản vá; bảo mật cao hơn là ghim SHA đầy đủ và để Dependabot cập nhật (`.github/dependabot.yml` với `package-ecosystem: github-actions`). Với bất kỳ action nào không chắc version, ghim theo major mới nhất ghi trên trang marketplace của nó.
+Major hiện tại (kiểm tra 18/11/2026 trên trang Releases của từng repo): `actions/checkout` v7.0.1, `actions/setup-java` v6.3.0, `gradle/actions` v6.4.1, `actions/upload-artifact` v7.0.2, `actions/download-artifact` v8.0.2, `actions/cache` v6.1.0, `google-github-actions/auth` v3, `android-actions/setup-android` v4.0.4, `r0adkll/upload-google-play` v1.1.5. Tất cả các bản này khai báo `runs.using: node24` trong `action.yml`.
+
+Vì sao phải theo major mới: GitHub đã gỡ Node 20 khỏi runner ("Node 20 is no longer available on GitHub Actions runners", changelog 23/9/2026, opt-out `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` không còn), nên các action `@v4` cũ chạy `node20` (ví dụ `checkout@v4`, `upload-artifact@v4`) cần nâng lên. Nguồn: https://github.blog/changelog/2026-09-23-node-20-is-no-longer-available-in-github-actions
+
+Hai thay đổi cần biết khi nâng: `checkout@v7` chặn checkout code PR từ fork cho trigger `pull_request_target` và `workflow_run` (release notes v7.0.0); `setup-gradle@v6` tách phần cache thành thành phần độc quyền `gradle-actions-caching` (Enhanced Caching, miễn phí cho repo public, "Free Preview" cho repo private), muốn thuần MIT thì đặt `cache-provider: basic` (xem `DISTRIBUTION.md` của gradle/actions).
+
+Ghim version: major tag (`@v7`) tự nhận bản vá nhưng tag có thể bị dời. GitHub khuyến nghị "Pin references to actions to a commit SHA in your workflow files" và kiểm tra SHA thuộc repo gốc, không phải fork (https://docs.github.com/en/actions/reference/security/secure-use#using-third-party-actions). Viết kèm comment tag để Dependabot (`.github/dependabot.yml`, `package-ecosystem: github-actions`) cập nhật cả SHA lẫn comment:
+
+```yaml
+- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+```
+
+Lưu ý từ cùng trang: Dependabot không tạo alert lỗ hổng cho action ghim SHA (chỉ cho action dùng semver), nên vẫn cần bật version updates.
 
 ### 10.4 Cache Gradle và configuration cache
 
-`gradle/actions/setup-gradle` cache `~/.gradle/caches`, `~/.gradle/wrapper`, và nếu bạn cung cấp `cache-encryption-key` thì cache cả configuration cache (`.gradle/configuration-cache`), thứ giúp bước configuration gần như 0 giây.
+`gradle/actions/setup-gradle` cache Gradle User Home (`~/.gradle/caches`, `~/.gradle/wrapper`, local build cache). Với v6 có hai provider (input `cache-provider`): `enhanced` (mặc định, độc quyền, cache chi tiết + cleanup) và `basic` (MIT, bọc `actions/cache`, key theo file build, không restore key). Configuration cache: ở v5 trở về trước, nếu cung cấp `cache-encryption-key` thì action lưu cả `.gradle/configuration-cache`; release notes v6.0.0 ghi "Existing, rudimentary, configuration-cache support has been removed, pending a fully functional implementation" (input `cache-encryption-key` vẫn còn trong `action.yml`). Vì vậy đừng hứa "configuration gần như 0 giây trên CI" với v6; đo bằng build scan (kiểm tra 18/11/2026).
 
 ```yaml
-- uses: gradle/actions/setup-gradle@v4
+- uses: gradle/actions/setup-gradle@v6
   with:
     cache-read-only: ${{ github.ref != 'refs/heads/main' }}   # PR chỉ đọc, main ghi, tránh cache bị PR làm bẩn
-    cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}  # openssl rand -base64 16
+    cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}  # openssl rand -base64 16; dùng cho configuration-cache khi action hỗ trợ lại
+    # cache-provider: basic   # bỏ comment nếu công ty không chấp nhận điều khoản thành phần độc quyền
 ```
+
+Nguồn: https://github.com/gradle/actions/blob/main/docs/setup-gradle.md#basic-caching và https://github.com/gradle/actions/releases/tag/v6.0.0
 
 `gradle.properties` của repo nên có:
 
@@ -1190,7 +1259,31 @@ android {
 
 `providers.environmentVariable` thân thiện với configuration cache hơn `System.getenv`. Local dev giữ mật khẩu trong `local.properties` (đã ignore) và đọc fallback nếu env null.
 
-Secret không bao giờ in ra log (GitHub tự che), nhưng `echo "$SECRET" | base64` thì không che được. Không `set -x` trong step có secret.
+Secret đăng ký trong GitHub được che (`***`) trong log, nhưng giá trị biến đổi từ secret (`echo "$SECRET" | base64`, cắt chuỗi, JSON lồng) thì không che được. Không `set -x` trong step có secret.
+
+Giới hạn và quy tắc chính chủ (kiểm tra 18/11/2026):
+
+- Kích thước: "Secrets are limited to 48 KB in size"; số lượng: 100 repository secrets, 100 environment secrets, 1.000 organization secrets (https://docs.github.com/en/actions/reference/security/secrets#limits-for-secrets). Keystore base64 thường vài KB nên vừa; file lớn hơn (ví dụ JSON dài) thì mã hoá `gpg --symmetric --cipher-algo AES256 my_secret.json`, commit file `.gpg`, chỉ lưu passphrase trong secret (https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets#storing-large-secrets).
+- Tên không bắt đầu bằng `GITHUB_` hoặc chữ số, không có khoảng trắng; secret cấp thấp (environment) đè secret cùng tên cấp cao hơn.
+- "Secrets cannot be directly referenced in `if:` conditionals": đưa secret vào `env` cấp job rồi kiểm tra env (cùng trang, mục using-secrets-in-a-workflow).
+- Giá trị nhạy cảm không phải secret (token sinh ra trong job) thì tự che bằng `::add-mask::`.
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+    steps:
+      - name: Skip when secret missing (fork PR)
+        if: ${{ env.PLAY_JSON == '' }}
+        run: echo "No Play credentials, skipping upload"
+      - name: Mask a derived token
+        run: |
+          TOKEN=$(./scripts/fetch-short-lived-token.sh)
+          echo "::add-mask::$TOKEN"
+          echo "TOKEN=$TOKEN" >> "$GITHUB_ENV"
+```
 
 ### 10.6 OIDC
 
@@ -1201,12 +1294,28 @@ permissions:
   id-token: write
   contents: read
 steps:
-  - uses: google-github-actions/auth@v2
+  - uses: google-github-actions/auth@v3
     with:
       workload_identity_provider: projects/123456/locations/global/workloadIdentityPools/github/providers/github
       service_account: ci-publisher@my-project.iam.gserviceaccount.com
   - run: gcloud firebase test android run ...
 ```
+
+Cơ chế bên trong (kiểm tra 18/11/2026):
+
+- Job phải có `permissions: id-token: write`: "Without `id-token: write`, the OIDC JWT ID token cannot be requested" (https://docs.github.com/en/actions/reference/security/oidc).
+- Claim `sub` mặc định theo ngữ cảnh: `repo:ORG/REPO:environment:Production` khi job dùng environment; `repo:ORG/REPO:pull_request` khi trigger là PR; `repo:ORG/REPO:ref:refs/heads/main` cho branch; `repo:ORG/REPO:ref:refs/tags/v1.4.0` cho tag (cùng trang, mục example-subject-claims). Cloud nên tin theo `sub` hẹp nhất, ví dụ chỉ environment `play-internal`.
+- Phía Google Cloud: tạo Workload Identity Pool + provider với issuer `https://token.actions.githubusercontent.com`, `--attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner"` và luôn có `--attribute-condition`. README của `google-github-actions/auth` ghi: "Always add an Attribute Condition to restrict entry into the Workload Identity Pool".
+
+```bash
+gcloud iam workload-identity-pools providers create-oidc "github" \
+  --project="my-project" --location="global" --workload-identity-pool="github" \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner" \
+  --attribute-condition="assertion.repository == 'ltthuc1989/kmp-template-impl'"
+```
+
+Action có hai chế độ: Direct WIF (cấp quyền IAM thẳng cho principal của pool) hoặc WIF qua service account (`service_account:` như ví dụ trên, impersonate). Nguồn: https://github.com/google-github-actions/auth#preferred-direct-workload-identity-federation và https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-google-cloud-platform
 
 Play Developer API hiện vẫn thường dùng JSON key của service account; OIDC dùng được cho FTL, GCS (golden, artifact), Firebase App Distribution. Mục tiêu Lead: không có secret dài hạn nào trong repo settings mà không có lý do.
 
@@ -1223,11 +1332,11 @@ description: JDK + Gradle cache
 runs:
   using: composite
   steps:
-    - uses: actions/setup-java@v4
+    - uses: actions/setup-java@v6
       with:
         distribution: temurin
         java-version: "17"
-    - uses: gradle/actions/setup-gradle@v4
+    - uses: gradle/actions/setup-gradle@v6
       with:
         cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 ```
@@ -1235,7 +1344,7 @@ runs:
 ```yaml
 # dùng
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v7
   - uses: ./.github/actions/setup-android
   - run: ./gradlew testDebugUnitTest
 ```
@@ -1254,7 +1363,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-android
       - run: ./gradlew ${{ inputs.module }}:testDebugUnitTest
 ```
@@ -1275,13 +1384,24 @@ jobs:
 jobs:
   instrumented:
     strategy:
-      fail-fast: false
+      fail-fast: false          # một tổ hợp fail không huỷ các tổ hợp còn lại
+      max-parallel: 2           # giới hạn số job matrix chạy cùng lúc (tiết kiệm phút, emulator nặng)
       matrix:
         api-level: [28, 34]
+        target: [default, google_apis]
+        exclude:                # bỏ một tổ hợp khỏi tích Descartes
+          - api-level: 28
+            target: google_apis
+        include:                # thêm tổ hợp mới hoặc thêm biến cho tổ hợp có sẵn
+          - api-level: 35
+            target: google_apis
+            arch: x86_64
     runs-on: ubuntu-latest
     steps:
-      - run: echo "API ${{ matrix.api-level }}"
+      - run: echo "API ${{ matrix.api-level }} ${{ matrix.target }} ${{ matrix.arch }}"
 ```
+
+Quy tắc chính chủ: "All include combinations are processed after exclude" (nên `include` có thể thêm lại tổ hợp đã exclude); "A matrix will generate a maximum of 256 jobs per workflow run"; `fail-fast` mặc định `true`. Nguồn: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstrategymatrixexclude và https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/run-job-variations
 
 ```yaml
 concurrency:
@@ -1299,7 +1419,7 @@ Badge trong README:
 
 Self-hosted runner: máy của bạn (Mac mini cho iOS, PC có KVM cho emulator) đăng ký với GitHub, `runs-on: [self-hosted, macOS, arm64]`. Lợi: không tính phút, Gradle cache nằm sẵn trên đĩa, nhanh gấp nhiều lần; hại: bạn bảo trì, bảo mật (không cho PR từ fork chạy trên self-hosted), không "sạch" giữa các run.
 
-Chi phí GitHub-hosted: repo public miễn phí; repo private có hạn mức phút theo gói (gói Free 2.000 phút/tháng theo docs), Linux tính 1x, Windows 2x, macOS 10x. Một PR check 10 phút Linux = 10 phút; một job iOS 20 phút macOS = 200 phút. Kiểm tra bảng giá hiện tại tại docs.github.com/billing. Cách giảm: cache tốt, concurrency cancel, path filter, iOS chỉ nightly hoặc self-hosted.
+Chi phí GitHub-hosted (kiểm tra 18/11/2026): standard runner trong repo public miễn phí. Repo private trừ vào "included compute usage" của gói, docs hiện ghi bằng tiền chứ không bằng phút: GitHub Free $12/tháng, Pro $18, Team $18, Enterprise Cloud $300 ("$300 USD covers 50,000 minutes on a standard Linux runner"). Giá mỗi phút: Linux 2-core x64 $0.006, Windows 2-core $0.010, macOS 3/4-core $0.062 (tức macOS đắt khoảng 10 lần Linux), làm tròn lên phút. Ví dụ: PR check 10 phút Linux = $0.06; job iOS 20 phút macOS = $1.24. Nguồn: https://docs.github.com/en/billing/concepts/product-billing/github-actions và https://docs.github.com/en/billing/reference/actions-runner-pricing. Cách giảm: cache tốt, concurrency cancel, path filter, iOS chỉ nightly hoặc self-hosted.
 
 ### 10.9 Workflow hoàn chỉnh cho `kmp-template-impl`
 
@@ -1314,10 +1434,9 @@ on:
     tags: ["v*"]
   pull_request:
     branches: [main]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "marketing/**"
+    # Không dùng paths-ignore ở đây: workflow bị skip thì required check ci-passed
+    # nằm "Pending" mãi và chặn merge PR chỉ sửa docs (mục 7.3).
+  merge_group:                 # bắt buộc nếu bật merge queue (mục 7.1)
   workflow_dispatch:
     inputs:
       track:
@@ -1352,16 +1471,16 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
@@ -1374,7 +1493,7 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: static-analysis-reports
           path: |
@@ -1389,16 +1508,16 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
@@ -1409,7 +1528,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unit-test-results
           path: "**/build/test-results/**/*.xml"
@@ -1417,7 +1536,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kover-report
           path: build/reports/kover/report.xml
@@ -1448,16 +1567,16 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -1479,7 +1598,7 @@ jobs:
         run: ./gradlew :composeApp:bundleRelease
 
       - name: Upload bundle and mapping
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-bundle
           path: |
@@ -1497,7 +1616,7 @@ jobs:
     environment: play-internal   # Settings > Environments: thêm "Required reviewers" để có bước duyệt tay
     steps:
       - name: Download bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-bundle
           path: dist
@@ -1528,16 +1647,16 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: true
 
@@ -1547,7 +1666,7 @@ jobs:
 
       - name: Upload instrumented results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: instrumented-test-results
           path: "**/build/outputs/androidTest-results/**"
@@ -1570,7 +1689,7 @@ Kiểm tra YAML trước khi push: `actionlint` (brew install actionlint) bắt 
 - Secret rỗng ở PR fork: step decode keystore tạo file rỗng, build fail khó hiểu. Chặn job bằng `if`.
 - Cache 2GB Gradle restore mất 1 phút: chấp nhận; hoặc self-hosted.
 - Quên `timeout-minutes`: job treo 6 giờ (mặc định) đốt phút.
-- `schedule` chỉ chạy trên default branch và bị tạm dừng nếu repo không có hoạt động 60 ngày.
+- `schedule` chỉ chạy trên default branch, khoảng ngắn nhất 5 phút, có thể bị trễ khi GitHub tải cao; với repo public, "scheduled workflows are automatically disabled when no repository activity has occurred in 60 days" (https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule). Docs chỉ nêu quy tắc 60 ngày cho repo public.
 
 **Đọc thêm:**
 - https://docs.github.com/en/actions (toàn bộ docs: syntax, contexts, expressions, secrets, environments)
@@ -1586,7 +1705,7 @@ Kiểm tra YAML trước khi push: `actionlint` (brew install actionlint) bắt 
 version: 2.1                     # luôn 2.1 (có orbs, parameters, commands)
 
 orbs:                            # gói job/command/executor dùng lại từ registry
-  android: circleci/android@2.5.0
+  android: circleci/android@3.2.0   # bản mới nhất 18/11/2026 (Orb Registry)
 
 parameters:                      # tham số pipeline (truyền khi trigger qua API/UI)
   deploy_track:
@@ -1596,7 +1715,7 @@ parameters:                      # tham số pipeline (truyền khi trigger qua 
 executors:                       # định nghĩa máy chạy
   android-jvm:
     docker:
-      - image: cimg/android:2024.11
+      - image: cimg/android:2026.11   # tag dạng YYYY.MM, có biến thể -ndk, -node, -browsers
     resource_class: large
 
 commands:                        # nhóm step dùng lại
@@ -1617,12 +1736,13 @@ Khác GHA: job trong CircleCI không chạy nếu không được liệt kê tro
 
 ### 11.2 Android orb, cache, parallelism, context, approval, macOS
 
-- Orb `circleci/android`: executor `android/android-docker` (JVM, không emulator) và `android/android-machine` (VM có KVM, chạy emulator), command `android/restore-gradle-cache`, `android/save-gradle-cache`, `android/start-emulator-and-run-tests`. Tên command/parameter kiểm tra tại trang orb vì khác nhau giữa major version.
+- Orb `circleci/android` (bản 3.x, kiểm tra source orb 3.2.0 ngày 18/11/2026): từ 3.0 mọi tên dùng gạch dưới. Executor `android/android_docker` (image `cimg/android:<tag>`, JVM, không emulator) và `android/android_machine` (machine image `android:<tag>`, có KVM, khuyến nghị resource class `large` trở lên cho emulator); command `android/restore_gradle_cache`, `android/save_gradle_cache`, `android/start_emulator_and_run_tests` (tham số `system_image`, `test_command`), `android/create_avd`, `android/run_tests`; job dựng sẵn `android/run_ui_tests`, `android/deploy_to_play_store`. Config viết cho orb 2.x (tên gạch ngang như `android-machine`, `start-emulator-and-run-tests`) sẽ lỗi khi nâng lên 3.x. Nguồn: https://circleci.com/developer/orbs/orb/circleci/android
 - Cache thủ công: `restore_cache`/`save_cache` với key theo checksum catalog và wrapper. Cache bất biến (không ghi đè key cũ), nên đổi prefix `gradle-v2-` khi muốn làm sạch.
 - Parallelism: `parallelism: N` tạo N container cùng job; `circleci tests split` chia danh sách (file test hoặc tên module) cho mỗi container; `--split-by=timings` dùng dữ liệu từ `store_test_results` các lần trước (cần tên trong danh sách khớp tên file/class trong report JUnit XML).
 - Context: nhóm env var bí mật ở Organization Settings > Contexts, gắn cho job bằng `context: [android-release]`; có thể giới hạn context theo security group và yêu cầu approval.
 - Approval: job `type: approval` trong workflow; pipeline dừng tới khi ai đó bấm Approve trên UI.
-- macOS executor: `macos: xcode: "<version>"` với `resource_class: macos.m1.medium.gen1` (tên và Xcode version có sẵn kiểm tra tại docs; brief ecosystem: Apple yêu cầu Xcode 26 cho upload từ 4/2026).
+- macOS executor: `macos: xcode: "26.6.0"` với `resource_class: m4pro.medium` (6 vCPU, 28 GB) hoặc `m4pro.large` (12 vCPU, 56 GB); bảng "Supported Xcode versions" trên docs hiện có Xcode 14.3.1 tới 27.3, một số bản 26.1-26.3 ghi "Deprecated October 30th, 2026" (https://circleci.com/docs/guides/execute/using-macos/, kiểm tra 18/11/2026). Apple: từ 28/4/2026 "Apps uploaded to App Store Connect must be built with Xcode 26 or later using an SDK for iOS 26" (https://developer.apple.com/news/upcoming-requirements/).
+- Lịch chạy định kỳ: `triggers: - schedule:` trong `workflows` là "scheduled workflows" kiểu cũ (vẫn dùng ở config mục 11.3). CircleCI khuyến nghị chuyển sang schedule triggers (trước gọi là scheduled pipelines), tạo qua project settings hoặc API: chọn actor nên dùng được restricted context, một schedule chạy nhiều workflow, test thử schedule mà không sửa config. Trang migrate hiện không ghi ngày ngừng hỗ trợ scheduled workflows. Nguồn: https://circleci.com/docs/guides/orchestrate/migrate-scheduled-workflows-to-schedule-triggers/ và https://circleci.com/docs/guides/orchestrate/schedule-triggers/
 
 ### 11.3 `config.yml` hoàn chỉnh tương đương workflow GHA
 
@@ -1632,7 +1752,7 @@ Upload Play ở đây dùng Fastlane `supply` để bạn thấy cách thứ hai
 version: 2.1
 
 orbs:
-  android: circleci/android@2.5.0   # kiểm tra bản mới nhất tại circleci.com/developer/orbs/orb/circleci/android
+  android: circleci/android@3.2.0   # bản mới nhất 18/11/2026; 3.x đổi tên sang gạch dưới
 
 parameters:
   deploy_track:
@@ -1642,7 +1762,7 @@ parameters:
 executors:
   android-jvm:
     docker:
-      - image: cimg/android:2024.11   # chọn tag theo hub.docker.com/r/cimg/android (có JDK 17 + SDK)
+      - image: cimg/android:2026.11   # tag mới nhất trên circleci.com/developer/images/image/cimg/android
     resource_class: large
     working_directory: ~/project
     environment:
@@ -1765,16 +1885,16 @@ jobs:
 
   instrumented_tests:
     executor:
-      name: android/android-machine
-      tag: "2024.11.1"          # kiểm tra tag tại trang orb
-      resource-class: large
+      name: android/android_machine
+      tag: "2026.10.1"          # machine image android, xem circleci.com/developer/machine/image/android
+      resource_class: large
     steps:
       - checkout
-      - android/restore-gradle-cache
-      - android/start-emulator-and-run-tests:
-          system-image: system-images;android-34;google_apis;x86_64
-          test-command: ./gradlew :composeApp:connectedDebugAndroidTest
-      - android/save-gradle-cache
+      - android/restore_gradle_cache
+      - android/start_emulator_and_run_tests:
+          system_image: system-images;android-34;google_apis;x86_64
+          test_command: ./gradlew :composeApp:connectedDebugAndroidTest
+      - android/save_gradle_cache
       - collect_test_results
 
 workflows:
@@ -1812,7 +1932,7 @@ workflows:
               only: /^v.*/
 
   nightly:
-    triggers:
+    triggers:                    # scheduled workflow kiểu cũ; nên chuyển sang schedule trigger (mục 11.2)
       - schedule:
           cron: "0 19 * * 0-4"
           filters:
@@ -1845,9 +1965,9 @@ Trả lời phỏng vấn: "Chọn theo nơi repo ở và năng lực DevOps c�
 - Approval job không có `filters` giống deploy: xuất hiện ở mọi branch.
 
 **Đọc thêm:**
-- https://circleci.com/docs/configuration-reference/ (toàn bộ keys của config.yml)
+- https://circleci.com/docs/reference/configuration-reference/ (toàn bộ keys của config.yml)
 - https://circleci.com/developer/orbs/orb/circleci/android (Android orb: executors, commands, ví dụ)
-- https://circleci.com/docs/parallelism-faster-jobs/ (test splitting)
+- https://circleci.com/docs/guides/optimize/parallelism-faster-jobs/ (test splitting)
 - https://docs.fastlane.tools/actions/supply/ (fastlane supply)
 
 ## 12. CI/CD đặc thù Android
@@ -1860,15 +1980,88 @@ Ba cách, theo thứ tự nên thử:
 2. `reactivecircus/android-emulator-runner@v2`: action tự tạo AVD, có cache AVD; linh hoạt hơn GMD khi cần tuỳ chỉnh emulator flags.
 3. Firebase Test Lab: không nuôi emulator, chạy nhiều model thật; trả tiền theo phút device. Cần `gcloud` và quyền (service account hoặc OIDC).
 
+GMD nhiều thiết bị: khai báo device group, AGP chạy song song cả nhóm, task tên `<group>Group<Variant>AndroidTest` (AGP docs, API 27+; muốn ATD thì đổi sang `systemImageSource = "aosp-atd"` hoặc `"google-atd"`, docs ghi chú ATD hỗ trợ API level hạn chế nên kiểm tra image có sẵn qua `sdkmanager --list`; trên server không có GPU như GitHub Actions phải thêm `-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect`):
+
+```kotlin
+// composeApp/build.gradle.kts (AGP 8.x)
+android {
+    testOptions {
+        managedDevices {
+            localDevices {
+                create("pixel6Api34") { device = "Pixel 6"; apiLevel = 34; systemImageSource = "aosp" }
+                create("pixelTabletApi34") { device = "Pixel Tablet"; apiLevel = 34; systemImageSource = "aosp" }
+            }
+            groups {
+                create("phoneAndTablet") {
+                    targetDevices.add(devices["pixel6Api34"])
+                    targetDevices.add(devices["pixelTabletApi34"])
+                }
+            }
+        }
+    }
+}
+// ./gradlew phoneAndTabletGroupDebugAndroidTest
+```
+
+Nguồn: https://developer.android.com/studio/test/managed-devices#define-groups. Sharding: `android.experimental.androidTest.numManagedDeviceShards=<n>` trong `gradle.properties`.
+
+Cache AVD snapshot với `android-emulator-runner` (công thức trong README, mục "AVD snapshot caching"): lần đầu tạo AVD và lưu snapshot vào `actions/cache`, các lần sau boot từ snapshot và không ghi đè snapshot.
+
+```yaml
+- name: AVD cache
+  uses: actions/cache@v6
+  id: avd-cache
+  with:
+    path: |
+      ~/.android/avd/*
+      ~/.android/adb*
+    key: avd-${{ matrix.api-level }}
+- name: Create AVD and generate snapshot for caching
+  if: steps.avd-cache.outputs.cache-hit != 'true'
+  uses: reactivecircus/android-emulator-runner@v2
+  with:
+    api-level: ${{ matrix.api-level }}
+    force-avd-creation: false
+    emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+    disable-animations: false
+    script: echo "Generated AVD snapshot for caching."
+- name: Run tests
+  uses: reactivecircus/android-emulator-runner@v2
+  with:
+    api-level: ${{ matrix.api-level }}
+    force-avd-creation: false
+    emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+    disable-animations: true
+    script: ./gradlew connectedCheck
+```
+
+Trước các bước trên vẫn cần step "Enable KVM" (mục 10.9). Nguồn: https://github.com/ReactiveCircus/android-emulator-runner#usage--examples (README, đoạn "AVD snapshot caching"; đang ví dụ bằng `actions/cache@v5`; v6 là major mới nhất của `actions/cache`).
+
 Luôn: tắt animation, bật orchestrator với `clearPackageData`, giới hạn `timeout-minutes`, upload `androidTest-results` và video/logcat khi fail.
 
 ### 12.2 Ký app: keystore, Play App Signing
 
-- Play App Signing (bắt buộc với AAB): Google giữ app signing key; bạn giữ upload key. Mất upload key thì yêu cầu reset trong Play Console (có xác minh), không mất app. Vì vậy keystore trên CI là upload key.
+- Play App Signing (bắt buộc với AAB): Google giữ app signing key; bạn giữ upload key. Vì vậy keystore trên CI là upload key. Mất hoặc lộ upload key thì "you are not locked out of your app", quy trình "Request an upload key reset" trong Play Console Help (kiểm tra 18/11/2026):
+  1. Tạo upload key mới (Android Studio hoặc `keytool -genkeypair`).
+  2. Xuất certificate sang PEM: `keytool -export -rfc -keystore upload-keystore.jks -alias upload -file upload_certificate.pem`.
+  3. Play Console > trang Play app signing (Protected with Play > Play Store protection > Manage Play app signing) > mục "Upload key certificate" > "Request upload key reset".
+  4. Ghi lý do, upload `upload_certificate.pem`, bấm "Request". Cần quyền admin để cấu hình Play App Signing.
+  5. Sau khi được duyệt: thay secret `KEYSTORE_BASE64`/mật khẩu trên CI, thu hồi key cũ ở mọi máy.
+  Nguồn: https://support.google.com/googleplay/android-developer/answer/9842756
 - Keystore trên CI: base64 trong secret, decode vào thư mục tạm, xoá sau build (runner hosted tự huỷ; self-hosted phải `rm`).
 - Không in `keytool -list -v` ra log có mật khẩu.
 - Debug keystore chia sẻ trong repo (như `gradle/keystore/debug.keystore` của bạn) để mọi dev và CI cài đè được bản debug của nhau; chấp nhận được vì debug key không có giá trị trên store.
-- Verify chữ ký sau build: `apksigner verify --print-certs app.apk` hoặc `bundletool` để chắc AAB được ký đúng key.
+- Verify chữ ký sau build. AAB được ký bằng JAR signing nên dùng `jarsigner`, không dùng `apksigner` (Android docs: "You cannot use apksigner to sign your app bundle"); APK thì dùng `apksigner`:
+
+```bash
+# AAB: in certificate người ký, so SHA-256 với "Upload key certificate" trong Play Console
+jarsigner -verify -verbose -certs composeApp/build/outputs/bundle/release/composeApp-release.aab
+keytool -printcert -jarfile composeApp-release.aab        # chỉ in fingerprint, gọn hơn
+# APK (ví dụ APK tải từ Play hoặc sinh bằng bundletool build-apks)
+apksigner verify --print-certs app-release.apk
+```
+
+  `jarsigner -verify` chỉ nói "jar verified" (chữ ký hợp lệ), không nói ký bằng key nào; phải so fingerprint. Nguồn: https://developer.android.com/build/building-cmdline (mục sign từ command line), https://docs.oracle.com/en/java/javase/17/docs/specs/man/jarsigner.html, https://developer.android.com/tools/apksigner (kiểm tra 18/11/2026).
 
 ### 12.3 Fastlane: `supply` và `screengrab`
 
@@ -1915,12 +2108,18 @@ Bạn đã có `tools/take_screenshots.py` trong `compose-template` cho store sc
 
 | Track | Ai thấy | Dùng cho |
 |---|---|---|
-| Internal testing | Tối đa 100 tester theo email, có ngay | Mỗi build CI, QA |
-| Closed testing | Nhóm tester (email/Google Group), cần review nhẹ | Beta nội bộ, đối tác |
-| Open testing | Ai cũng tham gia được qua link | Beta công khai |
+| Internal testing | "up to 100 testers per app", bản mới tới tester trong vài phút, có thể không qua review chuẩn | Mỗi build CI, QA |
+| Closed testing | Email list (tối đa 2.000 tester mỗi list, 50 list mỗi track) hoặc Google Group (không giới hạn) | Beta nội bộ, đối tác; bắt buộc cho tài khoản cá nhân mới (dưới) |
+| Open testing | Ai cũng tham gia được, mặc định không giới hạn (nếu đặt giới hạn thì tối thiểu 1.000) | Beta công khai |
 | Production | Mọi người | Release, có staged rollout |
 
-Staged rollout: production phát cho x% user (1%, 5%, 10%, 20%, 50%, 100%). Theo dõi crash-free rate (Crashlytics), ANR, rating, KPI nghiệp vụ ở mỗi mức; tăng khi ổn. Halt khi có sự cố: user đã nhận bản mới không tự quay về bản cũ.
+Nguồn bảng: https://support.google.com/googleplay/android-developer/answer/9845334 (kiểm tra 18/11/2026).
+
+Tài khoản developer cá nhân tạo sau 13/11/2023 phải chạy closed test trước khi xin production access: "a minimum of 12 testers who have been opted in continuously for at least 14 days" (14 ngày liên tục; tester opt-out rồi opt-in lại thì đếm lại). Bài help này chỉ nêu yêu cầu cho tài khoản cá nhân. Nguồn: https://support.google.com/googleplay/android-developer/answer/14151465. Với app cá nhân của bạn: lên kế hoạch closed test ít nhất 2 tuần trước ngày muốn public.
+
+Staged rollout: production phát cho x% user (1%, 5%, 10%, 20%, 50%, 100%). Theo dõi crash và ANR (Android vitals, Crashlytics), rating, KPI nghiệp vụ ở mỗi mức; tăng khi ổn. Ngưỡng "bad behavior" của Android vitals tính trên 28 ngày gần nhất: user-perceived crash rate 1.09% overall, 8% mỗi phone model; user-perceived ANR rate 0.47% overall, 8% mỗi phone model; vượt ngưỡng thì Play có thể giảm hiển thị app và hiện cảnh báo trên store listing (https://developer.android.com/topic/performance/vitals#what_are_the_bad_behavior_thresholds, kiểm tra 18/11/2026).
+
+Halt và resume (Play Console Help "Release app updates with staged rollouts"): Release > chọn release > "Manage rollout > Halt rollout"; tiếp tục bằng "Manage rollout > Resume rollout". "Users who already received the app version in your staged rollout version will remain on that version." Có vấn đề với bundle thì "create and roll out a new release with a fixed app bundle". Qua API: Publishing API đặt `status: halted` cho release trên track (input `status` của `r0adkll/upload-google-play` ở mục 10.9 có giá trị này). Nguồn: https://support.google.com/googleplay/android-developer/answer/6346149
 
 Rollback trên Play không tồn tại theo nghĩa "hạ version": người dùng không thể bị downgrade. Cách làm: halt rollout, build bản mới với `versionCode` cao hơn (fix thật hoặc revert code), release lại. Vì vậy tốc độ pipeline hotfix (mục 6.4) là thước đo quan trọng. Kill switch bằng feature flag/remote config giảm nhu cầu rollback.
 
@@ -1936,7 +2135,7 @@ Feature flag: Remote Config (Firebase) hoặc hệ thống riêng. Quy tắc: fl
 - [ ] `versionCode` tăng, `versionName` khớp tag.
 - [ ] Mapping file (R8) upload cùng AAB (Crashlytics cần để deobfuscate).
 - [ ] Native debug symbols upload nếu có NDK.
-- [ ] Target SDK đúng yêu cầu Play (xem brief: API 36 cho app mới/update từ 31/8/2026, gia hạn tới 1/11/2026); 16 KB page size nếu có native.
+- [ ] Target SDK đúng yêu cầu Play: "New apps and app updates must target Android 16 (API level 36) or higher" từ 31/8/2026, xin gia hạn được tới 1/11/2026; app hiện có phải target API 35+ để còn hiển thị với user mới (https://support.google.com/googleplay/android-developer/answer/11926878). 16 KB page size nếu có native: "Starting February 1, 2027, if your app updates don't support 16 KB memory page sizes, you won't be able to release these updates" (https://developer.android.com/guide/practices/page-sizes).
 - [ ] Data safety form, permission declaration không đổi hoặc đã cập nhật.
 - [ ] Internal track cài được, login được, mua được (license tester).
 - [ ] Screenshot test và instrumented test nightly gần nhất xanh.
@@ -1984,8 +2183,8 @@ Bạn đã port app sang iOS; interviewer cho vị trí "mobile lead cover cả 
 
 ### 13.1 Runner macOS và Xcode
 
-- GHA: `runs-on: macos-15` (hoặc nhãn mới hơn; xem danh sách runner image tại docs). Mỗi image có nhiều Xcode cài sẵn; chọn bằng `sudo xcode-select -s /Applications/Xcode_<version>.app`. Brief ecosystem: Apple yêu cầu Xcode 26 / iOS 26 SDK cho upload từ 28/4/2026, nên kiểm tra image có Xcode 26.
-- CircleCI: `macos: xcode: "<version>"`.
+- GHA: `macos-latest` hiện trỏ `macos-26` (arm64); `macos-15` vẫn có, `macos-14` đã đánh dấu deprecated (https://github.com/actions/runner-images#available-images). Ghim nhãn cụ thể (`macos-26`) để tránh bị dời khi `-latest` chuyển. Mỗi image có nhiều Xcode; image `macos-26` arm64 có Xcode 26.0.1 tới 26.6 (mặc định 26.6, đường dẫn `/Applications/Xcode_26.6.app`), xem danh sách và simulator trong https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md. Chọn bằng `sudo xcode-select -s /Applications/Xcode_<version>.app`. Apple yêu cầu build bằng Xcode 26+ với iOS 26 SDK cho mọi upload từ 28/4/2026 (https://developer.apple.com/news/upcoming-requirements/), image `macos-26` đáp ứng (kiểm tra 18/11/2026).
+- CircleCI: `macos: xcode: "26.6.0"`, `resource_class: m4pro.medium` (mục 11.2).
 - Chi phí 10x Linux. Chạy iOS job khi `iosApp/**`, `composeApp/src/iosMain/**`, hoặc module shared đổi; còn lại nightly. Hoặc self-hosted Mac mini.
 
 ### 13.2 Build và test
@@ -1993,20 +2192,25 @@ Bạn đã port app sang iOS; interviewer cho vị trí "mobile lead cover cả 
 ```yaml
 ios-tests:
   name: ios-tests
-  runs-on: macos-15
+  runs-on: macos-26
   timeout-minutes: 45
   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
   steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-java@v4
+    - uses: actions/checkout@v7
+    - uses: actions/setup-java@v6
       with:
         distribution: temurin
         java-version: "17"
-    - uses: gradle/actions/setup-gradle@v4
+    - uses: gradle/actions/setup-gradle@v6
       with:
         cache-read-only: true
+    - name: Cache Kotlin/Native toolchain (~/.konan)
+      uses: actions/cache@v6
+      with:
+        path: ~/.konan
+        key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
     - name: Select Xcode
-      run: sudo xcode-select -s /Applications/Xcode_26.0.app   # kiểm tra tên thư mục trên runner image
+      run: sudo xcode-select -s /Applications/Xcode_26.6.app   # tên thư mục theo README của image macos-26
     - name: Shared module tests on iOS simulator
       run: ./gradlew :core:repository:iosSimulatorArm64Test :feature:setting:iosSimulatorArm64Test
     - name: Build iOS app
@@ -2015,13 +2219,15 @@ ios-tests:
           -project iosApp/iosApp.xcodeproj \
           -scheme iosApp \
           -configuration Debug \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
+          -destination 'platform=iOS Simulator,name=iPhone 17' \
           -skipPackagePluginValidation \
           CODE_SIGNING_ALLOWED=NO \
           build
 ```
 
 Xcode gọi Gradle qua build phase `embedAndSignAppleFrameworkForXcode` (KMP tạo sẵn), nên bước `xcodebuild` đã build shared framework; không cần `linkDebugFrameworkIosSimulatorArm64` riêng. `CODE_SIGNING_ALLOWED=NO` cho build simulator không cần cert.
+
+Vì sao cache `~/.konan`: Kotlin/Native tải compiler, toolchain LLVM và platform libs vào đây; docs Kotlin ghi "When building in containers (such as Docker) or with continuous integration systems, the compiler may have to create the `~/.konan` directory from scratch for each build. To avoid this step, configure your environment to preserve `~/.konan` between builds" (có thể đổi vị trí bằng Gradle property `konan.data.dir`). Key nên gắn với version Kotlin trong catalog. Nguồn: https://kotlinlang.org/docs/native-improving-compilation-time.html#preserve-downloaded-and-cached-components-between-builds (kiểm tra 18/11/2026).
 
 ### 13.3 TestFlight và fastlane match
 
@@ -2042,7 +2248,7 @@ platform :ios do
 end
 ```
 
-Lệnh thuần Apple nếu không dùng fastlane: `xcodebuild archive` → `xcodebuild -exportArchive -exportOptionsPlist` → `xcrun altool`/Transporter (tên tool thay đổi theo Xcode; kiểm tra docs Apple).
+Lệnh thuần Apple nếu không dùng fastlane: `xcodebuild archive` → `xcodebuild -exportArchive -exportOptionsPlist` → upload. Apple hiện liệt kê các cách upload: Xcode, `xcrun altool --upload-app -f <ipa> -t ios ...` (đi kèm Xcode), Transporter (app macOS, có bản command-line), App Store Connect API (`POST /v1/buildUploads` với JWT từ API key), và Xcode Cloud. Trang không đánh dấu tool nào deprecated (https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds, kiểm tra 18/11/2026). Trên CI ưu tiên xác thực bằng App Store Connect API key, không dùng Apple ID + app-specific password.
 
 **Lỗi hay gặp / trade-off**
 - Build iOS fail chỉ trên CI vì Gradle không tìm thấy JDK: set `JAVA_HOME` cho build phase (`xcodebuild` không kế thừa shell của bạn).
@@ -2051,7 +2257,7 @@ Lệnh thuần Apple nếu không dùng fastlane: `xcodebuild archive` → `xcod
 - Cache Gradle macOS khác Linux: key riêng, hoặc chấp nhận build lại.
 
 **Đọc thêm:**
-- https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners (runner macOS, image)
+- https://docs.github.com/en/actions/concepts/runners/github-hosted-runners (runner macOS, nhãn) và https://github.com/actions/runner-images (phần mềm cài sẵn từng image)
 - https://docs.fastlane.tools/actions/match/ và https://docs.fastlane.tools/actions/pilot/
 - https://kotlinlang.org/docs/multiplatform/ (tìm mục CI / GitHub Actions) (CI cho KMP, GitHub Actions ví dụ)
 
@@ -2059,14 +2265,24 @@ Lệnh thuần Apple nếu không dùng fastlane: `xcodebuild archive` → `xcod
 
 ### 14.1 DORA metrics cho mobile
 
-| Metric | Nghĩa | Mobile diễn giải | Mục tiêu hợp lý |
-|---|---|---|---|
-| Deployment frequency | Bao lâu release một lần | Số bản lên production/tháng; internal build/ngày | 2 tuần/lần production, internal mỗi merge |
-| Lead time for changes | Từ commit tới production | Thời gian từ merge tới 100% rollout | Dưới 2 tuần với train |
-| Change failure rate | % release gây sự cố | % release phải halt/hotfix | Dưới 10-15% |
-| Time to restore | Từ sự cố tới khôi phục | Từ halt tới hotfix 100% hoặc kill switch | Kill switch: phút; hotfix: 24-48h |
+DORA hiện dùng 5 metric, chia hai nhóm (https://dora.dev/guides/dora-metrics/, trang cập nhật 5/1/2026, kiểm tra 18/11/2026):
 
-Bổ sung mobile: crash-free users (>99.5%), ANR rate (dưới ngưỡng Play "bad behavior"), thời gian PR check, tỉ lệ flaky. Đo tự động từ CI và Play Console; báo cáo hàng tháng. Sách Accelerate (xem brief) là nguồn của DORA.
+- Throughput: change lead time, deployment frequency, failed deployment recovery time.
+- Instability: change fail rate, deployment rework rate.
+
+"Failed deployment recovery time" thay cho MTTR / "time to restore service" cũ (chỉ đo khôi phục sau một deployment lỗi, không đo mọi sự cố). "Deployment rework rate" là metric mới: "The ratio of deployments that are unplanned but happen as a result of an incident in production". DORA nhấn mạnh tốc độ và ổn định không đánh đổi nhau: "Top performers do well across all five metrics".
+
+| Metric (tên DORA) | Định nghĩa DORA | Mobile diễn giải | Mục tiêu tự đặt cho team app |
+|---|---|---|---|
+| Deployment frequency | Số deployment trong một khoảng thời gian | Số bản lên production/tháng; internal build/ngày | 2 tuần/lần production, internal mỗi merge |
+| Change lead time | Từ commit vào version control tới chạy ở production | Từ merge tới bản lên production track (và tới 100% rollout) | Dưới 2 tuần với train |
+| Change fail rate | Tỉ lệ deployment cần can thiệp ngay (rollback, hotfix) | % release phải halt/hotfix | Dưới 10-15% |
+| Failed deployment recovery time | Thời gian khôi phục sau deployment lỗi cần can thiệp ngay | Từ halt tới hotfix 100% hoặc tắt bằng kill switch | Kill switch: phút; hotfix: 24-48h |
+| Deployment rework rate | Tỉ lệ deployment ngoài kế hoạch do sự cố production | Số bản hotfix ngoài train / tổng số bản | Càng thấp càng tốt; theo dõi xu hướng |
+
+Cột cuối là mục tiêu tự đặt, không phải benchmark DORA: trang metrics không công bố mốc elite/high/medium/low; các cụm hiệu năng và con số đi kèm nằm trong State of DevOps / DORA report từng năm và thay đổi theo năm, nên khi phỏng vấn nói rõ năm report nếu dẫn số.
+
+Bổ sung mobile: crash-free users (>99.5%), user-perceived crash rate dưới 1.09% và ANR rate dưới 0.47% (ngưỡng bad behavior của Android vitals, mục 12.4), thời gian PR check, tỉ lệ flaky. Đo tự động từ CI và Play Console; báo cáo hàng tháng. Nguồn gốc nghiên cứu: sách *Accelerate* (Forsgren, Humble, Kim, 2018), chương 2 "Measuring Performance".
 
 ### 14.2 Ngân sách thời gian pipeline
 
@@ -2075,18 +2291,38 @@ Bổ sung mobile: crash-free users (>99.5%), ANR rate (dưới ngưỡng Play "b
 - Nightly: không giới hạn chặt nhưng có `timeout-minutes` (60-90).
 - Hotfix từ merge tới internal track: dưới 30 phút.
 
-Khi vượt: đo (Gradle build scan / `--profile`), cache hit rate, module hoá để incremental, tách job song song, self-hosted cho phần nặng, bỏ job thừa (lint hai lần, test chạy cả debug lẫn release).
+Khi vượt: đo trước, rồi mới sửa. Hai công cụ chính chủ của Gradle (https://docs.gradle.org/current/userguide/inspect.html):
+
+- `./gradlew :composeApp:bundleRelease --scan`: build scan (Develocity) cho timeline từng task, lý do task không `UP-TO-DATE`/`FROM-CACHE`, cache hit, dependency resolution. Publish lên scans.gradle.com phải đồng ý Terms of Use; trên GHA, `setup-gradle` có input `build-scan-publish: true` cùng `build-scan-terms-of-use-url`/`build-scan-terms-of-use-agree`. Nguồn: https://docs.gradle.org/current/userguide/build_scans.html
+- `./gradlew assembleDebug --profile`: báo cáo HTML cục bộ trong `build/reports/profile/` (thời gian configuration, dependency resolution, task execution), không gửi dữ liệu ra ngoài, hợp với công ty cấm build scan public.
+
+Sau khi đo: tăng cache hit rate, module hoá để incremental, tách job song song, self-hosted cho phần nặng, bỏ job thừa (lint hai lần, test chạy cả debug lẫn release).
 
 ### 14.3 Chính sách flaky test trong CI
 
-- Retry tự động tối đa 1 lần, có nhãn "flaky" trong report khi lần 2 pass (GHA: dùng action retry hoặc Gradle `retry` plugin của Gradle Enterprise/Develocity; CircleCI: rerun failed tests).
+- Retry tự động tối đa 1 lần, có nhãn "flaky" trong report khi lần 2 pass. Trên Gradle dùng plugin `org.gradle.test-retry` (Apache-2.0, mã nguồn mở, không cần Develocity; bản 1.6.6 trên Plugin Portal ngày 18/11/2026). Nó chỉ chạy lại test fail, và nếu lần sau pass thì build pass nhưng report ghi cả lần fail. CircleCI: rerun failed tests.
+
+```kotlin
+// build-logic convention plugin hoặc module build.gradle.kts
+plugins { id("org.gradle.test-retry") version "1.6.6" }
+
+tasks.withType<Test>().configureEach {
+    retry {
+        maxRetries.set(1)                       // tối đa 1 lần chạy lại mỗi test fail
+        maxFailures.set(10)                     // quá 10 test fail thì không retry: lỗi thật, không phải flaky
+        failOnPassedAfterRetry.set(false)       // true nếu muốn flaky vẫn làm đỏ build (chế độ phát hiện)
+    }
+}
+```
+
+  Nguồn: https://github.com/gradle/test-retry-gradle-plugin. Với instrumented test (`connectedAndroidTest`) plugin này không áp dụng; dùng retry của Firebase Test Lab (`maxTestReruns`) hoặc rule retry trong test.
 - Dashboard flaky top 10 hàng tuần, có owner.
 - Quarantine tag: test bị quarantine không chặn PR, chạy riêng.
 - SLA 1 tuần; quá hạn xoá. Xem `19-Testing-Deep-Dive.md` mục 13.2.
 
 ### 14.4 Branch protection + CI
 
-Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` hay bị PR đè nhau. Không cho admin bypass. PR từ fork chạy không secret; deploy chỉ từ `main`/tag.
+Required check = `ci-passed` (tổng hợp, workflow không có path filter cấp workflow, mục 7.3). Merge queue khi team >5 và `main` hay bị PR đè nhau; nhớ thêm `merge_group:` vào `on:` (mục 7.1). Không cho admin bypass. PR từ fork chạy không secret; deploy chỉ từ `main`/tag.
 
 ### 14.5 Kiểm soát chi phí
 
@@ -2114,7 +2350,7 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 - Flaky retry 3 lần "cho xanh": bug race thật lọt production.
 
 **Đọc thêm:**
-- https://dora.dev (DORA metrics, Accelerate)
+- https://dora.dev/guides/dora-metrics/ (5 metric DORA hiện tại)
 - https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions
 - https://docs.gradle.org/current/userguide/dependency_verification.html
 - Sách: Accelerate (Forsgren, Humble, Kim), chương 2 và 4; The Manager's Path (Fournier) phần Tech Lead
@@ -2132,7 +2368,7 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 **Điểm interviewer muốn nghe:** Phân biệt branch riêng và chung; hash đổi khi rebase.
 
 ### Q3. What is the difference between git reset --soft, --mixed and --hard?
-**A:** All three move the current branch and HEAD to the target commit. Soft stops there, leaving the index and working tree untouched, so the changes from the undone commits are staged; I use it to squash the last few commits. Mixed, the default, also resets the index to the target, so changes become unstaged edits. Hard resets the index and working tree too, discarding uncommitted changes, which is the only destructive one. Committed work is still reachable through reflog for about 90 days, so even a wrong hard reset of commits is recoverable; only uncommitted edits are truly lost.
+**A:** All three move the current branch and HEAD to the target commit. Soft stops there, leaving the index and working tree untouched, so the changes from the undone commits are staged; I use it to squash the last few commits. Mixed, the default, also resets the index to the target, so changes become unstaged edits. Hard resets the index and working tree too, discarding uncommitted changes, which is the only destructive one. Committed work is still recoverable through the reflog: by default git keeps reflog entries for 90 days if they are still reachable (gc.reflogExpire) but only 30 days for unreachable ones (gc.reflogExpireUnreachable), and commits dropped by a reset, amend or rebase are exactly the unreachable kind. So a wrong hard reset of commits is recoverable within about a month; only uncommitted edits are truly lost.
 **Follow-ups:** How do you recover after a wrong reset --hard? What is ORIG_HEAD? When do you use revert instead?
 **Điểm interviewer muốn nghe:** Ba vùng, chỉ --hard phá working tree, reflog cứu commit.
 
@@ -2167,7 +2403,7 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 **Điểm interviewer muốn nghe:** Cấu trúc, lợi ích tự động hoá, enforce ở PR title.
 
 ### Q10. How do you configure branch protection for main in a fintech app?
-**A:** Require a pull request with at least one approval, two for payment or security modules through CODEOWNERS, dismiss stale approvals on new commits, require the aggregated CI status check, require linear history, block force pushes and deletions, require signed commits, and apply the rules to administrators. Production deployment uses a protected environment with required reviewers, so merging to main never directly ships. For larger teams I enable the merge queue so branches are tested against the latest main without constant rebasing.
+**A:** Require a pull request with at least one approval, two for payment or security modules through CODEOWNERS, dismiss stale approvals on new commits, require the aggregated CI status check, require linear history, block force pushes and deletions, require signed commits, and apply the rules to administrators. Production deployment uses a protected environment with required reviewers, so merging to main never directly ships. For larger teams I enable the merge queue so branches are tested against the latest main without constant rebasing, which requires every workflow that produces a required check to also trigger on merge_group. I configure this as a ruleset with an empty or minimal bypass list, because rulesets layer and the most restrictive rule wins.
 **Follow-ups:** Why a single aggregated check instead of listing each job? What are rulesets versus classic protection? How do you handle emergencies?
 **Điểm interviewer muốn nghe:** Danh sách cụ thể và lý do, không ngoại lệ cho admin.
 
@@ -2177,12 +2413,12 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 **Điểm interviewer muốn nghe:** Định nghĩa gọn, biết job chạy trên runner mới, cách nối job.
 
 ### Q12. How do you cache Gradle effectively on CI?
-**A:** I use gradle/actions/setup-gradle, which caches dependency caches and the wrapper keyed on the build files, and with an encryption key it also caches the configuration cache so the configuration phase is near zero. I enable Gradle build cache and configuration cache in gradle.properties. Pull request jobs run with cache-read-only so a broken branch cannot poison the shared cache, and main writes it. For larger teams a remote build cache lets any machine reuse task outputs produced elsewhere. I measure cache hit rate with build scans before adding more complexity.
+**A:** I use gradle/actions/setup-gradle, currently v6, which caches the Gradle User Home: dependency caches, the wrapper and the local build cache. In v6 the default provider is the proprietary Enhanced Caching, and I can switch to the MIT-licensed basic provider with cache-provider: basic if the company does not accept those terms. Older versions could also save the configuration cache when given an encryption key, but the v6.0.0 release notes say that support was removed pending a new implementation, so I do not promise a near-zero configuration phase on CI. I enable Gradle build cache and configuration cache in gradle.properties. Pull request jobs run with cache-read-only so a broken branch cannot poison the shared cache, and main writes it. For larger teams a remote build cache lets any machine reuse task outputs produced elsewhere. I measure cache hit rate with build scans before adding more complexity.
 **Follow-ups:** Why is the configuration cache sensitive to environment variables? What invalidates the cache? When is a self-hosted runner better than caching?
 **Điểm interviewer muốn nghe:** Setup-gradle, read-only cho PR, config cache, đo trước khi tối ưu.
 
 ### Q13. How do you sign an Android release on CI safely?
-**A:** The upload keystore is stored base64-encoded as a secret, decoded into the runner's temp directory in the build job only, and passed to Gradle through environment variables read with providers.environmentVariable, never committed. Passwords live in separate secrets scoped to an environment that requires reviewers for production. The job that uses them does not run on pull requests, so fork PRs cannot reach them. Thanks to Play App Signing the key on CI is only the upload key; if it leaks I can rotate it through Play Console without losing the app identity.
+**A:** The upload keystore is stored base64-encoded as a secret, decoded into the runner's temp directory in the build job only, and passed to Gradle through environment variables read with providers.environmentVariable, never committed. Passwords live in separate secrets scoped to an environment that requires reviewers for production. The job that uses them does not run on pull requests, so fork PRs cannot reach them. Thanks to Play App Signing the key on CI is only the upload key; if it leaks I generate a new key, export its certificate as PEM with keytool, and use Request upload key reset on the Play app signing page, without losing the app identity. After the build I verify the bundle with jarsigner -verify -certs, because apksigner does not handle app bundles, and compare the fingerprint with the upload certificate shown in Play Console.
 **Follow-ups:** What about keystore for debug builds? How do you verify the bundle was signed with the right key? Where does OIDC fit?
 **Điểm interviewer muốn nghe:** Base64 secret, env vars, không chạy trên PR, Play App Signing.
 
@@ -2192,7 +2428,7 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 **Điểm interviewer muốn nghe:** Token ngắn hạn, điều kiện tin cậy, giảm secret.
 
 ### Q15. Your PR pipeline takes 40 minutes. How do you bring it under 15?
-**A:** Measure first with build scans to see where time goes. Typical fixes: fix cache misses, enable configuration cache, run lint, detekt and unit tests as parallel jobs, drop redundant variants like testing both debug and release, move instrumented and iOS tests to nightly, use path filters so docs-only changes skip builds, cancel superseded runs, and split tests across containers where the runtime is really in tests. If the bottleneck is compilation, modularization and a remote build cache pay off; if it is runner provisioning, a self-hosted runner with a warm Gradle cache helps most.
+**A:** Measure first with build scans to see where time goes. Typical fixes: fix cache misses, enable configuration cache, run lint, detekt and unit tests as parallel jobs, drop redundant variants like testing both debug and release, move instrumented and iOS tests to nightly, skip heavy jobs for docs-only changes with job-level path filters (not workflow-level paths, which leave the required check pending), cancel superseded runs, and split tests across containers where the runtime is really in tests. If the bottleneck is compilation, modularization and a remote build cache pay off; if it is runner provisioning, a self-hosted runner with a warm Gradle cache helps most.
 **Follow-ups:** How do you keep it from regressing? What is the trade-off of self-hosted runners? How do you split Gradle tests across containers?
 **Điểm interviewer muốn nghe:** Đo, cache, song song, dời chậm ra nightly, giữ ngân sách.
 
@@ -2207,7 +2443,7 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 **Điểm interviewer muốn nghe:** GMD + KVM, không gate PR, có owner.
 
 ### Q18. What is a staged rollout and how do you decide to advance or halt?
-**A:** A staged rollout releases a production version to a percentage of users, starting around 1 to 10 percent, and increases in steps. Before each step I check crash-free users and ANR rate against thresholds, key business metrics like login or purchase success, and store reviews. If a metric breaches, I halt, which stops new users from receiving it, and ship a fixed version with a higher versionCode since Play cannot downgrade users. Kill switches via remote config cover feature-level problems without a new build.
+**A:** A staged rollout releases a production version to a percentage of users, starting around 1 to 10 percent, and increases in steps. Before each step I check crash-free users and ANR rate against thresholds, key business metrics like login or purchase success, and store reviews. Play's bad behavior thresholds are a hard ceiling: 1.09 percent user-perceived crash rate and 0.47 percent ANR rate overall, 8 percent per phone model, measured over 28 days. If a metric breaches, I halt with Manage rollout, Halt rollout, which stops new users from receiving it while users who already updated stay on that version, and ship a fixed version with a higher versionCode since Play cannot downgrade users. Kill switches via remote config cover feature-level problems without a new build.
 **Follow-ups:** What thresholds would you set? How long between steps? How do you communicate a halt to stakeholders?
 **Điểm interviewer muốn nghe:** Ngưỡng cụ thể, halt không phải rollback, kill switch.
 
@@ -2217,12 +2453,12 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 **Điểm interviewer muốn nghe:** Đơn điệu, nguồn tự động, fallback local, check trước upload.
 
 ### Q20. How would you set up iOS CI for a KMP app?
-**A:** A macOS runner with the Xcode version Apple currently requires for uploads, JDK for Gradle, and the shared module tests run on the iOS simulator through the iosSimulatorArm64Test task. The iOS app builds with xcodebuild, which invokes the KMP embedAndSign phase to produce the framework. Signing uses fastlane match to pull certificates and profiles from an encrypted repository with an App Store Connect API key, and pilot uploads to TestFlight. Because macOS minutes are expensive I run this on path changes to shared or iOS code and nightly, or on a self-hosted Mac mini.
+**A:** A macOS runner, today macos-26 on GitHub Actions, with Xcode 26 or later because Apple has required the iOS 26 SDK for uploads since April 28, 2026, JDK for Gradle, a cache of ~/.konan so the Kotlin/Native toolchain is not downloaded every run, and the shared module tests run on the iOS simulator through the iosSimulatorArm64Test task. The iOS app builds with xcodebuild, which invokes the KMP embedAndSign phase to produce the framework. Signing uses fastlane match to pull certificates and profiles from an encrypted repository with an App Store Connect API key, and pilot uploads to TestFlight. Because macOS minutes are expensive I run this on path changes to shared or iOS code and nightly, or on a self-hosted Mac mini.
 **Follow-ups:** How does Xcode find the JDK on CI? What is the difference between match and manual signing? How do you cache Gradle on macOS?
 **Điểm interviewer muốn nghe:** Xcode version, simulator tests, match, chi phí macOS.
 
 ### Q21. What DORA metrics would you track for a mobile team and what are good values?
-**A:** Deployment frequency measured as production releases per month plus internal builds per day; lead time as merge to full rollout; change failure rate as the share of releases halted or hotfixed; time to restore as halt to fixed rollout or kill switch activation. Reasonable targets for a two-week train are a release every two weeks, lead time under two weeks, change failure under 10 to 15 percent, and restore in hours via kill switch or within a day or two via hotfix. I add crash-free users, ANR rate and PR pipeline time as mobile-specific health signals, and I use them to improve the system, not to rank people.
+**A:** DORA now uses five metrics in two groups. Throughput: deployment frequency, change lead time, and failed deployment recovery time, which replaced the old time to restore. Instability: change fail rate and deployment rework rate, the share of unplanned deployments caused by a production incident. For a mobile team I measure deployment frequency as production releases per month plus internal builds per day; change lead time as merge to production track; change fail rate as the share of releases halted or hotfixed; recovery time as halt to fixed rollout or kill switch activation; and rework rate as off-train hotfix releases over all releases. My own targets for a two-week train are a release every two weeks, lead time under two weeks, change fail rate under 10 to 15 percent, and recovery in minutes via kill switch or within a day or two via hotfix. Those are team targets, not DORA benchmarks, since DORA's performance clusters change with each yearly report. I add crash-free users and the Android vitals thresholds, 1.09 percent user-perceived crash rate and 0.47 percent ANR rate, plus PR pipeline time, and I use them to improve the system, not to rank people.
 **Follow-ups:** How do you collect these automatically? What would you do if change failure rate rises? How does a release train affect lead time?
 **Điểm interviewer muốn nghe:** Bốn metric diễn giải cho mobile, con số hợp lý, không dùng để chấm cá nhân.
 
@@ -2242,7 +2478,7 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 **Điểm interviewer muốn nghe:** Step-level vs job-level, phạm vi secret.
 
 ### Q25. How do you handle a flaky test that keeps failing the nightly pipeline?
-**A:** I quarantine it with a tag so it no longer affects the main result, assign an owner and a one-week deadline, and look for the common causes: real time, hardcoded dispatchers, shared state, animations, network or emulator starvation. The fix is usually injecting a clock or dispatcher, cleaning state in teardown, or replacing the real dependency with a fake. If nobody fixes it within the SLA the test is deleted, because a test nobody trusts has negative value. I track the flaky count as a pipeline health metric.
+**A:** I quarantine it with a tag so it no longer affects the main result, assign an owner and a one-week deadline, and look for the common causes: real time, hardcoded dispatchers, shared state, animations, network or emulator starvation. The fix is usually injecting a clock or dispatcher, cleaning state in teardown, or replacing the real dependency with a fake. If nobody fixes it within the SLA the test is deleted, because a test nobody trusts has negative value. For JVM tests I allow at most one automatic retry with the open-source Gradle test-retry plugin, with maxFailures set so a real breakage is not retried, and the report still records the first failure so the flaky count is visible. I track that count as a pipeline health metric.
 **Follow-ups:** Would you enable automatic retries? How do you detect flakiness automatically? What if the flakiness reveals a real race?
 **Điểm interviewer muốn nghe:** Quarantine, owner, deadline, không retry mù.
 
@@ -2277,7 +2513,7 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 **Điểm interviewer muốn nghe:** Không cấp secret cho fork; hiểu pull_request_target.
 
 ### Q32. How do you keep CI cost under control?
-**A:** Measure minutes per workflow monthly. Then: cache properly, cancel superseded runs on PRs, path filters for docs-only changes, timeouts on every job, artifacts with short retention, schedule expensive emulator and macOS jobs nightly instead of per PR, and a self-hosted Mac mini for iOS once macOS minutes exceed its cost. I also delete workflows nobody reads. The target is a cost that scales with releases, not with every commit.
+**A:** Measure minutes per workflow monthly. Then: cache properly, cancel superseded runs on PRs, job-level path filters for docs-only changes, timeouts on every job, artifacts with short retention, schedule expensive emulator and macOS jobs nightly instead of per PR, and a self-hosted Mac mini for iOS once macOS minutes exceed its cost. I also delete workflows nobody reads. The target is a cost that scales with releases, not with every commit.
 **Follow-ups:** How do you estimate self-hosted versus hosted break-even? What is the cost of a flaky test in minutes? How do you track cost per team?
 **Điểm interviewer muốn nghe:** Đo rồi cắt, nightly cho đắt, self-hosted khi vượt ngưỡng.
 
@@ -2292,7 +2528,7 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 **Điểm interviewer muốn nghe:** Workflow chạy từ branch, lint, dry-run.
 
 ### Q35. How do you structure CI for a multi-module Android repo so that unrelated changes stay fast?
-**A:** I rely on Gradle's build cache and configuration cache so unchanged modules resolve from cache even when I run the full task graph, which is simpler and safer than hand-written module selection. On top I use path filters to skip builds for documentation or marketing changes, and for very large repos a script computes affected modules from git diff and runs only their tests, with a nightly full run as the safety net. CODEOWNERS and required checks are per module so review scales too.
+**A:** I rely on Gradle's build cache and configuration cache so unchanged modules resolve from cache even when I run the full task graph, which is simpler and safer than hand-written module selection. On top I skip heavy jobs for documentation or marketing changes with job-level path filters, keeping the aggregated required check running so it never stays pending, and for very large repos a script computes affected modules from git diff and runs only their tests, with a nightly full run as the safety net. CODEOWNERS and required checks are per module so review scales too.
 **Follow-ups:** What are the risks of affected-module logic? How does the configuration cache interact with environment variables? How do you handle build-logic changes that affect everything?
 **Điểm interviewer muốn nghe:** Cache trước, affected-module sau, có full run bảo hiểm.
 
@@ -2302,7 +2538,7 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 **Điểm interviewer muốn nghe:** Checklist cụ thể, biết bẫy thường gặp.
 
 ### Q37. Your KMP template repo has no CI today. What is your first week plan?
-**A:** Day one: a PR workflow with lint, detekt and unit tests, branch protection requiring the aggregated check, and the keystore moved out of the repo if needed. Day two: Gradle caching and configuration cache, measure the time, add timeouts and concurrency. Day three: signed bundle on tags and upload to the internal track behind an environment approval, with versionCode from the run number. Day four: nightly instrumented tests on Gradle Managed Devices and screenshot verification. Day five: iOS simulator tests on a macOS runner for shared modules, documentation in CONTRIBUTING, and a dashboard for pipeline time and flaky tests.
+**A:** Day one: a PR workflow with lint, detekt and unit tests, branch protection requiring the aggregated check, and the keystore moved out of the repo if needed. Day two: Gradle caching with setup-gradle and Gradle's own build and configuration cache, measure the time with a build scan or --profile, add timeouts and concurrency. Day three: signed bundle on tags and upload to the internal track behind an environment approval, with versionCode from the run number. Day four: nightly instrumented tests on Gradle Managed Devices and screenshot verification. Day five: iOS simulator tests on a macOS runner for shared modules, documentation in CONTRIBUTING, and a dashboard for pipeline time and flaky tests.
 **Follow-ups:** What would you cut if you had two days? How do you convince a team to adopt the gates? What metrics show it worked?
 **Điểm interviewer muốn nghe:** Kế hoạch tăng dần, ưu tiên gate PR trước, deploy sau.
 
@@ -2383,5 +2619,5 @@ Required check = `ci-passed` (tổng hợp). Merge queue khi team >5 và `main` 
 11. https://docs.fastlane.tools (supply, screengrab, match, pilot)
 12. https://kotlinlang.org/docs/multiplatform/ (tìm mục CI / GitHub Actions) (CI cho KMP)
 13. https://trunkbaseddevelopment.com và https://www.conventionalcommits.org
-14. https://dora.dev và sách Accelerate (Forsgren, Humble, Kim)
+14. https://dora.dev/guides/dora-metrics/ và sách Accelerate (Forsgren, Humble, Kim)
 15. https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions (bảo mật pipeline)

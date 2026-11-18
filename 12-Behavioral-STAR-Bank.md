@@ -20,13 +20,15 @@ flowchart LR
 
 ### 1.1 Năm tín hiệu interviewer chấm
 
-| Tín hiệu | Họ tìm gì trong câu chuyện | Dấu hiệu điểm thấp |
-|---|---|---|
-| Ownership | Bạn tự nhận việc, tự đi tới cùng, kể cả việc không ai giao | "Team quyết định", "được giao" suốt |
-| Impact | Kết quả đo được, cho user hoặc business, không chỉ cho code | Kết quả là "code sạch hơn" |
-| Collaboration | Làm việc với PM, backend, QA, HQ; ghi nhận người khác đúng chỗ | Chỉ có bạn và kẻ sai |
-| Growth | Bạn học gì, lần sau làm khác gì; nhận sai thật | "Nếu làm lại tôi cũng làm vậy" |
-| Judgement | Quyết định trong điều kiện thiếu thông tin, nêu trade-off, biết khi nào escalate | Không có lựa chọn nào bị loại |
+**Đây là bảng tổng hợp của bộ tài liệu, không phải rubric công bố của một công ty.** Không công ty nào công bố rubric chấm behavioral nội bộ. Nguồn chính chủ gần nhất là Amazon: bài "Amazon interview guide" (aboutamazon.com, 8/4/2025, https://www.aboutamazon.com/news/workplace/amazon-interview-guide) nói quy trình "distinctly behavioral-based", ứng viên được đánh giá "against Amazon's Leadership Principles and role requirements", khuyên trả lời theo STAR và dùng câu "I" để chỉ rõ đóng góp cá nhân, có số đo kết quả. Cột cuối map mỗi tín hiệu tới Leadership Principle gần nhất (https://www.amazon.jobs/content/en/our-workplace/leadership-principles) để bạn tự đối chiếu. Kiểm tra 18/11/2026.
+
+| Tín hiệu | Họ tìm gì trong câu chuyện | Dấu hiệu điểm thấp | Amazon LP gần nhất |
+|---|---|---|---|
+| Ownership | Bạn tự nhận việc, tự đi tới cùng, kể cả việc không ai giao | "Team quyết định", "được giao" suốt | Ownership |
+| Impact | Kết quả đo được, cho user hoặc business, không chỉ cho code | Kết quả là "code sạch hơn" | Deliver Results, Customer Obsession |
+| Collaboration | Làm việc với PM, backend, QA, HQ; ghi nhận người khác đúng chỗ | Chỉ có bạn và kẻ sai | Earn Trust |
+| Growth | Bạn học gì, lần sau làm khác gì; nhận sai thật | "Nếu làm lại tôi cũng làm vậy" | Learn and Be Curious |
+| Judgement | Quyết định trong điều kiện thiếu thông tin, nêu trade-off, biết khi nào escalate | Không có lựa chọn nào bị loại | Are Right, A Lot; Bias for Action |
 
 Bank/fintech thêm: **risk awareness** (bạn nghĩ tới tiền, dữ liệu, compliance trước khi ship), **process discipline** (làm theo quy trình nhưng biết khi nào quy trình sai).
 
@@ -145,7 +147,7 @@ Grab-style culture fit (và các công ty có bộ nguyên tắc tương tự nh
 39. Tell me about a time you handled a production incident involving money or sensitive data.
 40. Describe a time you had to balance compliance or security requirements against delivery speed.
 
-Câu 36 là câu kinh điển của Grab ("Heart" trong 4H: Heart, Hunger, Honour, Humility; xem trang nguyên tắc của Grab, cần kiểm tra bản hiện tại). Câu 5, 7, 38 bám Amazon "Have Backbone; Disagree and Commit". Câu 39-40 gần như chắc chắn ở OCB, Techcombank, Tyme, Timo, Payoo (xem `01-Market-Research-2026.md`).
+Câu 36 là câu kinh điển của Grab ("Heart" trong 4H: Heart, Hunger, Honour, Humility, là "The Grab Way" trên https://www.grab.careers/en/life-at-grab/ , kiểm tra 18/11/2026). Câu 5, 7, 38 bám Amazon "Have Backbone; Disagree and Commit". Câu 39-40 gần như chắc chắn ở OCB, Techcombank, Tyme, Timo, Payoo (xem `01-Market-Research-2026.md`).
 
 ### 2.1 Tra ngược: câu hỏi nào dùng template nào
 
@@ -198,7 +200,7 @@ Câu 37 (team khác nước) chưa có template riêng vì phụ thuộc vào l�
 
 **Đọc thêm:**
 - https://github.com/kaushikb9/em-interviews (thêm câu hỏi cho nhóm E, F, G)
-- https://www.grab.com/ (nguyên tắc Grab cho nhóm K; cần kiểm tra đường dẫn trang nguyên tắc hiện tại)
+- https://www.grab.careers/en/life-at-grab/ ("The Grab Way", 4H, cho nhóm K)
 - `01-Market-Research-2026.md` (công ty nào hỏi nhóm L)
 
 ## 3. 20 STAR story template
@@ -298,7 +300,7 @@ Cách dùng: mỗi template có câu hỏi nó trả lời, story gợi ý từ 
 - A: "I read the policy and wrote a one-page constraints doc: no behavioral ads, only Families-certified ad SDKs, no advertising ID, no precise location, minimal analytics with no personal data, a parental gate for external links and purchases. I reviewed every SDK's data collection against the Play Data safety form. I pushed back on a personalized-ads request with the numbers: policy rejection would cost the whole app."
 - R: "The app passed Families review [điền: lần đầu hoặc sau N lần]; the data safety form matched what the app does; no policy strikes in [điền số] releases."
 - L: "In regulated products, the constraints doc comes before the feature list."
-**Follow-ups:** What is a parental gate and how did you implement it? How do you keep the Data safety form accurate when SDKs update? What changed in COPPA recently (cần kiểm tra)?
+**Follow-ups:** What is a parental gate and how did you implement it? How do you keep the Data safety form accurate when SDKs update? What changed in the amended COPPA Rule (published 22/4/2025, effective 23/6/2025, full compliance by 22/4/2026; https://www.federalregister.gov/documents/2025/04/22/2025-05904/childrens-online-privacy-protection-rule)?
 **Red flags cần tránh:** Bịa ngưỡng luật; không biết Data safety form là gì.
 
 ### T9. Pipeline audio sinh bằng Gemini và CDN Firebase Storage
@@ -629,8 +631,8 @@ Bảng chấm cho peer:
 ## Đọc thêm tổng hợp
 
 1. https://www.amazon.jobs/content/en/our-workplace/leadership-principles : 16 nguyên tắc, mỗi nguyên tắc là một nguồn câu hỏi behavioral; dùng để sinh thêm câu hỏi luyện.
-2. https://www.grab.com/ : trang nguyên tắc "The Grab Way" (4H: Heart, Hunger, Honour, Humility; cần kiểm tra đường dẫn hiện tại) cho vòng culture fit Grab.
-3. https://rework.withgoogle.com/ : structured interviewing, cách interviewer chấm theo rubric; đọc để hiểu bạn bị chấm thế nào.
+2. https://www.grab.careers/en/life-at-grab/ : "The Grab Way" (4H: Heart, Hunger, Honour, Humility) cho vòng culture fit Grab.
+3. https://www.aboutamazon.com/news/workplace/amazon-interview-guide : Amazon tự mô tả vòng behavioral (STAR, chấm theo Leadership Principles, câu "I" thay vì "we"). Trang structured interviewing của Google re:Work từng là nguồn tương tự nhưng đường dẫn guide cũ đã 404 (kiểm tra 18/11/2026), chỉ còn trang chủ https://rework.withgoogle.com/ .
 4. https://github.com/kaushikb9/em-interviews : câu hỏi EM/TL, dùng cho nhóm E và F.
 5. The Manager's Path (Fournier), ch. 3-4: nguồn story mẫu cho tech lead và 1:1.
 6. `11-Leadership-Management.md`: Q&A lead có nhiều story mẫu trùng với template ở đây.

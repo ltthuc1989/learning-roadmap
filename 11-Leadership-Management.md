@@ -120,7 +120,7 @@ HTTP engine, file paths) are provided in androidMain / iosMain modules.
 |---|---|---|
 | Hilt | Compile-time graph, team knows it, great Android tooling | Android only; iOS would need a second DI, two graphs to keep in sync |
 | Koin | Kotlin DSL, works in commonMain, no codegen, easy to read, Koin Annotations optional | Runtime resolution: a missing binding fails at runtime, not at compile; needs `verify()` tests and a startup smoke test |
-| kotlin-inject / Metro | Compile-time, KMP | Smaller community at the time; team had no experience (cần kiểm tra trạng thái hiện tại) |
+| kotlin-inject / Metro | Compile-time, KMP | Smaller community at the time; team had no experience (both still actively released: Metro 1.6.0, kotlin-inject 0.9.0 as of 18/11/2026, so revisit) |
 
 ## Consequences
 Good: one DI graph for both platforms; feature modules declare their own Koin module;
@@ -190,7 +190,7 @@ Template RFC:
 
 Tech radar (Thoughtworks) là bảng phân loại công nghệ theo bốn vòng: **Adopt** (dùng mặc định), **Trial** (dùng trong dự án có kiểm soát), **Assess** (tìm hiểu, chưa dùng production), **Hold** (không dùng cho việc mới). Với team mobile nhỏ, một trang markdown cập nhật mỗi quý là đủ. Giá trị: trả lời "được dùng cái này không" mà không cần hỏi lead; và cho interviewer thấy bạn nghĩ ở mức platform.
 
-Ví dụ radar cho team bạn (cập nhật theo `01` và FACTS trong brief):
+Ví dụ radar cho team bạn (cập nhật mỗi quý theo `01`):
 
 | Ring | Mục |
 |---|---|
@@ -253,9 +253,9 @@ Ví dụ một quý cho team app KMP:
 
 | Mục tiêu sản phẩm (PM) | Việc kỹ thuật | Bắt buộc / deadline bên ngoài |
 |---|---|---|
-| Tăng D7 retention lên [điền số] | Giảm cold start, offline content pack, push đúng lúc | Target API 36 trước 31/8/2026 (gia hạn 1/11/2026, xem brief) |
-| Mở thị trường iOS | Port 2 feature còn lại sang commonMain, CI iOS | Xcode 26 / iOS 26 SDK để upload (từ 28/4/2026) |
-| Giảm chi phí support | Crashlytics triage SLA, kill switch Remote Config | 16 KB page size cho native libs (chặn update từ 1/2/2027 theo Play) |
+| Tăng D7 retention lên [điền số] | Giảm cold start, offline content pack, push đúng lúc | Target API 36 cho app mới và update từ 31/8/2026, xin gia hạn được tới 1/11/2026 ([Play target API](https://support.google.com/googleplay/android-developer/answer/11926878)) |
+| Mở thị trường iOS | Port 2 feature còn lại sang commonMain, CI iOS | Xcode 26 / iOS 26 SDK để upload (từ 28/4/2026, [Apple upcoming requirements](https://developer.apple.com/news/upcoming-requirements/)) |
+| Giảm chi phí support | Crashlytics triage SLA, kill switch Remote Config | 16 KB page size cho native libs (chặn update từ 1/2/2027 theo Play, [page sizes](https://developer.android.com/guide/practices/page-sizes)) |
 
 Cách làm: 1 buổi với PM lấy mục tiêu quý; bạn đề xuất tối đa 3 technical bet; mỗi bet có metric; 20% capacity cho nợ kỹ thuật và việc bắt buộc; review giữa quý.
 
@@ -319,12 +319,12 @@ Checklist đánh giá SDK chi tiết nằm ở `22-Product-Metrics-Compliance.md
 
 ### 2.1 Mục tiêu và nguyên tắc
 
-Code review có ba mục tiêu theo thứ tự: (1) không đưa bug, lỗ hổng, nợ xấu vào main; (2) truyền kiến thức hai chiều; (3) giữ codebase nhất quán. Google eng-practices tóm tắt thành một câu: approve khi PR làm code health **tốt hơn**, không cần hoàn hảo.
+Code review có ba mục tiêu theo thứ tự: (1) không đưa bug, lỗ hổng, nợ xấu vào main; (2) truyền kiến thức hai chiều; (3) giữ codebase nhất quán. Google eng-practices tóm tắt thành một câu: reviewer "should favor approving a CL once it is in a state where it definitely improves the overall code health of the system being worked on, even if the CL isn't perfect" (https://google.github.io/eng-practices/review/reviewer/standard.html). Rule chi tiết có link đúng mục, ví dụ xấu → tốt và rubric nằm ở `27-Engineering-Standards-Per-Phase.md` chủ đề 6 (Pull request) và chủ đề 7 (Code review); mục này chỉ là phần văn hoá và SLA cho team.
 
 Nguyên tắc cho team mobile:
-- PR nhỏ: dưới ~400 dòng thay đổi, một mục đích. PR lớn thì chia theo stack.
+- PR nhỏ, một mục đích. Hai con số có nguồn, đừng trộn: Google ghi "100 lines is usually a reasonable size for a CL, and 1000 lines is usually too large, but it's up to the judgment of your reviewer", và một thay đổi 200 dòng rải trên 50 file thường cũng là quá lớn (https://google.github.io/eng-practices/review/developer/small-cls.html#what-is-small). Con số "400" đến từ nghiên cứu SmartBear trên team Cisco: reviewer "should review no more than 200 to 400 lines of code (LOC) at a time", quá 400 LOC khả năng tìm lỗi giảm (https://smartbear.com/learn/code-review/best-practices-for-peer-code-review/; lưu ý SmartBear bán tool review). Quy tắc team: nhắm ~100-200 dòng, trần mềm 400 dòng phải có lý do trong mô tả; PR lớn hơn thì tách theo các pattern ở `27` mục 6.3 (stacking, theo file, ngang, dọc).
 - Mô tả PR có: vì sao, làm gì, cách test, screenshot/video nếu UI, link ticket, nhãn `ai-assisted` nếu có.
-- Reviewer trả lời trong **1 ngày làm việc**; PR hotfix trong 2 giờ. Đây là SLA ghi rõ, đo được.
+- Reviewer trả lời trong **1 ngày làm việc**: Google "Speed of Code Reviews" ghi "One business day is the maximum time it should take to respond to a code review request (i.e., first thing the next morning)", và khuyên review ngay khi không đang ở giữa việc cần tập trung (https://google.github.io/eng-practices/review/reviewer/speed.html#fast). Đó là mức tối đa, không phải mục tiêu. PR hotfix trong 2 giờ là SLA nội bộ của team (không phải số của Google). Cả hai ghi rõ và đo được ("time to first review").
 - Tác giả không tự merge khi còn comment "issue" chưa resolve.
 - Tối thiểu 1 approve; module nhạy cảm (billing, auth, security) cần 2, trong đó 1 là code owner (`CODEOWNERS`).
 
@@ -380,14 +380,23 @@ Bar giống hệt code người viết, cộng thêm ba điểm: (1) tác giả 
 
 ### 3.1 Hai framework trong 10 dòng
 
-**Situational leadership** (Hersey, Blanchard): chọn cách dẫn theo mức sẵn sàng của người đó với **việc cụ thể**, không phải theo thâm niên.
+**Situational leadership** (Hersey, Blanchard): chọn cách dẫn theo mức sẵn sàng của người đó với **việc cụ thể**, không phải theo thâm niên. Bốn tên dưới đây là của bản SLII do Ken Blanchard phát triển (sách *Leadership and the One Minute Manager*, Blanchard, Zigarmi & Zigarmi, 1985): S1-S4 ứng với mức phát triển D1-D4 (competence + commitment). Mô hình gốc của Hersey & Blanchard (lý thuyết "life cycle" 1969, sau đưa vào sách *Management of Organizational Behavior*) gọi bốn kiểu là Telling, Selling, Participating, Delegating; interviewer dùng tên nào cũng được.
 - Mới, chưa biết làm: **Directing** (chỉ rõ việc, cách làm, kiểm tra sớm).
 - Biết một chút, dễ nản: **Coaching** (vẫn chỉ cách, nhưng giải thích và hỏi ý).
 - Làm được nhưng thiếu tự tin: **Supporting** (hỏi họ định làm sao, bạn gỡ rào).
 - Làm tốt, tự chủ: **Delegating** (giao mục tiêu, không giao cách).
 Một senior Android chuyển sang KMP có thể ở mức Directing cho iOS build nhưng Delegating cho Compose. Nói được ví dụ này là điểm cộng.
 
-**GROW** (cho buổi coaching): **Goal** (muốn đạt gì), **Reality** (đang ở đâu, bằng chứng), **Options** (có những cách nào, ít nhất 3), **Will** (sẽ làm gì, khi nào, bạn hỗ trợ gì). Bạn hỏi nhiều hơn nói.
+**GROW** (cho buổi coaching): **Goal** (muốn đạt gì), **Reality** (đang ở đâu, bằng chứng), **Options** (có những cách nào, ít nhất 3), **Will** (sẽ làm gì, khi nào, bạn hỗ trợ gì). Bạn hỏi nhiều hơn nói. Nguồn gốc: John Whitmore, *Coaching for Performance* (bản 5th, 2017, Nicholas Brealey, viết cùng Performance Consultants), phần "The GROW Model" với các chương "G: Goal Setting", "R: What is Reality?", rồi Options và Will; số chương khác nhau giữa các bản nên trích theo tên phần. Ý cốt lõi của Whitmore: coaching dựa trên câu hỏi mở tạo ra **awareness** và **responsibility** ở người được coach, không phải lời khuyên.
+
+Câu hỏi mẫu theo GROW (EN) cho 1:1 về một mục tiêu kỹ thuật:
+
+```
+G: What would "done well" look like for the iOS release by end of quarter?
+R: What have you tried so far? What happened? What is in your way right now?
+O: What are three ways you could approach it? What would you do if the deadline were tomorrow?
+W: Which one will you start with, and by when? What support do you need from me? How will we know it worked?
+```
 
 ### 3.2 1:1: cấu trúc và nhịp
 
@@ -396,6 +405,7 @@ Một senior Android chuyển sang KMP có thể ở mức Directing cho iOS bui
 - Không phải status report. Status để standup hoặc Slack.
 - Ghi chú riêng sau mỗi buổi: cam kết hai bên, chủ đề lặp lại.
 - Mỗi quý một buổi "career": họ muốn đi đâu, cần bằng chứng gì để lên cấp.
+- Nguồn: Camille Fournier, *The Manager's Path* (O'Reilly, 2017), ch. 1 "Management 101" (những gì nên kỳ vọng ở manager: 1:1 định kỳ, feedback, hỗ trợ phát triển nghề nghiệp, và cách "được quản lý" tốt) và ch. 4 "Managing People" (bắt đầu quan hệ báo cáo mới, các kiểu 1:1 khác nhau, văn hoá feedback liên tục). Ch. 2 "Mentoring" và ch. 3 "Tech Lead" sát nhất với vai trò Tech Lead không làm people manager.
 
 Script mẫu (EN) cho 1:1 với một mid-level developer mới dùng AI agent nhiều:
 
@@ -460,9 +470,10 @@ Mentor cho lời khuyên. Sponsor **dùng uy tín của mình** để tạo cơ 
 - Giữ underperformer quá lâu vì ngại: team mất niềm tin vào lead.
 
 **Đọc thêm:**
-- The Manager's Path, ch. 2 "Mentoring" và ch. 4 "Managing People" (1:1 types, feedback)
+- The Manager's Path (Fournier, 2017), ch. 1 "Management 101", ch. 2 "Mentoring", ch. 3 "Tech Lead", ch. 4 "Managing People" (1:1 types, feedback)
+- John Whitmore, *Coaching for Performance*, 5th ed. (2017), phần "The GROW Model"
 - https://www.ccl.org/articles/leading-effectively-articles/closing-the-gap-between-intent-vs-impact-sbii/
-- https://rework.withgoogle.com/ (Google re:Work, phần managers và 1:1)
+- https://rework.withgoogle.com/intl/en/guides/following-the-data-the-research-behind-great-managers (Google re:Work, Project Oxygen: hành vi của manager giỏi, đứng đầu là "is a good coach")
 
 ## 4. Planning và estimation
 
@@ -497,11 +508,27 @@ RICE = Reach x Impact x Confidence / Effort. Cho team nhỏ, dùng ICE (Impact, 
 
 ### 4.5 Agile/Scrum như thực hành
 
-Ritual đáng giữ: planning ngắn (1h/2 tuần), daily 10 phút (hoặc async trên Slack), retro có action item có owner, refinement trước planning. Ritual hay bị hình thức: sprint review để demo cho chính mình, daily thành report cho lead. Nếu không ai dùng velocity để quyết định thì bỏ story point.
+Chuẩn gốc là Scrum Guide 2020 (Schwaber & Sutherland, bản tháng 11/2020, https://scrumguides.org/scrum-guide.html), biết để nói đúng thuật ngữ:
+
+- 3 accountability (không còn gọi là "role"): Developers, Product Owner, Scrum Master; một Scrum Team "typically 10 or fewer people" (#scrum-team).
+- 5 event và timebox cho Sprint một tháng (Sprint ngắn hơn thì thường ngắn hơn): Sprint (≤ 1 tháng, chứa mọi event), Sprint Planning ≤ 8 giờ, Daily Scrum 15 phút, Sprint Review ≤ 4 giờ, Sprint Retrospective ≤ 3 giờ (#scrum-events).
+- Daily Scrum là của Developers, mục đích "inspect progress toward the Sprint Goal and adapt the Sprint Backlog as necessary"; không phải báo cáo cho lead (#daily-scrum).
+- 3 artifact, mỗi cái có một commitment: Product Backlog → Product Goal, Sprint Backlog → Sprint Goal, Increment → Definition of Done (#scrum-artifacts).
+- Guide không nhắc story point hay velocity: đó là thực hành thêm, không phải Scrum.
+
+Thực hành cho team mobile 4-8 người: planning ngắn (1h/2 tuần), daily 10 phút (hoặc async trên Slack), retro có action item có owner, refinement trước planning. Ritual hay bị hình thức: sprint review để demo cho chính mình, daily thành report cho lead (trái với mục đích ở trên). Nếu không ai dùng velocity để quyết định thì bỏ story point.
 
 ### 4.6 Kanban cho release train mobile
 
-Mobile khác web: không deploy liên tục được tới user vì có store review và tỷ lệ update. Nên dùng **release train**: tàu chạy đúng giờ (ví dụ 2 tuần), feature nào xong (sau flag) thì lên, chưa xong thì đợi chuyến sau. Kanban với WIP limit cho luồng: Ready -> In dev -> In review -> QA -> Ready for train. Lead theo dõi cycle time từ In dev tới Ready for train.
+Mobile khác web: không deploy liên tục được tới user vì có store review và tỷ lệ update. Nên dùng **release train**: tàu chạy đúng giờ (ví dụ 2 tuần), feature nào xong (sau flag) thì lên, chưa xong thì đợi chuyến sau. Kanban với WIP limit cho luồng: Ready -> In dev -> In review -> QA -> Ready for train.
+
+Định nghĩa chuẩn từ The Kanban Guide (Vacanti & Coleman, bản v2025.5, cập nhật 1/5/2025, https://kanbanguides.org/english/):
+
+- "Kanban is a strategy for optimizing the flow of value through a process." Ba thực hành: định nghĩa và trực quan hoá workflow, chủ động quản lý item trong workflow, cải tiến workflow.
+- WIP: "Any work items between a started point and a finished point". Definition of Workflow tối thiểu gồm: đơn vị công việc, điểm started/finished, các state ở giữa, cách kiểm soát WIP, policy chuyển state, và service level expectation (SLE) dựa trên cycle time lịch sử.
+- 4 flow metric bắt buộc: WIP (số item đã bắt đầu chưa xong), Throughput (số item xong mỗi đơn vị thời gian), Work Item Age (từ lúc bắt đầu tới hiện tại, cho item đang làm), Cycle Time (từ lúc bắt đầu tới lúc xong).
+
+Áp vào train: started point = "In dev", finished point = "Ready for train". Lead theo dõi Work Item Age hằng ngày (item nào già hơn SLE, ví dụ 85% item xong trong 6 ngày, thì swarm vào) và Cycle Time sau mỗi chuyến tàu.
 
 ### 4.7 Làm việc với PM, Design, QA, Backend
 
@@ -549,6 +576,13 @@ Success metric and when we review
 
 Kết luận trước, ba lựa chọn, đề xuất một, rủi ro, câu hỏi cần họ quyết. 5 phút. Không giải thích Koin là gì. Chuẩn bị một "appendix" cho ai hỏi sâu.
 
+Nguồn của "kết luận trước":
+
+- Barbara Minto, *The Minto Pyramid Principle: Logic in Writing, Thinking and Problem Solving* (bản 1996, thay cho sách 1987; https://www.barbaraminto.com/). Ý chính: ý tưởng xếp thành kim tự tháp dưới **một** ý chính; ý ở mỗi tầng tóm tắt nhóm ý bên dưới; mở bài bằng khung SCQ (Situation, Complication, Question) để chỉ ra câu hỏi trong đầu người đọc, rồi trả lời ngay ở đỉnh.
+- BLUF (Bottom Line Up Front) từ chuẩn viết của quân đội Mỹ, Army Regulation 25-50 *Preparing and Managing Correspondence* (bản 10/10/2020): đặt khuyến nghị, kết luận hoặc lý do viết ở đoạn đầu.
+
+Ví dụ SCQ + đáp án cho exec (EN): "Situation: iOS is 30% of new installs. Complication: our Swift-only payment module blocks the KMP migration and costs two engineers' time each release. Question: do we rewrite it now or wrap it? Answer: wrap it this quarter (two weeks), rewrite next year; I need a yes by Friday."
+
 ### 5.4 Status update mà lãnh đạo đọc
 
 Mỗi tuần, 5 dòng: **On track / At risk / Off track** cho mỗi mục tiêu; thay đổi so với tuần trước; quyết định cần ai; rủi ro mới; con số chính (crash-free, release date). Màu đỏ sớm thì không ai giận; đỏ muộn thì mất tin.
@@ -568,13 +602,17 @@ Manager của bạn cần: không bất ngờ, biết sớm rủi ro, có đề 
 
 Cấu trúc một message quyết định: bối cảnh 2 câu, đề xuất, deadline trả lời, "nếu không ai phản hồi tới X thì mặc định làm Y". Dùng thread, một chủ đề một thread, cập nhật kết luận ở đầu thread.
 
+Với quyết định lớn, viết narrative thay vì slide. Amazon là ví dụ chính chủ: thư cổ đông 2017 của Jeff Bezos ghi "We don't do PowerPoint (or any other slide-oriented) presentations at Amazon. Instead, we write narratively structured six-page memos", mọi người đọc im lặng ở đầu buổi họp "in a kind of "study hall"", và "a great memo probably should take a week or more" (https://www.aboutamazon.com/news/company-news/2017-letter-to-shareholders, kiểm tra 18/11/2026). Bài học cho Tech Lead: RFC hoặc one-pager (mục 1.2, 5.2) gửi trước, dành 5-10 phút đầu họp để đọc, họp để quyết chứ không để trình bày.
+
 **Lỗi hay gặp / trade-off:**
 - Giải thích cơ chế thay vì tác động: exec ngắt lời sau 30 giây.
 - Chỉ mang vấn đề, không mang phương án.
 - Báo đỏ quá muộn vì hy vọng kịp.
 
 **Đọc thêm:**
-- The Manager's Path, ch. 5 (managing up, communicating with stakeholders)
+- The Manager's Path (Fournier), ch. 1 "Management 101" (cách được quản lý, nền của managing up) và ch. 5 "Managing a Team"
+- Barbara Minto, *The Minto Pyramid Principle* (1996): phần SCQ và cấu trúc kim tự tháp
+- https://www.aboutamazon.com/news/company-news/2017-letter-to-shareholders (đoạn về six-page memo và high standards)
 - https://lethain.com/ (tìm bài "writing engineering strategy")
 - https://www.leaddev.com/ (series về communication for tech leads)
 
@@ -654,18 +692,21 @@ Blameless: viết "the release was shipped without the billing test suite" thay 
 ### 6.6 Reliability metrics và DORA cho mobile
 
 - **Crash-free users** và **crash-free sessions** (Crashlytics), theo version. Theo dõi khác biệt giữa bản mới và bản cũ ở cùng bậc rollout.
-- **ANR rate**, **user-perceived crash rate** (Android vitals; ngưỡng Play đặt, cần kiểm tra tại developer.android.com/topic/performance/vitals).
+- **ANR rate**, **user-perceived crash rate** (Android vitals). Ngưỡng "bad behavior" của Play: user-perceived crash rate 1.09% overall và 8% mỗi phone model; user-perceived ANR rate 0.47% overall và 8% mỗi phone model; Play dùng dữ liệu 28 ngày gần nhất, vượt ngưỡng thì có thể giảm hiển thị trên Play và hiện cảnh báo trên store listing (https://developer.android.com/topic/performance/vitals#what_are_the_bad_behavior_thresholds, kiểm tra 18/11/2026).
 - **Startup time** (cold/warm/hot) từ vitals và Macrobenchmark.
 - **Adoption**: % user lên bản mới sau 7 ngày (cho biết bao lâu hotfix mới hiệu lực).
 
-DORA (Accelerate) áp vào mobile:
+DORA hiện dùng 5 metric (https://dora.dev/guides/dora-metrics/, kiểm tra 18/11/2026): nhóm throughput gồm change lead time, deployment frequency, failed deployment recovery time; nhóm instability gồm change fail rate, deployment rework rate. "Failed deployment recovery time" thay cho "time to restore"/MTTR cũ; "deployment rework rate" là "The ratio of deployments that are unplanned but happen as a result of an incident in production". Áp vào mobile:
 
 | DORA | Mobile |
 |---|---|
 | Deployment frequency | Số release train đúng giờ / tháng; số bản internal/day |
-| Lead time for changes | Từ merge tới 100% rollout |
-| Change failure rate | % release phải halt hoặc hotfix |
-| Time to restore | Từ phát hiện tới kill switch bật hoặc hotfix đạt [X]% adoption |
+| Change lead time | Từ merge tới bản lên production track (theo dõi thêm tới 100% rollout) |
+| Change fail rate | % release phải halt hoặc hotfix |
+| Failed deployment recovery time | Từ phát hiện bản lỗi tới kill switch bật hoặc hotfix đạt [X]% adoption |
+| Deployment rework rate | % release là hotfix ngoài lịch train, do sự cố production |
+
+Chi tiết cách đo và mục tiêu tự đặt: `20-Git-CICD.md` mục 14.1.
 
 Chi tiết metric sản phẩm và vitals ở `22-Product-Metrics-Compliance.md`.
 
@@ -678,7 +719,7 @@ Chi tiết metric sản phẩm và vitals ở `22-Product-Metrics-Compliance.md`
 - https://sre.google/sre-book/managing-incidents/
 - https://sre.google/sre-book/postmortem-culture/
 - https://response.pagerduty.com/
-- https://dora.dev/
+- https://dora.dev/guides/dora-metrics/
 
 ## 7. Hiring và team building
 
@@ -704,7 +745,8 @@ Mỗi vòng có **rubric** 1-4 cho 3-4 signal, viết ví dụ cho mức 2 và 4
 - Cùng bộ câu hỏi cho mọi ứng viên của một vị trí; cùng rubric.
 - Ghi chép hành vi, không ghi cảm giác ("ứng viên nêu được 2 trade-off của Koin" thay vì "có vẻ ok").
 - Bias thường gặp: halo (một câu hay kéo cả buổi), similarity (giống mình), anchoring (CV hoặc lương cũ), recency.
-- Google re:Work: structured interviewing tăng độ tin cậy; work sample tốt hơn brain teaser.
+- Google re:Work, "A guide to structured interviewing for better hiring practices" (https://rework.withgoogle.com/intl/en/guides/a-guide-to-structured-interviewing-for-better-hiring-practices, kiểm tra 18/11/2026) nêu bốn thành phần: "Using vetted, high-quality questions that are relevant to the role"; ghi feedback đầy đủ về câu trả lời; chấm bằng rubric chuẩn hoá; training và calibration cho interviewer. Hai loại câu hỏi: behavioral ("describe prior achievements") và hypothetical (tình huống giả định gắn với việc). Rubric: Google thường viết ví dụ cho câu trả lời "poor, borderline, solid, and outstanding".
+- Nghiên cứu gốc: Schmidt, F. L. & Hunter, J. E. (1998), "The validity and utility of selection methods in personnel psychology: Practical and theoretical implications of 85 years of research findings", *Psychological Bulletin*, 124(2), 262-274, https://doi.org/10.1037/0033-2909.124.2.262. Hệ số validity dự đoán hiệu suất công việc: work sample test .54, structured interview .51, unstructured interview .38 (vì vậy bài tập gần việc thật và câu hỏi có cấu trúc thắng nói chuyện tự do). Lưu ý: Sackett, Zhang, Berry & Lievens (2022), *Journal of Applied Psychology* 107(11), 2040-2068 (https://doi.org/10.1037/apl0000994) cho rằng các hiệu chỉnh range restriction cũ bị overcorrect, hạ nhiều hệ số khoảng .10-.20, và structured interview thành phương pháp đứng đầu (mean operational validity .42); khi phỏng vấn nói "structured beats unstructured" an toàn hơn là đọc con số.
 - Cho ứng viên biết trước format và được dùng AI hay không ở vòng coding.
 
 ### 7.4 Onboarding 30/60/90
@@ -730,7 +772,8 @@ Phòng: stay interview mỗi quý ("what would make you leave?"), lương theo t
 - Hire nhanh cho đủ headcount, trả giá bằng 6 tháng.
 
 **Đọc thêm:**
-- https://rework.withgoogle.com/ (Hiring: structured interviewing, rubrics)
+- https://rework.withgoogle.com/intl/en/guides/a-guide-to-structured-interviewing-for-better-hiring-practices (structured interviewing, rubrics)
+- Schmidt & Hunter (1998), Psychological Bulletin 124(2): https://doi.org/10.1037/0033-2909.124.2.262
 - https://github.com/kaushikb9/em-interviews
 - Team Topologies (Skelton, Pais), ch. 4-5
 - The Manager's Path, ch. 5 (hiring, onboarding)
@@ -784,7 +827,7 @@ Kể bằng story thật: bug nào sinh ra rule nào trong playbook của bạn 
 
 **Đọc thêm:**
 - `10-AI-for-Mobile-Lead.md`, `18-AI-Study-Workflow.md` (P8)
-- https://docs.anthropic.com/ (Claude Code docs: CLAUDE.md, hooks, permissions; cần kiểm tra đường dẫn hiện tại)
+- Claude Code docs: https://code.claude.com/docs/en/memory (CLAUDE.md), https://code.claude.com/docs/en/hooks, https://code.claude.com/docs/en/permissions
 
 ## 10. First 90 days as a Tech Lead
 
@@ -838,7 +881,7 @@ Kể bằng story thật: bug nào sinh ra rule nào trong playbook của bạn 
 **Điểm interviewer muốn nghe:** Gắn với mục tiêu sản phẩm, có deadline bên ngoài, có metric.
 
 ### Q6. How do you run code review in your team?
-**A:** Small PRs with a description that says why, what and how it was tested. One business day to first review, two hours for hotfixes, and I track it. Comments use labels so the author knows what is blocking: issue, suggestion, nitpick, question. Sensitive modules, billing, auth and security, need two approvals including a code owner. Style is enforced by tools, not reviewers. For AI-assisted PRs, the author must be able to explain every line, and we check for invented APIs and tests that only mirror the implementation. I review the core modules and anything with an ADR; module owners review the rest, so I am not a bottleneck.
+**A:** Small PRs with a description that says why, what and how it was tested. I use Google's engineering practices as the reference: around 100 lines is a reasonable change and 1000 is usually too large, so our soft ceiling is about 400 lines, the point where the SmartBear Cisco study saw defect finding drop. Google also sets one business day as the maximum time to respond to a review request, so that is our SLA, with two hours for hotfixes as our own rule, and I track time to first review. Comments use labels so the author knows what is blocking: issue, suggestion, nitpick, question. Sensitive modules, billing, auth and security, need two approvals including a code owner. Style is enforced by tools, not reviewers. For AI-assisted PRs, the author must be able to explain every line, and we check for invented APIs and tests that only mirror the implementation. I review the core modules and anything with an ADR; module owners review the rest, so I am not a bottleneck.
 **Follow-ups:** What do you do when review time keeps growing? How do you handle a reviewer who is too harsh? Do you require tests in every PR?
 **Điểm interviewer muốn nghe:** SLA đo được, phân quyền review, bar riêng cho AI code.
 
@@ -848,7 +891,7 @@ Kể bằng story thật: bug nào sinh ra rule nào trong playbook của bạn 
 **Điểm interviewer muốn nghe:** Cụ thể, có tác động, có mức độ, có hướng xử lý.
 
 ### Q8. How do you mentor engineers?
-**A:** Weekly 30-minute one-on-ones where the agenda is theirs, not a status report. Each person has a one-page growth plan per quarter: target level, three capabilities to prove, and the opportunities I will create, such as owning a release or giving a tech talk. I adapt style to the task: a senior Android engineer moving to iOS builds gets directing and pairing; the same person on Compose gets full delegation. Feedback is specific and quick, in the SBI format, within 48 hours. For juniors in the AI era I add rules: write the first version by hand, explain the PR verbally before review, and write the first tests manually before letting an agent generate more.
+**A:** Weekly 30-minute one-on-ones where the agenda is theirs, not a status report. Each person has a one-page growth plan per quarter: target level, three capabilities to prove, and the opportunities I will create, such as owning a release or giving a tech talk. I adapt style to the task, following situational leadership: a senior Android engineer moving to iOS builds gets directing and pairing; the same person on Compose gets full delegation. In coaching conversations I use Whitmore's GROW sequence, goal, reality, options, will, and ask more than I tell. Feedback is specific and quick, in the SBI format, within 48 hours. For juniors in the AI era I add rules: write the first version by hand, explain the PR verbally before review, and write the first tests manually before letting an agent generate more.
 **Follow-ups:** How do you mentor someone more experienced than you in some area? How do you measure mentoring? What do you do when a mentee is not improving?
 **Điểm interviewer muốn nghe:** Có cấu trúc, có kế hoạch, điều chỉnh theo người, có quy tắc cho AI.
 
@@ -928,7 +971,7 @@ Kể bằng story thật: bug nào sinh ra rule nào trong playbook của bạn 
 **Điểm interviewer muốn nghe:** On-call mobile tập trung vào hành động giảm thiệt hại, có runbook.
 
 ### Q24. How do you hire a senior Android engineer?
-**A:** A clear JD with verifiable requirements, a loop of at most five rounds: recruiter screen, hiring manager, coding, Android deep-dive, system design, and a behavioral round that can be merged with the hiring manager conversation. Each round has a rubric with 1-4 scores on named signals and example answers for levels 2 and 4; interviewers submit scores before the debrief. We tell candidates the format and whether AI is allowed in the coding round. I look for evidence of shipping: staged rollout, a postmortem they ran, a design decision with a trade-off they can defend. I decide within 48 hours of the last round.
+**A:** A clear JD with verifiable requirements, a loop of at most five rounds: recruiter screen, hiring manager, coding, Android deep-dive, system design, and a behavioral round that can be merged with the hiring manager conversation. Each round is a structured interview in the sense of Google's re:Work guide: the same role-relevant questions, behavioral and hypothetical, a rubric with 1-4 scores on named signals and example answers for levels 2 and 4, trained interviewers, and scores submitted before the debrief. The research backs this: Schmidt and Hunter's 1998 meta-analysis put structured interviews and work samples well above unstructured interviews, and Sackett and colleagues' 2022 reanalysis ranked structured interviews first. We tell candidates the format and whether AI is allowed in the coding round. I look for evidence of shipping: staged rollout, a postmortem they ran, a design decision with a trade-off they can defend. I decide within 48 hours of the last round.
 **Follow-ups:** How do you reduce bias? What question gives you the most signal? What is a red flag?
 **Điểm interviewer muốn nghe:** Structured, rubric, nhanh, tìm bằng chứng ship thật.
 
@@ -998,7 +1041,7 @@ Kể bằng story thật: bug nào sinh ra rule nào trong playbook của bạn 
 **Điểm interviewer muốn nghe:** Gate tự động, test đúng chỗ, giảm chi phí lỗi, đo lường.
 
 ### Q38. How do you plan a sprint for a mobile team?
-**A:** Refinement before planning so stories are sliced and estimated. Planning in one hour: capacity minus on-call and release duties, pull from the ordered backlog, each story has a done definition including tests and analytics events. Daily standup in ten minutes or async. The release train runs independently of the sprint; whatever is done behind a flag goes on the next train. Retro produces one or two action items with owners, and I follow up on them in the next retro.
+**A:** Refinement before planning so stories are sliced and estimated. Planning in one hour: capacity minus on-call and release duties, pull from the ordered backlog, each story has a done definition including tests and analytics events. Daily standup in ten minutes or async, run by and for the developers to inspect progress toward the sprint goal, as the 2020 Scrum Guide defines it, not as a status report to me. The release train runs independently of the sprint; whatever is done behind a flag goes on the next train. Retro produces one or two action items with owners, and I follow up on them in the next retro.
 **Follow-ups:** Do you use story points? What happens to unfinished stories? How do you handle a hotfix mid-sprint?
 **Điểm interviewer muốn nghe:** Ritual gọn, release tách khỏi sprint, done có test và metric.
 
@@ -1008,7 +1051,7 @@ Kể bằng story thật: bug nào sinh ra rule nào trong playbook của bạn 
 **Điểm interviewer muốn nghe:** Hành vi cụ thể của lead, blameless, dấu hiệu đo được.
 
 ### Q40. How do you communicate status to executives?
-**A:** Weekly, five lines: each goal with on track, at risk or off track; what changed since last week; decisions I need from them with a deadline; new risks; and the key numbers, such as release date and crash-free. I go red early, because early red is a plan and late red is a failure. I keep a one-page appendix for anyone who wants the detail.
+**A:** Bottom line up front, in the Minto pyramid style: the first sentence is the conclusion or the decision I need. Then weekly, five lines: each goal with on track, at risk or off track; what changed since last week; decisions I need from them with a deadline; new risks; and the key numbers, such as release date and crash-free. I go red early, because early red is a plan and late red is a failure. I keep a one-page appendix for anyone who wants the detail.
 **Follow-ups:** How do you handle an executive who dives into technical details? What if your manager wants a different format? How do you present a slip?
 **Điểm interviewer muốn nghe:** Ngắn, nhất quán, màu rõ, báo sớm.
 
@@ -1106,7 +1149,7 @@ Chọn một sự cố bạn từng gặp (crash migration, billing lỗi, conte
 4. https://lethain.com/ (Will Larson): engineering strategy, scaling consistency, tech lead vs manager.
 5. https://www.leaddev.com/ : bài về code review, 1:1, incident, communication cho tech lead.
 6. https://github.com/kaushikb9/em-interviews : bộ câu hỏi EM/TL để luyện.
-7. https://rework.withgoogle.com/ : structured interviewing, Project Oxygen (managers), Project Aristotle (psychological safety).
+7. Google re:Work: structured interviewing (https://rework.withgoogle.com/intl/en/guides/a-guide-to-structured-interviewing-for-better-hiring-practices), Project Oxygen (https://rework.withgoogle.com/intl/en/guides/following-the-data-the-research-behind-great-managers), Project Aristotle (https://rework.withgoogle.com/intl/en/guides/understand-team-effectiveness).
 8. https://google.github.io/eng-practices/review/ : chuẩn code review của Google.
 9. https://adr.github.io/ và https://github.com/joelparkerhenderson/architecture-decision-record : ADR template và ví dụ.
 10. https://sre.google/sre-book/managing-incidents/ và https://sre.google/sre-book/postmortem-culture/ : incident và postmortem.

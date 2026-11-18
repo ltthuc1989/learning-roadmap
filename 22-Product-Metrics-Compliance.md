@@ -2,7 +2,7 @@
 
 > Mục tiêu: nói chuyện được với PM bằng metric, với compliance bằng điều khoản, với CFO bằng chi phí; biết đọc Android vitals, Crashlytics, kết quả A/B test; biết app của mình thu thập gì, khai báo gì, dùng license gì. | Mức cần đạt: Senior: biết crash-free, ANR, startup, event analytics, Data safety form. Staff: thiết kế taxonomy event, đọc kết quả experiment, đánh giá SDK, hiểu GDPR/ND13/COPPA ở mức ảnh hưởng tới code. Lead: đặt SLO, release health dashboard, chính sách SDK và license, trình bày cost/benefit, trả lời câu hỏi compliance của bank. | Thời gian gợi ý: tuần 11, ~8 giờ (đọc 4h, hands-on 4h)
 
-Ghi chú trước khi đọc: file này có nhiều điều khoản pháp lý và ngưỡng do Google đặt. Mọi con số và ngày trong file chỉ là điểm bắt đầu; chỗ nào ghi "cần kiểm tra" thì bạn phải mở link gốc trước khi nói trong phỏng vấn. Interviewer bank sẽ không trừ điểm nếu bạn nói "tôi cần kiểm tra ngưỡng hiện tại"; họ trừ điểm khi bạn nói sai một cách tự tin.
+Ghi chú trước khi đọc: file này có nhiều điều khoản pháp lý và ngưỡng do Google đặt. Các con số và ngày đã được đối chiếu với trang gốc ngày 18/11/2026 (link ngay cạnh từng con số). Google và cơ quan nhà nước đổi ngưỡng theo thời gian, nên trước buổi phỏng vấn quan trọng hãy mở lại link. Chỗ nào vẫn ghi "chưa xác minh" là nơi chưa tìm được văn bản gốc; nói đúng như vậy khi bị hỏi. Interviewer bank không trừ điểm khi bạn nói "tôi cần kiểm tra lại văn bản gốc"; họ trừ điểm khi bạn nói sai một cách tự tin.
 
 ## 0. Bản đồ chủ đề
 
@@ -29,6 +29,8 @@ flowchart LR
 
 Output là thứ team làm ra: feature, release, module. Outcome là thay đổi hành vi user hoặc business: nhiều user quay lại, nhiều người mua, ít ticket support. Lead kỹ thuật được đánh giá bằng outcome, dù bạn không sở hữu roadmap sản phẩm. Khi PM đưa feature, hỏi: "Outcome nào, đo bằng gì, bao giờ biết là thành công hay thất bại?" Nếu không trả lời được, feature chưa sẵn sàng để build.
 
+Ví dụ: output "ship offline mode cho lesson"; outcome "tỷ lệ session bị bỏ dở vì lỗi mạng giảm từ 9% xuống dưới 3%, và D7 retention của user ở vùng mạng yếu (lọc theo `network_type`) tăng 2 điểm trong 4 tuần". Câu thứ hai cho biết đo bằng event nào, nhóm nào, và khi nào kết luận.
+
 ### 1.2 Metric sản phẩm cơ bản
 
 | Metric | Nghĩa | Lead mobile cần biết |
@@ -40,10 +42,16 @@ Output là thứ team làm ra: feature, release, module. Outcome là thay đổi
 | ARPU / LTV | Doanh thu trung bình mỗi user; giá trị trọn đời (LTV ~ ARPU x thời gian giữ chân) | Dùng để biện minh chi phí: "giảm crash 1 điểm giữ thêm N user x LTV" |
 | Churn | % user rời đi trong kỳ | Uninstall rate trên Play Console là proxy |
 
+Ví dụ tính bằng số (để nói trôi chảy khi bị hỏi "define it precisely"):
+- **D7 retention** của cohort cài ngày 1/11 = số user trong cohort có ít nhất một `lesson_started` vào đúng ngày thứ 7 sau cài / số user cài ngày 1/11. Cohort 2.000 user, 360 user quay lại ngày 7: D7 = 18%. Ghi rõ "classic" (đúng ngày 7) hay "rolling" (ngày 7 trở đi), vì hai cách cho số khác nhau.
+- **Stickiness** = DAU trung bình / MAU. DAU 3.000, MAU 20.000: 15%, nghĩa là user trung bình mở app khoảng 4,5 ngày/tháng (0,15 x 30).
+- **Conversion trial -> paid** = số `purchase_completed` có `sku` subscription trong 14 ngày kể từ `trial_started` / số `trial_started`. Mẫu số phải là cùng cohort, không phải tổng purchase trong tháng chia tổng trial trong tháng.
+- **LTV đơn giản** = ARPU tháng x (1 / churn tháng). ARPU 20.000 đ, churn 10%/tháng: LTV khoảng 200.000 đ. Dùng để quy đổi: giữ thêm 500 user/tháng nhờ giảm crash onboarding tương đương khoảng 100 triệu đ LTV.
+
 ### 1.3 Kỹ thuật mobile ảnh hưởng metric thế nào
 
-- **Startup**: cold start chậm làm user bỏ ở lần mở đầu; vitals và Macrobenchmark đo được (xem `04-Android-Kotlin-Deep-Dive.md`).
-- **Crash và ANR**: crash trong onboarding hoặc checkout làm mất D1 và conversion; Play còn giảm visibility nếu vượt ngưỡng xấu.
+- **Startup**: cold start chậm làm user bỏ ở lần mở đầu; vitals coi cold start từ 5 giây là "excessive" (mục 2.1), Macrobenchmark đo được trong CI (xem `04-Android-Kotlin-Deep-Dive.md`).
+- **Crash và ANR**: crash trong onboarding hoặc checkout làm mất D1 và conversion; Play còn giảm visibility nếu vượt ngưỡng xấu (1,09% crash, 0,47% ANR, mục 2.1).
 - **App size**: size lớn làm giảm install conversion (nhất là thị trường data đắt) và tăng uninstall; Play Console cho so sánh size với app cùng loại.
 - **Battery và data**: excessive wakeups, background network làm user gỡ app; Play có cảnh báo trong vitals.
 - **Offline**: app trẻ em dùng ở nơi không mạng; content pack cache quyết định session length.
@@ -77,18 +85,55 @@ Ví dụ cho feature "content pack tải về" ở app phonics:
 
 ### 2.1 Android vitals
 
-Play Console thu thập từ thiết bị đã bật chia sẻ dữ liệu và hiển thị trong Android vitals. Hai **core vitals** quyết định visibility trên Play: **user-perceived crash rate** và **user-perceived ANR rate** (tính trên user, không phải trên session). Play đặt **bad behavior threshold** tổng và theo từng model thiết bị; vượt ngưỡng thì app có thể bị giảm khả năng hiển thị và có cảnh báo trên store listing. Ngưỡng cụ thể: **cần kiểm tra tại developer.android.com/topic/performance/vitals** trước khi nói số trong phỏng vấn.
+Play Console thu thập từ thiết bị đã đồng ý chia sẻ dữ liệu (chỉ thiết bị certified, chỉ app cài từ Play) và hiển thị trong Android vitals. Rate tính **theo daily active user**, không theo session: user mở app 3 lần trong ngày, crash 1 lần thì vitals tính 100% cho user đó trong ngày, Crashlytics tính 33% theo session ([vitals FAQ](https://developer.android.com/topic/performance/vitals)).
 
-Các vitals khác bạn phải gọi tên được: excessive wakeups, stuck partial wake locks, slow rendering và frozen frames, app startup time (cold/warm/hot, Play đánh dấu "slow" theo ngưỡng riêng cho mỗi loại, cần kiểm tra), excessive background network/Wi-Fi scans.
+**Core vitals** (ảnh hưởng visibility trên Play): stability gồm **user-perceived crash rate** và **user-perceived ANR rate**; battery gồm **excessive partial wake locks**; memory gồm **memory usage (Anonymous RSS + Swap)** và **bitmap memory usage**. Riêng nhóm memory và DEX code optimization chỉ bắt đầu ảnh hưởng visibility từ **tháng 2/2027**.
 
-Cách nói trong phỏng vấn: "I track the two core vitals per release against Play's thresholds, both overall and per device model, because a single bad device model can push you over. I check the current thresholds on the vitals page rather than remembering them."
+Bad behavior threshold ([nguồn](https://developer.android.com/topic/performance/vitals#what_are_the_bad_behavior_thresholds), kiểm tra 18/11/2026):
+
+| Metric | Overall (trung bình mọi thiết bị) | Per phone model |
+|---|---|---|
+| User-perceived crash rate | 1,09% | 8% |
+| User-perceived ANR rate | 0,47% | 8% |
+| Excessive partial wake locks | 5% session | không có ngưỡng per-device |
+
+- Play đánh giá trên **28 ngày gần nhất**, tính lại mỗi ngày; vượt ngưỡng thì Play có thể giảm visibility và hiện cảnh báo trên store listing. Vitals gắn nhãn "emerging issue" khi crash/ANR ảnh hưởng thiết bị quá 7 ngày, tức bạn còn khoảng 21 ngày trước khi trung bình 28 ngày bị kéo lên.
+- **Excessive partial wake lock** = tổng mọi partial wake lock giữ từ 2 giờ trở lên trong 24 giờ khi app ở background hoặc chạy foreground service (wake lock của audio, location, user-initiated job được miễn); ảnh hưởng visibility khi xảy ra ở hơn 5% session trong 28 ngày ([nguồn](https://developer.android.com/google/play/vitals/excessive-wakelock)).
+- **Startup "excessive"** theo TTID: cold từ 5 giây, warm từ 2 giây, hot từ 1,5 giây ([nguồn](https://developer.android.com/google/play/vitals/launch-time)). Đây không phải core vital nhưng là số dễ bị hỏi.
+
+Các vitals khác bạn phải gọi tên được: excessive wakeups, stuck partial wake locks, slow rendering, slow sessions, LMK (low memory killer), excessive background network/Wi-Fi scans, permission denials (danh sách đầy đủ ở cuối [trang vitals](https://developer.android.com/topic/performance/vitals)). Có thể kéo số vitals vào dashboard riêng qua [Play Developer Reporting API](https://developers.google.com/play/developer/reporting).
+
+Cách nói trong phỏng vấn: "I track the core vitals per release against Play's bad behavior thresholds: 1.09% user-perceived crash rate and 0.47% ANR rate overall, 8% for any single phone model, over a 28-day window. The per-model threshold matters because one popular low-end device can trigger a warning for users of that device even when the overall number is fine."
 
 ### 2.2 Crash-free, ANR và cách đọc
 
 - **Crash-free users** (Crashlytics): % user không gặp crash trong kỳ. So **theo version**, không so tổng; bản mới ở 5% rollout có crash-free thấp hơn bản cũ là tín hiệu halt.
 - **Crash-free sessions**: nhạy hơn với crash lặp ở ít user.
-- **ANR**: main thread bị chặn quá 5 giây (input dispatch) hoặc BroadcastReceiver/Service quá hạn; nguyên nhân phổ biến: IO trên main, lock contention, `SharedPreferences.commit`, init SDK nặng trong `Application.onCreate`. Chi tiết ở `04`.
-- Đọc stack trace ANR trong vitals: nhìn main thread, tìm frame của app, bỏ qua frame framework chờ.
+- **ANR** xảy ra khi ([nguồn](https://developer.android.com/topic/performance/vitals/anr), kiểm tra 18/11/2026):
+  - Input dispatching: không phản hồi input (chạm, phím) trong **5 giây**.
+  - `BroadcastReceiver` chưa xong `onReceive` trong thời hạn; nếu app có activity ở foreground thì hạn là **10 giây** (receiver nền có hạn dài hơn, trang không nêu số), hoặc gọi `goAsync()` mà không `finish()`.
+  - Service: `onCreate`/`onStartCommand`/`onBind` không xong trong "vài giây"; `startForegroundService()` mà service không gọi `startForeground()` trong **5 giây**.
+  - `JobService.onStartJob`/`onStopJob` không trả về trong vài giây; với app target Android 14+ ANR này được báo cho app.
+  - Nguyên nhân phổ biến: IO trên main, lock contention/deadlock, binder call đồng bộ chậm, `SharedPreferences.commit`, init SDK nặng trong `Application.onCreate`. Chi tiết ở `04`.
+- Đọc stack trace ANR trong vitals: nhìn main thread, tìm frame của app, bỏ qua frame framework chờ. Vitals thấy cả crash trước khi SDK khởi tạo, nên số vitals thường cao hơn Crashlytics.
+- Tự thu lý do process chết ở lần mở sau bằng [`ApplicationExitInfo`](https://developer.android.com/reference/android/app/ApplicationExitInfo) (API 30+), gửi kèm vào Crashlytics làm non-fatal:
+
+```kotlin
+// API 30+. Gọi ở background khi app khởi động.
+fun reportPreviousExits(context: Context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+    val am = context.getSystemService(ActivityManager::class.java)
+    am.getHistoricalProcessExitReasons(context.packageName, /* pid = */ 0, /* max = */ 5)
+        .filter { it.reason == ApplicationExitInfo.REASON_ANR }
+        .forEach { info ->
+            val trace = info.traceInputStream?.bufferedReader()?.use { it.readText() }
+            Firebase.crashlytics.log("ANR at ${info.timestamp}: ${info.description}")
+            trace?.lineSequence()?.take(40)?.forEach { Firebase.crashlytics.log(it) }
+            Firebase.crashlytics.recordException(IllegalStateException("Previous ANR"))
+        }
+}
+```
+Lưu ý: cần tự lưu `timestamp` đã báo để không gửi trùng ở lần mở sau.
 
 ### 2.3 Startup time và app size
 
@@ -121,7 +166,7 @@ Quy ước team:
 
 SLO cho mobile đặt theo **release** và theo **user**, không theo request. Ví dụ bộ SLO bạn có thể đề xuất (số là ví dụ cấu trúc, team tự chọn):
 - Crash-free users của version mới sau 7 ngày >= [X]% và không thấp hơn version trước quá [Y] điểm.
-- User-perceived ANR rate dưới ngưỡng Play (cần kiểm tra) ở mọi model top 20.
+- User-perceived ANR rate dưới ngưỡng Play (0,47% overall, 8% mỗi model, mục 2.1) ở mọi model top 20; team nên đặt ngưỡng nội bộ chặt hơn, ví dụ 0,3%, để có khoảng đệm trước khi chạm ngưỡng Play.
 - Cold start p90 (Macrobenchmark, thiết bị tham chiếu) <= [Z] ms, không tăng quá [W]% giữa hai version.
 - Download failure rate content pack < [V]%.
 
@@ -163,7 +208,19 @@ Quy ước đề xuất (một trang trong repo, có owner):
 - Param chuẩn cho mọi event: `screen_name`, `source` (từ đâu tới), `app_version`, `content_pack_version`; param riêng theo event: `lesson_id`, `duration_ms`, `reason`.
 - Không PII trong tên và giá trị param (không email, không tên trẻ).
 - Mỗi event có: mô tả, khi nào bắn, param và kiểu, owner, version thêm vào, version bỏ.
-- Giới hạn Firebase Analytics về số event khác tên, số param mỗi event, độ dài tên và giá trị: cần kiểm tra giới hạn hiện tại tại firebase.google.com/docs/analytics trước khi thiết kế.
+- Giới hạn Google Analytics for Firebase (bản standard, kiểm tra 18/11/2026; nguồn: [GA4 collection limits](https://support.google.com/analytics/answer/9267744?hl=en) và Javadoc [`FirebaseAnalytics.logEvent` / `setUserProperty`](https://firebase.google.com/docs/reference/android/com/google/firebase/analytics/FirebaseAnalytics)):
+
+| Giới hạn | Giá trị |
+|---|---|
+| Số tên event khác nhau | 500 mỗi app instance (event tự động thu không tính) |
+| Param mỗi event | 25 |
+| Độ dài tên event / tên param | 40 ký tự, bắt đầu bằng chữ cái, chỉ chữ số và `_` |
+| Độ dài giá trị param kiểu string | 100 ký tự |
+| User property | 25 tên; tên tối đa 24 ký tự, giá trị tối đa 36 ký tự |
+| User-ID | 256 ký tự |
+| Prefix cấm | `firebase_`, `google_`, `ga_` (cho event, param, user property); cộng danh sách tên event reserved trong [`FirebaseAnalytics.Event`](https://firebase.google.com/docs/reference/android/com/google/firebase/analytics/FirebaseAnalytics.Event) |
+
+  Hệ quả thiết kế: tên event phân biệt hoa thường (`Lesson_Started` và `lesson_started` là hai event); không nhét JSON vào param vì bị cắt ở 100 ký tự; 25 user property là ít, dành cho thứ thật sự dùng để chia segment (`subscription_status`, `content_pack_version`).
 - Registry là code: sealed class hoặc enum trong `core/analytics`, không string rải rác.
 
 ```kotlin
@@ -192,8 +249,29 @@ Kiến trúc analytics SDK (interface trong core, nhiều sink, gating theo cons
 ### 3.2 Firebase Analytics, Remote Config, A/B Testing
 
 - **Analytics**: user property (ví dụ `subscription_status`, không PII), audience, funnel exploration, retention; DebugView để kiểm tra event khi dev.
-- **Remote Config**: default value trong app (XML hoặc map), fetch theo chiến lược (fetch lúc start và activate ở lần sau để không "nhảy" UI; hoặc activate ngay cho kill switch), minimum fetch interval, real-time update listener; dùng cho kill switch, config, và làm nền cho experiment.
-- **A/B Testing**: chọn Remote Config param làm biến, chia nhóm theo audience, metric mục tiêu từ Analytics (retention, event, revenue); kết quả hiển thị dạng xác suất nhóm tốt hơn baseline (Bayesian). Giới hạn: chỉ metric có trong Analytics; đọc kỹ trước khi kết luận.
+- **Remote Config**: default value trong app (XML hoặc map), fetch theo chiến lược (fetch lúc start và activate ở lần sau để không "nhảy" UI; hoặc activate ngay cho kill switch), minimum fetch interval, real-time update listener; dùng cho kill switch, config, và làm nền cho experiment. **Minimum fetch interval mặc định là 12 giờ**; hạ xuống (ví dụ 0 hoặc 3600 giây) chỉ dùng khi dev, không dùng cho production ([throttling](https://firebase.google.com/docs/remote-config/android/get-started#throttling)). Từ **1/9/2026**, trên gói Blaze fetch request miễn phí tới 100.000/ngày/project, vượt thì tính tiền ($0,06 / 10K request tới 10 triệu/ngày) ([pricing](https://firebase.google.com/pricing)), nên đừng fetch mỗi lần mở màn hình. Ví dụ (Firebase Android BoM 35.x, Kotlin, API Kotlin nằm trong module chính từ BoM 34):
+
+```kotlin
+val remoteConfig = Firebase.remoteConfig
+remoteConfig.setConfigSettingsAsync(remoteConfigSettings {
+    minimumFetchIntervalInSeconds = if (BuildConfig.DEBUG) 0 else 12 * 3600
+})
+remoteConfig.setDefaultsAsync(R.xml.remote_config_defaults) // giá trị khi offline hoặc lần đầu
+
+// Lần mở app: fetch + activate; UI đọc giá trị sau khi activate xong (hoặc ở lần mở sau).
+remoteConfig.fetchAndActivate().addOnCompleteListener { task ->
+    val packV2Enabled = remoteConfig.getBoolean("pack_download_v2_enabled")
+}
+
+// Real-time: dùng cho kill switch, activate ngay khi server đổi.
+remoteConfig.addOnConfigUpdateListener(object : ConfigUpdateListener {
+    override fun onUpdate(configUpdate: ConfigUpdate) {
+        if ("pack_download_v2_enabled" in configUpdate.updatedKeys) remoteConfig.activate()
+    }
+    override fun onError(error: FirebaseRemoteConfigException) { /* log non-fatal */ }
+})
+```
+- **A/B Testing**: chọn Remote Config param làm biến, chia nhóm theo audience, metric mục tiêu từ Analytics (retention, event, revenue). Firebase A/B Testing dùng **frequentist inference**: one-tailed t-test/z-test, mức ý nghĩa 0,05, hiển thị p-value và khoảng tin cậy 95%; variant được gọi là "leader" khi khác biệt có ý nghĩa thống kê so với baseline ([ab-concepts, Interpret test results](https://firebase.google.com/docs/ab-testing/ab-concepts#interpreting-test-results), kiểm tra 18/11/2026; các tài liệu cũ mô tả kết quả kiểu Bayesian "probability to beat baseline", không còn đúng). Giới hạn: chỉ metric có trong Analytics; đọc kỹ trước khi kết luận.
 - Thay thế: Statsig, LaunchDarkly, Optimizely; tự build với flag server + analytics warehouse khi quy mô lớn.
 
 ### 3.3 Feature flag vs experiment
@@ -207,6 +285,8 @@ Kiến trúc analytics SDK (interface trong core, nhiều sink, gating theo cons
 
 Flag là hạ tầng; experiment là phương pháp chạy trên hạ tầng đó. Flag tồn tại mãi là nợ: đặt ngày hết hạn.
 
+Ví dụ cụ thể: `pack_download_v2_enabled` là **flag** (rollout 5% -> 25% -> 100% theo Remote Config condition "percent of users", tắt ngay nếu `pack_download_failed` tăng). Câu hỏi "downloader v2 có làm lesson completion tăng không" là **experiment**: Firebase A/B Testing chia 50/50 ngẫu nhiên trên cùng param, metric chính `lesson_completed`/`lesson_started`, chạy đủ số ngày đã tính ở 3.4, rồi mới đẩy flag lên 100%. Mỗi flag ghi trong registry: owner, ngày tạo, ngày hết hạn, ticket xoá.
+
 ### 3.4 Sample size và ý nghĩa thống kê, nói đơn giản
 
 - Bạn muốn phát hiện thay đổi nhỏ nhất đáng quan tâm (MDE, ví dụ +1 điểm conversion). Hiệu ứng càng nhỏ, baseline càng thấp, càng cần nhiều user mỗi nhánh.
@@ -214,16 +294,26 @@ Flag là hạ tầng; experiment là phương pháp chạy trên hạ tầng đ�
 - Dùng calculator (ví dụ Evan Miller sample size calculator) trước khi chạy; ghi số mẫu cần và ngày dự kiến đủ mẫu vào experiment doc.
 - Với app nhỏ, nhiều experiment không bao giờ đủ mẫu cho MDE 1 điểm; chọn metric gần hơn (ví dụ click paywall thay vì purchase) hoặc chấp nhận MDE lớn hơn.
 - Khoảng tin cậy quan trọng hơn p-value: "+2 điểm, CI từ -1 tới +5" nghĩa là chưa biết.
+- Công thức nhẩm (α = 5% hai phía, power 80%): **n mỗi nhánh ≈ 16 · σ² / δ²**, với metric tỷ lệ thì σ² = p(1 − p) (Kohavi, Tang, Xu, ch. 17). Ví dụ: conversion paywall baseline p = 20%, muốn phát hiện +1 điểm (δ = 0,01): n ≈ 16 · 0,2 · 0,8 / 0,0001 = **25.600 user mỗi nhánh**, tổng 51.200. App có 3.000 user mới/ngày vào paywall thì cần khoảng 17 ngày; muốn phát hiện +2 điểm thì chỉ cần 1/4, khoảng 6.400 mỗi nhánh. Đây là cách giải thích cho PM vì sao "test 1 tuần" thường không đủ.
 
 ### 3.5 Guardrail metrics
 
 Mỗi experiment có metric chính và guardrail: crash-free, ANR, cold start, uninstall, revenue, support ticket. Experiment "thắng" ở metric chính nhưng guardrail xấu thì không ship. Guardrail phải được định nghĩa trước khi chạy.
 
+Ví dụ bảng guardrail viết trong experiment doc trước khi bật:
+
+| Guardrail | Định nghĩa | Ngưỡng dừng |
+|---|---|---|
+| Crash-free users | Crashlytics, lọc theo variant qua custom key `exp_variant` | Thấp hơn control quá 0,2 điểm |
+| User-perceived ANR | Vitals theo version (vitals không tách variant, nên đọc kèm non-fatal ANR từ `ApplicationExitInfo`) | Vượt 0,47% hoặc tăng quá 0,1 điểm |
+| Cold start p90 | Custom trace Firebase Performance quanh startup, có attribute `exp_variant` (trace tự động `_app_start` không gắn được attribute riêng), cộng Macrobenchmark chạy cả hai variant | Tăng quá 10% |
+| Refund / uninstall 7 ngày | Play Console + event `subscription_refunded` | Tăng có ý nghĩa thống kê |
+
 ### 3.6 Lỗi phổ biến
 
 - **Peeking**: xem kết quả mỗi ngày và dừng khi "có ý nghĩa". Với test tần suất cổ điển, điều này làm tỷ lệ kết luận sai tăng mạnh. Định ngày kết thúc trước, hoặc dùng phương pháp sequential.
 - **Novelty effect**: feature mới được bấm nhiều tuần đầu rồi hết. Chạy ít nhất 2 chu kỳ tuần, xem cohort theo ngày exposure.
-- **Sample ratio mismatch**: nhóm A/B không đúng tỷ lệ 50/50 (do crash ở một nhánh, do exposure sai). Kiểm tra trước khi đọc metric.
+- **Sample ratio mismatch**: nhóm A/B không đúng tỷ lệ 50/50 (do crash ở một nhánh, do exposure sai). Kiểm tra trước khi đọc metric bằng chi-square một bậc tự do. Ví dụ: control 50.000, treatment 48.500, kỳ vọng 49.250 mỗi nhánh: χ² = 2 · 750² / 49.250 ≈ 22,8, p < 0,001, tức SRM thật, không đọc metric nữa mà đi tìm nguyên nhân (Kohavi, Tang, Xu, ch. 21).
 - **Version confounding**: experiment chỉ chạy trên bản mới, user bản mới khác user bản cũ (họ update sớm hơn). So trong cùng version.
 - **Multiple comparisons**: 20 metric thì có 1 "có ý nghĩa" ngẫu nhiên. Một metric chính.
 - **Exposure sai**: tính user vào nhóm khi họ chưa thấy feature. Bắn event exposure đúng chỗ.
@@ -232,71 +322,132 @@ Mỗi experiment có metric chính và guardrail: crash-free, ANR, cold start, u
 
 Thứ tự: (1) sample ratio có đúng không; (2) exposure event có bắn đúng không; (3) metric chính với khoảng tin cậy; (4) guardrail; (5) phân rã theo platform, version, country, new vs returning để tìm nhóm bị hại; (6) so với decision rule đã viết trước; (7) quyết định: ship, iterate, hoặc dừng; ghi vào experiment log. Nếu kết quả "gần có ý nghĩa", câu trả lời là "chưa biết", không phải "ship vì có vẻ tốt".
 
+Ví dụ decision rule viết trước: "Ship nếu lesson completion tăng và cận dưới CI 95% > 0; giữ nguyên nếu CI chứa 0 sau đủ 25.600 user mỗi nhánh; dừng ngay nếu một guardrail chạm ngưỡng dừng." Kết quả thực tế "+1,4 điểm, CI [+0,3; +2,5], SRM p = 0,41, guardrail xanh" thì ship; "+1,4 điểm, CI [-0,2; +3,0]" thì ghi "không kết luận được", không ship vì "gần".
+
 **Đọc thêm:**
-- https://firebase.google.com/docs/remote-config
-- https://firebase.google.com/docs/ab-testing
-- Trustworthy Online Controlled Experiments (Kohavi, Tang, Xu), ch. 1-3 và ch. 17 (SRM, pitfalls)
+- https://firebase.google.com/docs/remote-config/android/get-started
+- https://firebase.google.com/docs/ab-testing/ab-concepts
+- Trustworthy Online Controlled Experiments (Kohavi, Tang, Xu), ch. 1-3, ch. 17 (thống kê, công thức sample size), ch. 21 (SRM và trust-related guardrail)
 - https://www.evanmiller.org/ab-testing/sample-size.html
 
 ## 4. Privacy và compliance
 
 ### 4.1 GDPR: những gì ảnh hưởng tới code mobile
 
-Áp dụng khi app có user ở EU/EEA, bất kể công ty ở đâu.
-- **Lawful basis** (Điều 6): consent, contract, legal obligation, vital interests, public task, legitimate interests. Analytics và ads cá nhân hoá thường dựa trên consent; chức năng cốt lõi dựa trên contract. Chọn basis trước, rồi mới code consent.
-- **Consent** phải tự nguyện, cụ thể, có thông tin, rõ ràng, rút lại dễ như cho. Không pre-tick, không gộp "đồng ý tất cả" bắt buộc. SDK analytics/ads chỉ khởi tạo **sau** consent; sự kiện trước consent phải buffer hoặc bỏ.
-- **Quyền của chủ thể dữ liệu**: truy cập, sửa, xoá (right to erasure), hạn chế, chuyển dữ liệu (portability), phản đối, không bị quyết định tự động. Code cần: xoá account và dữ liệu (cả log, cả backup theo lịch), export dữ liệu, tắt profiling.
-- **DPIA** (Điều 35) khi xử lý rủi ro cao: sinh trắc học, dữ liệu trẻ em, theo dõi quy mô lớn. eKYC khuôn mặt gần như chắc chắn cần DPIA.
-- **Privacy by design, data minimization**: thu đúng thứ cần, giữ đúng thời gian cần.
-- **Thông báo vi phạm** cho cơ quan giám sát trong 72 giờ kể từ khi biết (Điều 33; cần kiểm tra chi tiết). Lead mobile phải biết đường escalate khi phát hiện rò rỉ từ app (log, SDK, cache).
-- Mức phạt tối đa theo % doanh thu toàn cầu: cần kiểm tra tại gdpr.eu khi cần nêu số.
+Áp dụng khi app có user ở EU/EEA, bất kể công ty ở đâu (Điều 3(2)). Văn bản gốc: [Regulation (EU) 2016/679 trên EUR-Lex](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679); mỗi điều có anchor dạng `#art_33`. Số liệu dưới đây đối chiếu với EUR-Lex ngày 18/11/2026.
+- **Lawful basis** ([Điều 6(1)](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679#art_6)): consent, contract, legal obligation, vital interests, public task, legitimate interests. Analytics và ads cá nhân hoá thường dựa trên consent; chức năng cốt lõi dựa trên contract. Chọn basis trước, rồi mới code consent.
+- **Consent** ([Điều 4(11)](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679#art_4) và [Điều 7](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679#art_7)) phải tự nguyện, cụ thể, có thông tin, rõ ràng. Điều 7(3) viết nguyên văn: "It shall be as easy to withdraw as to give consent", nên nếu đồng ý bằng một nút trên màn hình đầu thì rút lại cũng phải là một nút trong Settings. Điều 7(4): không được ép consent cho dữ liệu không cần thiết để cung cấp dịch vụ. Không pre-tick, không gộp "đồng ý tất cả" bắt buộc. SDK analytics/ads chỉ khởi tạo **sau** consent; sự kiện trước consent phải buffer hoặc bỏ.
+- **Trẻ em** ([Điều 8(1)](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679#art_8)): với dịch vụ xã hội thông tin cung cấp trực tiếp cho trẻ và dựa trên consent, trẻ từ **16 tuổi** tự đồng ý được; dưới 16 cần người giữ quyền phụ huynh đồng ý; mỗi nước thành viên được hạ tuổi nhưng **không thấp hơn 13**. Vì vậy UMP/consent flow phải biết quốc gia và tuổi.
+- **Dữ liệu đặc biệt** ([Điều 9](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679#art_9)): biometric data dùng để định danh duy nhất một người (face match eKYC) bị cấm xử lý trừ khi có ngoại lệ ở Điều 9(2), thường là explicit consent.
+- **Quyền của chủ thể dữ liệu** (Điều 15 truy cập, 16 sửa, 17 xoá, 18 hạn chế, 20 portability, 21 phản đối, 22 quyết định tự động). Theo [Điều 12(3)](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679#art_12), phải phản hồi trong **1 tháng** kể từ khi nhận yêu cầu, gia hạn thêm tối đa 2 tháng nếu phức tạp. Code cần: xoá account và dữ liệu (cả log, cả backup theo lịch), export dữ liệu, tắt profiling.
+- **DPIA** ([Điều 35](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679#art_35)) khi xử lý rủi ro cao: sinh trắc học, dữ liệu trẻ em, theo dõi quy mô lớn. eKYC khuôn mặt gần như chắc chắn cần DPIA.
+- **Privacy by design, data minimization** (Điều 25, Điều 5(1)(c)): thu đúng thứ cần, giữ đúng thời gian cần.
+- **Thông báo vi phạm** ([Điều 33(1)](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679#art_33)): controller báo cơ quan giám sát "without undue delay and, where feasible, not later than **72 hours** after having become aware of it", trừ khi vi phạm khó gây rủi ro; báo trễ phải kèm lý do. Processor (ví dụ vendor SDK) phải báo controller "without undue delay" (Điều 33(2)); nếu rủi ro cao cho người dùng thì báo cả người dùng (Điều 34). Lead mobile phải biết đường escalate khi phát hiện rò rỉ từ app (log, SDK, cache), vì đồng hồ 72 giờ chạy từ lúc tổ chức biết, không phải lúc pháp chế biết.
+- **Mức phạt** ([Điều 83](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679#art_83)): Điều 83(5) (vi phạm nguyên tắc, consent, Điều 5, 6, 7, 9, quyền chủ thể, chuyển dữ liệu ra ngoài EU) tối đa **20 triệu EUR hoặc 4% doanh thu toàn cầu năm trước**, lấy mức cao hơn; Điều 83(4) (nghĩa vụ controller/processor như Điều 8, 25, 33, 35) tối đa 10 triệu EUR hoặc 2%.
 
 ### 4.2 Việt Nam: Nghị định 13/2023/NĐ-CP và Luật Bảo vệ dữ liệu cá nhân 2025
 
-- **Nghị định 13/2023/NĐ-CP** về bảo vệ dữ liệu cá nhân, có hiệu lực từ 1/7/2023. Điểm ảnh hưởng tới app:
-  - Phân loại **dữ liệu cá nhân cơ bản** và **dữ liệu cá nhân nhạy cảm** (sinh trắc học, tài chính, vị trí, sức khoẻ...). eKYC và biometrics login thuộc nhạy cảm.
-  - Consent phải rõ ràng, tự nguyện, có thể in/sao chép được, tách riêng cho từng mục đích; được rút lại.
-  - **Hồ sơ đánh giá tác động xử lý dữ liệu cá nhân** gửi Bộ Công an (A05) trong thời hạn quy định kể từ khi bắt đầu xử lý (cần kiểm tra thời hạn và biểu mẫu hiện hành); hồ sơ riêng cho **chuyển dữ liệu ra nước ngoài** (Firebase, Crashlytics, RevenueCat đều là chuyển ra nước ngoài).
-  - Dữ liệu trẻ em: yêu cầu consent của cha mẹ/người giám hộ theo độ tuổi quy định (cần kiểm tra điều khoản cụ thể).
-  - Quyền của chủ thể: biết, đồng ý, truy cập, rút lại, xoá, hạn chế, phản đối, khiếu nại, bồi thường.
-- **Luật Bảo vệ dữ liệu cá nhân** được Quốc hội thông qua tháng 6/2025, hiệu lực từ 1/1/2026 (cần kiểm tra ngày hiệu lực và nghị định hướng dẫn tại vanban.chinhphu.vn). Luật nâng Nghị định 13 lên tầm luật, bổ sung quy định về mua bán dữ liệu cá nhân, chuyên gia/tổ chức bảo vệ dữ liệu, và chế tài theo % doanh thu (cần kiểm tra mức cụ thể). Với bank, phòng pháp chế sẽ dẫn; lead mobile cần biết: dữ liệu nào trong app là nhạy cảm, SDK nào gửi dữ liệu ra nước ngoài, consent flow có đúng không.
+Tình trạng tại 18/11/2026 (khung pháp lý đã đổi từ 1/1/2026, đừng nói "Nghị định 13 là văn bản chính" nữa):
 
-Cách nói trong phỏng vấn (EN): "For Vietnam I work from Decree 13 and the 2025 Personal Data Protection Law: classify what the app collects into basic and sensitive data, make consent explicit and per purpose, keep an inventory of SDKs that transfer data abroad for the cross-border dossier, and involve legal early for the impact assessment. I check the current effective dates and forms with legal rather than from memory."
+| Văn bản | Vai trò | Hiệu lực |
+|---|---|---|
+| **Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15** | Luật gốc, 5 chương 39 điều; Quốc hội khoá XV kỳ họp 9 thông qua **26/6/2025** | **1/1/2026** |
+| **Nghị định 356/2025/NĐ-CP** (ký 31/12/2025) | Quy định chi tiết Luật, có 10 biểu mẫu hồ sơ; **thay thế Nghị định 13/2023/NĐ-CP** | 1/1/2026 |
+| **Nghị định 330/2026/NĐ-CP** | Xử phạt vi phạm hành chính về an ninh mạng và bảo vệ dữ liệu cá nhân | 19/8/2026, không có thời gian chuyển tiếp |
+| Nghị định 13/2023/NĐ-CP (17/4/2023) | Văn bản cũ, hiệu lực 1/7/2023 đến hết 31/12/2025 | Hết hiệu lực, chỉ còn ý nghĩa chuyển tiếp |
+
+Nguồn: toàn văn Luật trên [Công báo số 971+972 ngày 24/7/2025 (PDF)](https://congbaocdn.chinhphu.vn/CongBaoCP/VanBan/2025/6/45578/57730-1-2025971-97291-2025-qh15.pdf) và [trang văn bản trên vanban.chinhphu.vn](https://vanban.chinhphu.vn/?pageid=27160&docid=214590&classid=1&typegroupid=3) (số điều dưới đây đối chiếu với bản Công báo ngày 18/11/2026); [so sánh NĐ 356 với NĐ 13 (LuatVietnam)](https://luatvietnam.vn/legal-updates/new-features-of-decree-356-2025-compared-with-decree-13-2023-on-personal-data-protection-892-106712-article.html); [VOV về NĐ 330/2026](https://vov.vn/chinh-tri/tu-1982026-tu-y-thu-thap-xu-ly-du-lieu-ca-nhan-bi-phat-toi-70-trieu-dong-post1326424.vov). Nội dung NĐ 356 (Điều 5, Điều 8) và mức phạt từng hành vi trong NĐ 330 mới đọc qua bản tóm tắt của LuatVietnam và báo chí, chưa đối chiếu văn bản gốc trên Công báo.
+
+Điểm ảnh hưởng tới app (theo số điều của Luật 91/2025/QH15):
+- **Phân loại** (Điều 2): **dữ liệu cá nhân cơ bản** và **dữ liệu cá nhân nhạy cảm**; NĐ 356 liệt kê danh mục cụ thể. Sinh trắc học, tài chính, vị trí, sức khoẻ là nhạy cảm; eKYC và biometrics login thuộc nhóm này. Điều 31 riêng cho dữ liệu vị trí và sinh trắc học.
+- **Sự đồng ý** (Điều 9): chỉ có hiệu lực khi tự nguyện và chủ thể biết rõ loại dữ liệu, mục đích, bên kiểm soát; rút lại và hạn chế xử lý theo Điều 10. Consent cũ lấy theo NĐ 13 trước 1/1/2026 vẫn dùng tiếp, **không phải xin lại** (Điều 39).
+- **Quyền chủ thể** (Điều 4): biết, đồng ý hoặc không, rút lại; xem, sửa; yêu cầu cung cấp, xoá, hạn chế, phản đối; khiếu nại, bồi thường. NĐ 356 Điều 5 đặt hạn xử lý: rút lại/hạn chế/phản đối phải phản hồi trong 2 ngày làm việc, xong trong 15 ngày; truy cập/sửa 10 ngày; xoá 20 ngày (cộng thêm khi có bên xử lý hoặc bên thứ ba).
+- **Chuyển dữ liệu xuyên biên giới** (Điều 20) và **hồ sơ đánh giá tác động** (Điều 21, 22): Firebase, Crashlytics, RevenueCat, AdMob đều là chuyển ra nước ngoài, cần hồ sơ đánh giá tác động chuyển dữ liệu xuyên biên giới. Hồ sơ đã nộp theo NĐ 13 trước 1/1/2026 tiếp tục dùng, chỉ cập nhật theo luật mới (Điều 39). Doanh nghiệp nhỏ và startup được chọn không áp dụng Điều 21, 22 và khoản 2 Điều 33 trong 5 năm từ 1/1/2026, trừ khi kinh doanh dịch vụ xử lý dữ liệu, xử lý dữ liệu nhạy cảm, hoặc xử lý dữ liệu số lượng lớn.
+- **Trẻ em** (Điều 24): người đại diện theo pháp luật (cha mẹ, người giám hộ) thay mặt trẻ thực hiện các quyền của chủ thể dữ liệu, kể cả việc đồng ý; nếu xử lý để công bố, tiết lộ thông tin đời sống riêng tư, bí mật cá nhân của trẻ **từ đủ 07 tuổi** thì cần cả trẻ và người đại diện đồng ý (Điều 24 khoản 2). Phải ngừng xử lý khi người đại diện rút lại đồng ý (khoản 3).
+- **Ngân hàng** (Điều 27) và **quảng cáo** (Điều 28) có điều riêng; NĐ 356 Điều 8 yêu cầu ngân hàng báo cơ quan chuyên trách và chủ thể trong **72 giờ** khi phát hiện lộ, mất dữ liệu nhạy cảm.
+- **Nhân sự bảo vệ dữ liệu** (khoản 2 Điều 33): chỉ định bộ phận/nhân sự hoặc thuê dịch vụ.
+- **Mức phạt tiền tối đa** (Điều 8): mua bán dữ liệu cá nhân tới **10 lần khoản thu** từ vi phạm; vi phạm chuyển dữ liệu xuyên biên giới tới **5% doanh thu năm trước liền kề**; vi phạm khác tới **3 tỷ đồng**. Đó là mức cho tổ chức; cá nhân bằng 1/2.
+
+Với bank, phòng pháp chế sẽ dẫn; lead mobile cần biết: dữ liệu nào trong app là nhạy cảm, SDK nào gửi dữ liệu ra nước ngoài, consent flow có đúng không, và yêu cầu xoá có chạy hết đường (server, log, vendor) trong 20 ngày không.
+
+Cách nói trong phỏng vấn (EN): "Since 1 January 2026 Vietnam's framework is the Personal Data Protection Law 91/2025, passed in June 2025, with Decree 356/2025 replacing Decree 13 as the implementing decree, and Decree 330/2026 adding administrative sanctions since August. For the app that means: classify data into basic and sensitive, consent that is informed and per purpose, an inventory of SDKs that transfer data abroad for the cross-border impact assessment, and deletion requests honored within the decree's deadlines. Fines go up to 5% of the previous year's revenue for cross-border violations, so legal takes it seriously and needs my inventory."
 
 ### 4.3 Google Play Data safety form
 
 - Bắt buộc cho mọi app; khai: dữ liệu **thu thập** (collected) và **chia sẻ** (shared) theo loại (location, personal info, financial, device IDs, app activity...), mục đích, bắt buộc hay tuỳ chọn, mã hoá khi truyền, cách yêu cầu xoá, có tuân theo Families policy không.
 - Phải bao gồm hành vi của **SDK bên thứ ba** (Firebase, AdMob, AppLovin, RevenueCat). Google Play SDK Index và trang data safety của từng SDK cho thông tin.
 - Sai khai báo là vi phạm policy (có thể bị gỡ). Quy trình: mỗi khi thêm/đổi SDK hoặc event mới, cập nhật một file `data-inventory.md` trong repo rồi đồng bộ lên form; review mỗi release lớn.
-- Yêu cầu **xoá tài khoản**: app cho tạo tài khoản phải có đường xoá trong app và link web (cần kiểm tra chi tiết policy hiện hành tại Play policy center).
+- Yêu cầu **xoá tài khoản** ([Play Console Help 13327111](https://support.google.com/googleplay/android-developer/answer/13327111?hl=en), kiểm tra 18/11/2026): app cho tạo tài khoản phải (1) có đường xoá account **và dữ liệu liên quan** ngay trong app, và (2) có **web link** để yêu cầu xoá kể cả khi user đã gỡ app; link khai trong mục Data deletion của Data safety. Xoá dữ liệu cả trên server của bạn và yêu cầu vendor xử lý dữ liệu xoá theo. Được giữ lại một phần vì bảo mật, chống gian lận, tuân thủ pháp luật (ví dụ log giao dịch ngân hàng) nhưng phải nói rõ trong privacy policy. Hạn cuối tuân thủ là 31/5/2024; app không đạt có thể bị gỡ. App không có đăng nhập (như app phonics không account) không thuộc phạm vi, nhưng vẫn phải trả lời câu hỏi Data deletion.
 
 ### 4.4 Permissions best practices
 
 - Xin đúng lúc (in context), có rationale, hoạt động được khi bị từ chối (graceful degradation), không xin lại liên tục.
-- Dùng Photo Picker thay quyền media; dùng contacts picker (Android 17 chuyển sang session-only, xem brief); location chỉ foreground và chỉ khi cần; không SMS/Call log trừ khi là chức năng cốt lõi được Play duyệt.
-- Android 16: local network permission opt-in; health permissions thay `BODY_SENSORS` (brief). Kiểm tra merged manifest trên mỗi PR vì SDK có thể thêm quyền.
+- Dùng Photo Picker thay quyền media; dùng contacts picker hệ thống của Android 17 (`ACTION_PICK_CONTACTS`: chỉ trả về các trường user chọn, quyền truy cập tạm thời theo session, không cần `READ_CONTACTS`; [Android 17 is here, mục Privacy-preserving choices](https://developer.android.com/blog/posts/android-17-is-here)); location chỉ foreground và chỉ khi cần (Android 17 có thêm nút location do hệ thống vẽ, cấp precise location cho session hiện tại); không SMS/Call log trừ khi là chức năng cốt lõi được Play duyệt.
+- **Local network**: trên Android 16 đây mới là chế độ **opt-in để test** (bật bằng `adb shell am compat enable RESTRICT_LOCAL_NETWORK <package>`), không có permission mới cho production. Từ **Android 17 (API 37)**, app target 37 trở lên bị chặn truy cập LAN mặc định và phải xin runtime permission **`ACCESS_LOCAL_NETWORK`** (nhóm `NEARBY_DEVICES`) hoặc dùng picker hệ thống (`NsdManager` với `DiscoveryRequest.FLAG_SHOW_PICKER`, Output Switcher cho cast). App target 36 trở xuống vẫn được cấp ngầm qua `INTERNET` và **không nên** khai báo `ACCESS_LOCAL_NETWORK` ([Local network permission](https://developer.android.com/privacy-and-security/local-network-permission#android-17-enforcement)).
+- **Health**: app target Android 16 dùng permission chi tiết `android.permission.health.*` (ví dụ `READ_HEART_RATE`, `READ_HEALTH_DATA_IN_BACKGROUND`) thay `BODY_SENSORS`/`BODY_SENSORS_BACKGROUND`, và app mobile phải khai activity hiện privacy policy, thiếu thì permission bị thu hồi ([behavior changes 16, Health and fitness permissions](https://developer.android.com/about/versions/16/behavior-changes-16#health-fitness-permissions)).
+- Kiểm tra merged manifest trên mỗi PR vì SDK có thể thêm quyền.
 - Mọi quyền trong manifest phải map được vào Data safety form và vào một dòng trong privacy policy.
 
 ### 4.5 Consent management: UMP cho ads
 
-- Google yêu cầu app dùng AdMob phục vụ user ở EEA/UK phải dùng CMP được Google chứng nhận (UMP là lựa chọn mặc định, hỗ trợ TCF). Yêu cầu này có hiệu lực từ đầu 2024 (cần kiểm tra thông báo hiện hành của AdMob).
-- UMP cũng xử lý thông báo cho các bang Mỹ có luật riêng và iOS ATT. Luồng: `requestConsentInfoUpdate` -> hiện form nếu cần -> chỉ load ads sau khi `canRequestAds`.
-- App trẻ em: cấu hình child-directed / under-age-of-consent trong request ads và UMP; ads phải non-personalized; cần kiểm tra hướng dẫn cấu hình hiện tại cho app trong Families.
+- Google yêu cầu: từ **16/1/2024** với EEA và UK, và từ **31/7/2024** với Thuỵ Sĩ, chỉ traffic qua **CMP được Google chứng nhận, tích hợp IAB TCF** mới được ads cá nhân hoá; CMP không chứng nhận chỉ còn non-personalized/limited ads ([AdMob Help 13554116](https://support.google.com/admob/answer/13554116?hl=en), kiểm tra 18/11/2026). UMP SDK của Google là một CMP chứng nhận.
+- UMP cũng xử lý thông báo cho các bang Mỹ có luật riêng và iOS ATT. Luồng: `requestConsentInfoUpdate` -> `loadAndShowConsentFormIfRequired` -> chỉ khởi tạo Mobile Ads và load ads khi `canRequestAds()`; thêm nút "Privacy options" trong Settings khi `privacyOptionsRequirementStatus == REQUIRED` ([UMP Android](https://developers.google.com/admob/android/privacy)). Ví dụ (UMP `com.google.android.ump:user-messaging-platform:4.0.0`):
+
+```kotlin
+private val adsInitialized = AtomicBoolean(false)
+
+fun gatherConsent(activity: Activity, isChildDirected: Boolean) {
+    val info = UserMessagingPlatform.getConsentInformation(activity)
+    val params = ConsentRequestParameters.Builder()
+        .setTagForUnderAgeOfConsent(isChildDirected) // TFUA: báo UMP đây là user dưới tuổi consent
+        .build()
+    info.requestConsentInfoUpdate(activity, params, {
+        UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
+            if (info.canRequestAds()) initAds(activity)
+        }
+    }, { requestError -> /* log non-fatal; vẫn thử canRequestAds với trạng thái cũ */ })
+    if (info.canRequestAds()) initAds(activity) // consent từ phiên trước
+}
+
+private fun initAds(context: Context) {
+    if (!adsInitialized.compareAndSet(false, true)) return
+    MobileAds.initialize(context)
+}
+// Settings: nếu info.privacyOptionsRequirementStatus == REQUIRED, hiện nút gọi
+// UserMessagingPlatform.showPrivacyOptionsForm(activity) { error -> }
+```
+- App trẻ em: đặt tag ở **cả hai nơi**, UMP (`setTagForUnderAgeOfConsent`) và request ads qua [`RequestConfiguration`](https://developers.google.com/admob/android/targeting#set_the_age_treatment). API hiện hành là **`setAgeRestrictedTreatment(AgeRestrictedTreatment.CHILD)`** (giá trị `CHILD`, `TEEN`, `UNSPECIFIED`; thêm tham số `tfat` vào ad request). Hai API cũ `setTagForChildDirectedTreatment()` (TFCD) và `setTagForUnderAgeOfConsent()` (TFUA) trên `RequestConfiguration` đã **deprecated**; TFCD/TFUA `TRUE` tương đương `CHILD`, `TEEN` không có tương đương cũ; nếu đặt cả mới lẫn cũ, Google áp dụng mức bảo thủ nhất. Kèm `setMaxAdContentRating(MAX_AD_CONTENT_RATING_G)`, rồi `MobileAds.setRequestConfiguration(...)` **trước** khi load ad. App trong Designed for Families dạng "primarily child-directed" và user Family Link luôn bị coi là child-directed. Với mediation, adapter chỉ chuyển tiếp tín hiệu age treatment từ một số phiên bản tối thiểu (trang targeting liệt kê, ví dụ AppLovin 13.6.3.0), nên kiểm tra phiên bản adapter.
 - Consent cho analytics tách khỏi consent cho ads; lưu trạng thái, cho đổi trong Settings.
 
 ### 4.6 Families policy và COPPA cho app trẻ em
 
 Bạn ship app trẻ em, đây là nơi bạn có lợi thế nếu nói chính xác.
-- **COPPA** (Mỹ): bảo vệ trẻ dưới 13; thu thập thông tin cá nhân từ trẻ cần **verifiable parental consent**; FTC thực thi. Quy tắc COPPA được FTC sửa đổi gần đây (cần kiểm tra ngày hiệu lực và thay đổi về consent cho chia sẻ dữ liệu với bên thứ ba).
-- **Google Play Families policy**: khai target audience; nếu có trẻ em trong đối tượng thì: chỉ dùng ad SDK trong danh sách Families self-certified; không truyền advertising ID cho trẻ; không vị trí chính xác; không API nhạy cảm; nội dung phù hợp; parental gate cho link ngoài, mua hàng, chia sẻ; nếu dùng Firebase Analytics phải cấu hình đúng cho trẻ em. Chi tiết: Play policy center, mục Families (cần kiểm tra bản hiện hành).
+- **COPPA** (Mỹ, 16 CFR Part 312): bảo vệ trẻ dưới 13; thu thập thông tin cá nhân từ trẻ cần **verifiable parental consent**; FTC thực thi. **Bản sửa đổi** của COPPA Rule đăng Federal Register ngày **22/4/2025**, có hiệu lực **23/6/2025**, hạn tuân thủ chung **22/4/2026** (một số nghĩa vụ của Safe Harbor có hạn sớm hơn) ([Federal Register 2025-05904](https://www.federalregister.gov/documents/2025/04/22/2025-05904/childrens-online-privacy-protection-rule), [FTC press release](https://www.ftc.gov/news-events/news/press-releases/2025/01/ftc-finalizes-changes-childrens-privacy-rule-limiting-companies-ability-monetize-kids-data), kiểm tra 18/11/2026). Thay đổi chính ảnh hưởng tới app: cần **consent riêng** của phụ huynh trước khi chia sẻ dữ liệu trẻ cho bên thứ ba để quảng cáo nhắm mục tiêu hoặc mục đích khác; không được giữ dữ liệu trẻ vô thời hạn, chỉ giữ tới khi hết mục đích (cần chính sách retention bằng văn bản); "personal information" nay gồm cả **biometric identifiers** và giấy tờ định danh do nhà nước cấp; Safe Harbor program phải công khai danh sách thành viên.
+- **Google Play Families policy** ([Play Console Help 9893335](https://support.google.com/googleplay/android-developer/answer/9893335?hl=en)): khai target audience; nếu có trẻ em trong đối tượng thì:
+  - Ads cho trẻ hoặc user chưa rõ tuổi chỉ qua **Google Play Families Self-Certified Ads SDKs**; không interest-based ads, không remarketing.
+  - App chỉ nhắm trẻ em **không được gửi AAID**, IMEI, MAC... ; app nhắm cả trẻ và người lớn không được gửi các ID này từ trẻ hoặc user chưa rõ tuổi (cần neutral age screen). App chỉ nhắm trẻ em target API 33+ **không nên khai `AD_ID` permission**.
+  - App chỉ nhắm trẻ em không được xin location permission hay thu precise location; Bluetooth phải qua Companion Device Manager.
+  - Không dùng API/SDK không được duyệt cho dịch vụ hướng tới trẻ em; nội dung phù hợp; parental gate cho link ngoài, mua hàng, chia sẻ. Nếu dùng Firebase Analytics, tắt thu Advertising ID và dùng tối thiểu event.
+  - App đạt chuẩn có thể opt in chương trình **Teacher Approved** (không bảo đảm được chọn).
 - Kỹ thuật bạn đã làm (`references/coppa.md`): không đăng nhập, không PII, ads non-personalized qua SDK certified, parental gate, Data safety khai đúng, analytics tối thiểu.
 - Khi trả lời bank: "the same discipline applies to adult sensitive data: inventory, minimize, gate, declare."
 
 ### 4.7 Bank/fintech: PCI DSS, 3-D Secure, eKYC
 
-- **PCI DSS** áp dụng khi lưu, xử lý hoặc truyền dữ liệu thẻ (PAN). Mục tiêu của mobile là **ra khỏi scope**: không chạm PAN; dùng SDK của payment gateway (hosted field/tokenization) để PAN đi thẳng tới gateway; app chỉ giữ token. Nếu app nhập PAN trực tiếp thì app và backend vào scope đầy đủ. Phiên bản hiện hành của chuẩn và các yêu cầu mới có hiệu lực: cần kiểm tra tại pcisecuritystandards.org. Với SoftPOS (điện thoại làm máy POS) có chuẩn riêng PCI MPoC (cần kiểm tra).
+- **PCI DSS** áp dụng khi lưu, xử lý hoặc truyền dữ liệu thẻ (PAN). Mục tiêu của mobile là **ra khỏi scope**: không chạm PAN; dùng SDK của payment gateway (hosted field/tokenization) để PAN đi thẳng tới gateway; app chỉ giữ token. Nếu app nhập PAN trực tiếp thì app và backend vào scope đầy đủ. Phiên bản hiện hành là **PCI DSS v4.0.1** (limited revision phát hành 6/2024, không thêm hay bỏ requirement); v4.0 bị retire ngày **31/12/2024**; 51 requirement "future-dated" của v4.x bắt buộc từ **31/3/2025** ([PCI SSC blog: Just Published PCI DSS v4.0.1](https://blog.pcisecuritystandards.org/just-published-pci-dss-v4-0-1), [future-dated requirements](https://blog.pcisecuritystandards.org/now-is-the-time-for-organizations-to-adopt-the-future-dated-requirements-of-pci-dss-v4-x), kiểm tra 18/11/2026). Trong nhóm future-dated có yêu cầu cho trang thanh toán web (6.4.3 quản lý script trên payment page, 11.6.1 phát hiện thay đổi trang), liên quan khi app mở WebView checkout. Với SoftPOS (điện thoại làm máy POS) có chuẩn riêng **PCI MPoC** (Mobile Payments on COTS); chi tiết version chưa xác minh trong lần kiểm tra này, xem [Document Library](https://www.pcisecuritystandards.org/document_library/).
 - **3-D Secure 2 (EMV 3DS)**: xác thực chủ thẻ khi thanh toán online; luồng **frictionless** (dựa trên risk, không hỏi user) và **challenge** (OTP, biometric trong app ngân hàng). Trên mobile dùng 3DS SDK của nhà cung cấp hoặc web flow; app ngân hàng là nơi nhận challenge (push, in-app). Ở EU gắn với yêu cầu SCA của PSD2.
-- **eKYC Việt Nam**: NHNN cho phép mở tài khoản thanh toán bằng eKYC từ 2021 (Thông tư 16/2020/TT-NHNN sửa Thông tư 23/2014); quy định hiện hành về tài khoản thanh toán, xác thực sinh trắc học với CCCD gắn chip, và an toàn giao dịch online (Quyết định 2345/QĐ-NHNN về sinh trắc học cho giao dịch giá trị lớn từ 7/2024, sau đó Thông tư 50/2024/TT-NHNN; Thông tư 17/2024/TT-NHNN về tài khoản thanh toán): **cần kiểm tra số hiệu và hiệu lực tại sbv.gov.vn và vanban.chinhphu.vn**. Kỹ thuật: đọc chip CCCD qua NFC, liveness detection, so khớp khuôn mặt với dữ liệu chip/CSDL dân cư, chống giả mạo (anti-spoofing), log đầy đủ cho audit, dữ liệu sinh trắc là dữ liệu nhạy cảm theo Nghị định 13. Security phía client ở `08-Security.md`.
+- **eKYC Việt Nam** (mốc chính):
+
+| Văn bản | Nội dung với app | Hiệu lực |
+|---|---|---|
+| Thông tư 16/2020/TT-NHNN (ký 4/12/2020, sửa TT 23/2014) | Lần đầu cho mở tài khoản thanh toán bằng eKYC | Năm 2021 (ngày cụ thể chưa đối chiếu) |
+| Quyết định 2345/QĐ-NHNN (18/12/2023) | Bắt buộc xác thực sinh trắc học khi chuyển tiền online **trên 10 triệu đồng/lần** hoặc **tổng trên 20 triệu đồng/ngày**, và khi cài Mobile Banking trên thiết bị mới; đối chiếu khuôn mặt với chip CCCD hoặc VNeID | 1/7/2024; **bị bãi bỏ toàn bộ** bởi Quyết định 2872/QĐ-NHNN từ 1/1/2025, nội dung chuyển vào TT 50/2024 ([LuatVietnam](https://luatvietnam.vn/tai-chinh/quyet-dinh-2872-qd-nhnn-405747-d1.html)) |
+| Thông tư 17/2024/TT-NHNN (thay TT 23/2014) | Mở và sử dụng tài khoản thanh toán, eKYC có kiểm soát gian lận; từ 1/1/2025 tài khoản chưa đối chiếu sinh trắc học với CCCD gắn chip/VNeID không được giao dịch online | 1/7/2024 (một số điều từ 1/10/2024 và 1/1/2025) |
+| Thông tư 18/2024/TT-NHNN | Hoạt động thẻ ngân hàng; chủ thẻ chưa đối chiếu sinh trắc học không giao dịch thẻ online được | Mốc sinh trắc 1/1/2025 (ngày hiệu lực chung chưa đối chiếu) |
+| Thông tư 50/2024/TT-NHNN (thay TT 35/2016) | An toàn, bảo mật dịch vụ ngân hàng trực tuyến, đưa nội dung QĐ 2345 vào thông tư, quy định hình thức xác nhận giao dịch theo Luật Giao dịch điện tử 2023 | 1/1/2025 (một số điều muộn hơn) |
+
+  Nguồn: [Thị trường Tài chính Tiền tệ (cơ quan của Hiệp hội Ngân hàng), 21/12/2024](https://thitruongtaichinhtiente.vn/sau-10-ngay-nua-khong-the-chuyen-khoan-thanh-toan-hoa-don-truc-tuyen-neu-chua-xac-thuc-sinh-trac-hoc-64815.html), [div.gov.vn: TT 50/2024 và yêu cầu với app Mobile Banking](https://div.gov.vn/tang-cuong-dam-bao-an-toan-bao-mat-trong-cung-cap-dich-vu-ngan-hang-truc-tuyen); bản gốc tra tại [sbv.gov.vn](https://www.sbv.gov.vn/). Các điều có hiệu lực muộn của TT 50 và ngưỡng chính xác trong TT 50 (thay cho QĐ 2345) chưa đối chiếu với văn bản gốc; khi phỏng vấn bank, nói "QĐ 2345 đã được thay bằng TT 50/2024 từ 1/1/2025". Kỹ thuật: đọc chip CCCD qua NFC, liveness detection, so khớp khuôn mặt với dữ liệu chip/CSDL dân cư, chống giả mạo (anti-spoofing), log đầy đủ cho audit; dữ liệu sinh trắc là dữ liệu nhạy cảm theo Luật 91/2025/QH15 (Điều 31 riêng cho sinh trắc học). Security phía client ở `08-Security.md`.
+- **TT 50/2024 với code app Mobile Banking** (Điều 8 và 11, theo [div.gov.vn](https://div.gov.vn/tang-cuong-dam-bao-an-toan-bao-mat-trong-cung-cap-dich-vu-ngan-hang-truc-tuyen)): có giải pháp phòng chống, phát hiện can thiệp trái phép vào app (anti-tamper); **không cho phép ghi nhớ mật khẩu đăng nhập**; với khách cá nhân, xác thực lại khi truy cập lần đầu hoặc từ thiết bị khác thiết bị lần trước (tối thiểu OTP SMS/voice tới số đã đăng ký, hoặc Soft OTP/Token OTP, cộng sinh trắc học khi luật chuyên ngành yêu cầu); mật khẩu tối thiểu 8 ký tự gồm số, chữ hoa, chữ thường, hiệu lực tối đa 12 tháng (30 ngày nếu là mật khẩu mặc định); PIN tối thiểu 6 số; OTP SMS/email hết hạn sau 5 phút, voice 3 phút, thẻ ma trận 2 phút. Đây là những thứ interviewer bank VN hỏi trực tiếp.
 - Bank thường có thêm: yêu cầu nội bộ về RASP, anti-tamper, không root, pinning, và pentest định kỳ bao gồm SDK bên thứ ba.
 
 ### 4.8 Log masking và data retention
@@ -316,13 +467,14 @@ Chỉ thị (EU) 2019/882 áp dụng từ 28/6/2025 cho nhiều dịch vụ số
 - Coi compliance là việc của pháp chế: pháp chế không biết SDK nào gửi gì đi đâu; bạn biết.
 
 **Đọc thêm:**
-- https://gdpr.eu/ (tóm tắt điều khoản, checklist)
-- https://vanban.chinhphu.vn/ (tra Nghị định 13/2023/NĐ-CP và Luật Bảo vệ dữ liệu cá nhân 2025)
-- https://support.google.com/googleplay/android-developer/answer/10787469?hl=en (Data safety; nếu link đổi, vào Play policy center)
-- https://play.google.com/about/developer-content-policy/ (Play policy center: User Data, Families, Permissions)
-- https://developers.google.com/admob/android/privacy (UMP)
-- https://www.ftc.gov/ (COPPA rule, tìm "Children's Online Privacy Protection Rule")
-- https://www.pcisecuritystandards.org/
+- https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679 (GDPR, văn bản chính thức; anchor `#art_6`, `#art_7`, `#art_8`, `#art_33`, `#art_83`)
+- https://congbaocdn.chinhphu.vn/CongBaoCP/VanBan/2025/6/45578/57730-1-2025971-97291-2025-qh15.pdf (Luật 91/2025/QH15 trên Công báo); https://vanban.chinhphu.vn/ để tra NĐ 356/2025 và NĐ 330/2026
+- https://support.google.com/googleplay/android-developer/answer/10787469?hl=en (Data safety)
+- https://support.google.com/googleplay/android-developer/answer/13327111?hl=en (account deletion)
+- https://support.google.com/googleplay/android-developer/answer/9893335?hl=en (Families policy)
+- https://developers.google.com/admob/android/privacy (UMP) và https://developers.google.com/admob/android/targeting#set_the_age_treatment (age treatment)
+- https://www.federalregister.gov/documents/2025/04/22/2025-05904/childrens-online-privacy-protection-rule (COPPA Rule sửa đổi 2025)
+- https://blog.pcisecuritystandards.org/just-published-pci-dss-v4-0-1 (PCI DSS v4.0.1)
 - https://www.sbv.gov.vn/ (văn bản NHNN về eKYC, sinh trắc học)
 
 ## 5. SDK, vendor evaluation và OSS licensing
@@ -333,7 +485,7 @@ Chỉ thị (EU) 2019/882 áp dụng từ 28/6/2025 cho nhiều dịch vụ số
 - [ ] Size: APK/AAB diff, method count, native libs (ABI nào, 16 KB page support chưa)
 - [ ] Permissions thêm vào merged manifest; có quyền nào không giải thích được với user không
 - [ ] Network: endpoint nào, dữ liệu gì, có cho tắt không; có pinning riêng gây xung đột không
-- [ ] Privacy: data collected/shared để khai Data safety; iOS privacy manifest nếu KMP (cần kiểm tra yêu cầu Apple hiện hành)
+- [ ] Privacy: data collected/shared để khai Data safety; iOS privacy manifest nếu KMP (từ 1/5/2024 App Store Connect yêu cầu khai approved reason cho required-reason API, kể cả API do SDK bên thứ ba gọi; SDK phổ biến phải kèm privacy manifest và chữ ký: [Apple upcoming requirements](https://developer.apple.com/news/upcoming-requirements/?id=05012024a))
 - [ ] Startup: init nặng không; có lazy init / App Startup không; có chạy background job không
 - [ ] Compat: minSdk, compileSdk, Kotlin/Coroutines version, KMP support nếu cần
 - [ ] Maintenance: release gần nhất, issue mở, phản hồi maintainer, có trong Play SDK Index không
@@ -387,9 +539,9 @@ Developer chịu trách nhiệm về hành vi của SDK trong app: User Data pol
 
 | Khoản | Cơ chế tính | Đòn bẩy |
 |---|---|---|
-| Cloud/Firebase (Blaze) | Storage và egress (content pack qua CDN), Firestore read/write, Functions, Auth MAU trên ngưỡng free; Analytics, Crashlytics, Remote Config miễn phí (cần kiểm tra bảng giá hiện tại) | Cache client, nén pack, CDN cache header, giảm read bằng local DB |
+| Cloud/Firebase (Blaze) | Storage và egress (content pack qua CDN), Firestore read/write, Functions, Auth MAU trên ngưỡng free; Analytics, A/B Testing, Performance Monitoring, FCM, App Distribution miễn phí; Crashlytics miễn phí cho mobile (Blaze có thể phát sinh Cloud Logging/Storage); Remote Config từ 1/9/2026 miễn phí tới 100.000 fetch/ngày/project, vượt thì $0,06/10K ([pricing](https://firebase.google.com/pricing), kiểm tra 18/11/2026) | Cache client, nén pack, CDN cache header, giảm read bằng local DB |
 | AI tokens | Theo token input/output, theo model; cache prefix; on-device "miễn phí" per inference nhưng tốn engineering | Chọn model nhỏ nhất đủ dùng, cap per user, hybrid on-device (xem `10-AI-for-Mobile-Lead.md`) |
-| CI minutes | GitHub Actions tính phút theo loại runner; macOS runner (cần cho iOS) có hệ số giá cao hơn Linux (cần kiểm tra bảng giá) | Gradle cache, remote build cache, chỉ chạy iOS build khi đổi code iOS, self-hosted runner |
+| CI minutes | GitHub Actions tính phút theo loại runner; giá/phút runner chuẩn: Linux 2-core $0,006, Windows 2-core $0,010, macOS $0,062 (khoảng 10 lần Linux); gói Free có $12 compute/tháng ([GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)) | Gradle cache, remote build cache, chỉ chạy iOS build khi đổi code iOS, self-hosted runner |
 | Device farm | Firebase Test Lab, BrowserStack, AWS Device Farm theo device-phút | Ma trận device nhỏ cho PR, lớn cho nightly |
 | Tool license | Datadog theo session, Sentry theo event, LaunchDarkly theo MAU | Sample, giới hạn event, xem lại mỗi quý |
 | Người | Lớn nhất: giờ review, giờ chờ CI, giờ fix flaky | Đo và báo cáo như chi phí thật |
@@ -430,7 +582,7 @@ Template ngắn cho từng loại (ADR và RFC đầy đủ ở `11-Leadership-M
 
 ## 8. ASO và release marketing cơ bản
 
-- **Store listing**: title ngắn có từ khoá chính, short description là câu bán hàng, full description có từ khoá tự nhiên; giới hạn ký tự của từng trường cần kiểm tra tại Play Console help. Localize listing cho từng thị trường (VN, EN tối thiểu).
+- **Store listing**: title ngắn có từ khoá chính, short description là câu bán hàng, full description có từ khoá tự nhiên; giới hạn ký tự: app name 30, short description 80, full description 4.000 ([Play Console Help 9859152](https://support.google.com/googleplay/android-developer/answer/9859152?hl=en)). Localize listing cho từng thị trường (VN, EN tối thiểu).
 - **Screenshots**: 2-3 ảnh đầu quyết định; mỗi ảnh một lợi ích, chữ to; video ngắn nếu có; feature graphic. Dùng Play store listing experiments để A/B icon và screenshot.
 - **Rating và review**: In-App Review API đúng lúc (sau lesson hoàn thành, không phải lúc mở app); trả lời review; rating thấp của một version là tín hiệu quality.
 - **Staged rollout như đòn bẩy marketing**: ra 10% để lấy review và crash sớm; 100% kèm thông báo, blog, push; release notes "what's new" viết cho user, không phải changelog kỹ thuật.
@@ -454,9 +606,9 @@ Template ngắn cho từng loại (ADR và RFC đầy đủ ở `11-Leadership-M
 **Điểm interviewer muốn nghe:** Hiểu cohort, biết engineering tác động D1, định nghĩa "active".
 
 ### Q3. What are Android vitals and which ones matter most?
-**A:** Android vitals is the quality data Play collects from opted-in devices. The two core vitals are user-perceived crash rate and user-perceived ANR rate; Play sets bad behavior thresholds overall and per device model, and exceeding them reduces discoverability and can show a warning on the listing. I check the current thresholds on the vitals page rather than quoting numbers from memory. Beyond those, I watch startup time, slow and frozen frames, excessive wakeups and stuck wake locks, because they show up as uninstalls before they show up as crashes.
+**A:** Android vitals is the quality data Play collects from opted-in, certified devices for apps installed from Play, measured per daily active user rather than per session. The core vitals are user-perceived crash rate and user-perceived ANR rate, excessive partial wake locks, and, with visibility impact from February 2027, memory and bitmap memory usage. The bad behavior thresholds are 1.09% crash and 0.47% ANR overall, 8% for any single phone model, and 5% of sessions for excessive wake locks, evaluated over the last 28 days; exceeding them can reduce discoverability and show a warning on the listing. Beyond those, I watch startup time, where vitals flags cold starts of 5 seconds or more, slow rendering, excessive wakeups and stuck wake locks, because they show up as uninstalls before they show up as crashes.
 **Follow-ups:** How does per-device threshold change your release process? How do you reproduce an ANR from vitals? Where does Crashlytics differ from vitals?
-**Điểm interviewer muốn nghe:** Biết hai core vitals, biết ngưỡng theo model, không bịa số.
+**Điểm interviewer muốn nghe:** Biết core vitals, nói đúng ngưỡng 1,09% / 0,47% / 8% per model / 28 ngày, biết vitals tính theo user-day.
 
 ### Q4. Your crash-free rate drops after a release. Walk me through what you do.
 **A:** First confirm it is the new version: compare crash-free of the new version against the previous version at the same rollout stage, not the overall number. If it is worse, halt the rollout and open an incident if it is a core flow. Look at the top issue by affected users, read the stack with custom keys such as feature flags and content pack version, and reproduce. Mitigate first: a kill switch if the crash is behind a flag, otherwise a hotfix from the release tag. Then the postmortem asks why the gate did not catch it and adds the test or the check. Throughout, a comms update every 30 minutes to the PM and support.
@@ -474,7 +626,7 @@ Template ngắn cho từng loại (ADR và RFC đầy đủ ở `11-Leadership-M
 **Điểm interviewer muốn nghe:** Nhịp cố định, label, owner, close by version, custom key không PII.
 
 ### Q7. How would you design an event taxonomy for a new app?
-**A:** One document with an owner and a code registry. Names are object_action in snake_case and past tense: lesson_started, purchase_completed. Every event carries standard parameters such as screen_name, source and content version; event-specific parameters are typed in a sealed class so nobody invents strings. No PII in names or values. Each event has a description, trigger, parameters, owner and the version it was added. I check the analytics SDK limits on event count and parameter sizes before designing, and I keep the number of events small; a funnel needs five good events, not fifty.
+**A:** One document with an owner and a code registry. Names are object_action in snake_case and past tense: lesson_started, purchase_completed. Every event carries standard parameters such as screen_name, source and content version; event-specific parameters are typed in a sealed class so nobody invents strings. No PII in names or values. Each event has a description, trigger, parameters, owner and the version it was added. I design inside the Firebase limits: 500 distinct event names, 25 parameters per event, 40-character names, 100-character string values, 25 user properties, and no firebase_, google_ or ga_ prefixes. And I keep the number of events small; a funnel needs five good events, not fifty.
 **Follow-ups:** How do you version events when the meaning changes? How do you test that events fire? How do you handle consent for analytics?
 **Điểm interviewer muốn nghe:** Quy ước tên, registry trong code, không PII, có owner.
 
@@ -494,14 +646,14 @@ Template ngắn cho từng loại (ADR và RFC đầy đủ ở `11-Leadership-M
 **Điểm interviewer muốn nghe:** Biết SRM, peeking, novelty, confounding; có thứ tự đọc.
 
 ### Q11. What does GDPR change in how you build a mobile app?
-**A:** Four things in code. Lawful basis first: core features run on contract, analytics and personalized ads on consent, so SDKs that need consent are initialized only after it is given and events before that are dropped or buffered. Data subject rights become features: delete account and data including logs and backups, export data, turn off profiling. Data minimization and retention become design constraints: collect what the feature needs and set a deletion schedule. And high-risk processing, such as biometrics or children's data, needs a DPIA with legal before launch. I keep a data inventory in the repo so the Data safety form and the DPIA come from the same source.
+**A:** Four things in code. Lawful basis first: core features run on contract, analytics and personalized ads on consent, so SDKs that need consent are initialized only after it is given and events before that are dropped or buffered. Data subject rights become features: delete account and data including logs and backups, export data, turn off profiling. Data minimization and retention become design constraints: collect what the feature needs and set a deletion schedule. And high-risk processing, such as biometrics or children's data, needs a DPIA with legal before launch under Article 35. Operationally I know the clocks: data subject requests are answered within one month under Article 12(3), and a breach goes to the supervisory authority within 72 hours of becoming aware under Article 33, so an engineer who finds tokens in a log escalates the same day. I keep a data inventory in the repo so the Data safety form and the DPIA come from the same source.
 **Follow-ups:** What is a lawful basis for crash reporting? How do you handle a user who withdraws consent mid-session? What is the breach notification timeline?
 **Điểm interviewer muốn nghe:** Lawful basis, consent trước SDK init, quyền thành feature, DPIA.
 
 ### Q12. What do you know about Vietnam's personal data regulations?
-**A:** Decree 13/2023 has been in force since mid-2023 and the Personal Data Protection Law passed in 2025 raises it to law; I verify the current effective dates and guidance with legal rather than from memory. In practice for an app: classify data into basic and sensitive, with biometrics and financial data as sensitive; make consent explicit, per purpose and withdrawable; prepare the processing impact assessment dossier and the cross-border transfer dossier, because Firebase, Crashlytics and most SDKs send data abroad; and handle children's data with guardian consent rules. My job as lead is the inventory: which SDK sends what where, so legal can file correctly.
+**A:** Since 1 January 2026 the framework is the Personal Data Protection Law 91/2025/QH15, passed on 26 June 2025, with Decree 356/2025 as its implementing decree replacing Decree 13/2023, and Decree 330/2026 on administrative sanctions in force since 19 August 2026. Consent and impact assessment dossiers made under Decree 13 remain valid under the transition article. In practice for an app: classify data into basic and sensitive, with biometrics, location and financial data as sensitive; consent that is voluntary, informed and per purpose, with withdrawal and restriction handled within the decree's deadlines; a processing impact assessment and a cross-border transfer impact assessment, because Firebase, Crashlytics and most SDKs send data abroad; and children's data handled through the legal representative, with the child's own consent too from age 7 when private information is disclosed. Maximum fines are ten times the proceeds for selling personal data, 5% of the previous year's revenue for cross-border violations and 3 billion dong for others. My job as lead is the inventory: which SDK sends what where, so legal can file correctly.
 **Follow-ups:** Which of your current SDKs transfer data abroad? What counts as sensitive data in your app? Who in your company owns the dossier?
-**Điểm interviewer muốn nghe:** Biết ND13 và luật 2025, biết phân loại, biết hồ sơ chuyển dữ liệu ra nước ngoài, không bịa ngày.
+**Điểm interviewer muốn nghe:** Biết Luật 91/2025 thay khung ND13 từ 1/1/2026, NĐ 356 và NĐ 330, biết phân loại, hồ sơ chuyển dữ liệu xuyên biên giới, mức phạt.
 
 ### Q13. How do you keep the Google Play Data safety form accurate?
 **A:** It comes from an inventory, not from memory. A data-inventory file in the repo lists every data type we collect or share, the purpose, whether it is optional, the SDK responsible, and the retention. Any PR that adds an SDK, a permission or an analytics event must update the inventory, and the release checklist includes syncing it to the form. I use the Play SDK Index and each SDK's published data safety information to fill the SDK rows, and I treat a mismatch as a policy risk because a wrong form can get the app removed.
@@ -509,24 +661,24 @@ Template ngắn cho từng loại (ADR và RFC đầy đủ ở `11-Leadership-M
 **Điểm interviewer muốn nghe:** Inventory trong repo, quy trình cập nhật, biết rủi ro gỡ app.
 
 ### Q14. How do you approach runtime permissions?
-**A:** Ask in context with a rationale, degrade gracefully when denied, never loop the request. Prefer system pickers over broad permissions: the photo picker instead of media permissions, the contacts picker, foreground-only location. Check the merged manifest on every PR because SDKs add permissions. Every permission maps to a line in the Data safety form and the privacy policy. I also track platform changes: Android 16 made local network access opt-in and replaced body sensors with health permissions, and Android 17 moved the contacts picker to session-only access, so the flows need re-testing on new OS versions.
+**A:** Ask in context with a rationale, degrade gracefully when denied, never loop the request. Prefer system pickers over broad permissions: the photo picker instead of media permissions, the contacts picker, foreground-only location. Check the merged manifest on every PR because SDKs add permissions. Every permission maps to a line in the Data safety form and the privacy policy. I also track platform changes: Android 16 replaced BODY_SENSORS with granular health permissions for apps targeting it and offered local network restrictions only as an opt-in test mode; Android 17 enforces them for apps targeting API 37, which must request ACCESS_LOCAL_NETWORK or use a system picker, and adds a system contacts picker that grants temporary, per-field access without READ_CONTACTS. So the flows need re-testing whenever we raise the target SDK.
 **Follow-ups:** How do you test the denied path? What do you do when a vendor SDK requires a permission you do not want? How do you handle "don't ask again"?
 **Điểm interviewer muốn nghe:** In-context, graceful, picker thay permission, merged manifest, theo dõi OS mới.
 
 ### Q15. How do you implement consent for ads and analytics?
-**A:** Separate consents for separate purposes. For ads I use the UMP SDK because Google requires a certified consent platform for users in the EEA and UK; the flow is request consent info, show the form if required, and only load ads once the SDK says ads can be requested. For analytics I gate SDK initialization and buffer or drop events until consent, and I expose a settings screen to change it. For the kids app the request is configured as child-directed so ads are non-personalized, and I verify the Families-specific configuration against current AdMob guidance.
+**A:** Separate consents for separate purposes. For ads I use the UMP SDK because Google requires a certified consent platform for users in the EEA and UK; the flow is request consent info, show the form if required, and only load ads once the SDK says ads can be requested. For analytics I gate SDK initialization and buffer or drop events until consent, and I expose a settings screen to change it. The certified-CMP rule has applied since 16 January 2024 for the EEA and UK and 31 July 2024 for Switzerland; without it only non-personalized or limited ads serve. For the kids app I tag under age of consent in UMP and set the ad request to child treatment with setAgeRestrictedTreatment, which replaced the deprecated child-directed and under-age-of-consent tags, plus a G content rating, so ads are non-personalized and no advertising ID is sent.
 **Follow-ups:** What happens to events fired before consent? How do you handle consent across reinstalls? How do you test the EEA flow from Vietnam?
-**Điểm interviewer muốn nghe:** UMP, tách mục đích, init sau consent, child-directed.
+**Điểm interviewer muốn nghe:** UMP, tách mục đích, init sau consent, child treatment (API age treatment mới), biết mốc 16/1/2024.
 
 ### Q16. You ship a kids app. What does COPPA and the Families policy mean for your code?
-**A:** No account, no personal data, no advertising ID transmitted for children, no precise location, only ad SDKs on the Families self-certified list and configured child-directed, minimal analytics configured for children, a parental gate in front of external links and purchases, and content rated appropriately. COPPA covers under-13s in the US and requires verifiable parental consent for any personal data collection, which we avoid entirely by not collecting any. The Data safety form says exactly that. I keep a constraints doc that every feature is checked against before design, and I re-check the policy pages when the FTC or Google updates them, which both did recently; the details need to be verified.
+**A:** No account, no personal data, no advertising ID transmitted for children, no precise location, only ad SDKs on the Families self-certified list and configured child-directed, minimal analytics configured for children, a parental gate in front of external links and purchases, and content rated appropriately. COPPA covers under-13s in the US and requires verifiable parental consent for any personal data collection, which we avoid entirely by not collecting any. The amended COPPA Rule, published on 22 April 2025 with compliance required from 22 April 2026, adds separate parental consent before disclosing children's data to third parties for targeted advertising, limits retention to what the purpose needs, and counts biometric identifiers as personal information. On Play, apps solely targeting children must not transmit the advertising ID or request the AD_ID permission when targeting API 33 or higher, and must not request location. The Data safety form says exactly what we do. I keep a constraints doc that every feature is checked against before design.
 **Follow-ups:** How does a parental gate work? What if the business wants a leaderboard with names? How do you handle a teacher or school account?
 **Điểm interviewer muốn nghe:** Danh sách ràng buộc cụ thể, parental gate, không thu thập dữ liệu, biết policy thay đổi.
 
 ### Q17. How do you keep a banking app out of PCI DSS scope?
-**A:** By never touching the card number in our code. The card entry is handled by the payment gateway's SDK or hosted fields so the PAN goes straight to the gateway, and the app only holds a token. No PAN in logs, in analytics, in screenshots, in crash reports. If a product requirement forces us to handle the PAN, then the app and backend are fully in scope and the cost is a full assessment, so I push hard for tokenization. I check the current PCI DSS version and any newly effective requirements on the council's site before committing to a design.
+**A:** By never touching the card number in our code. The card entry is handled by the payment gateway's SDK or hosted fields so the PAN goes straight to the gateway, and the app only holds a token. No PAN in logs, in analytics, in screenshots, in crash reports. If a product requirement forces us to handle the PAN, then the app and backend are fully in scope and the cost is a full assessment, so I push hard for tokenization. The current standard is PCI DSS v4.0.1, released in June 2024 after v4.0 was retired at the end of 2024, and its future-dated requirements, such as script management on payment pages, have been mandatory since 31 March 2025, which matters if checkout runs in a WebView.
 **Follow-ups:** What about storing the last four digits? How does 3-D Secure fit in? What about SoftPOS apps?
-**Điểm interviewer muốn nghe:** Tokenization, không chạm PAN, biết chi phí khi vào scope, không bịa version.
+**Điểm interviewer muốn nghe:** Tokenization, không chạm PAN, biết chi phí khi vào scope, biết v4.0.1 và mốc 31/3/2025.
 
 ### Q18. Explain 3-D Secure 2 from a mobile perspective.
 **A:** It is the cardholder authentication step for online card payments. In the frictionless flow the issuer's risk engine approves without user interaction; in the challenge flow the user authenticates, typically with an OTP or with biometrics inside the issuing bank's app. On the merchant side the app integrates a 3DS SDK or a web flow and must handle both outcomes plus timeouts and app switching. On the issuer side, the banking app is where the challenge arrives, usually by push, so reliability of push and deep links becomes a payment metric. In the EU this ties to strong customer authentication under PSD2.
@@ -534,9 +686,9 @@ Template ngắn cho từng loại (ADR và RFC đầy đủ ở `11-Leadership-M
 **Điểm interviewer muốn nghe:** Frictionless vs challenge, vai trò merchant vs issuer, push và deep link.
 
 ### Q19. What do you know about eKYC regulation in Vietnam?
-**A:** The State Bank allowed electronic account opening with eKYC from 2021 and has since added rules on biometric authentication for online transactions above certain values and on reading chip-based ID cards; the exact circulars, thresholds and effective dates I confirm on the SBV site before relying on them. Technically it means NFC reading of the citizen ID chip, liveness detection, face matching against the chip or national database, anti-spoofing, full audit logging, and treating biometric data as sensitive under Decree 13. The security side, attestation, anti-tamper and secure capture, I cover separately.
+**A:** The State Bank allowed electronic account opening with eKYC from 2021 through Circular 16/2020. Decision 2345 made biometric authentication mandatory from 1 July 2024 for online transfers above 10 million dong per transaction or 20 million per day and for setting up mobile banking on a new device; it was repealed from 1 January 2025 when Circular 50/2024 on online banking security took over its content. Circular 50 also requires anti-tamper measures, no saved login passwords, and re-authentication on a new device. Circular 17/2024 on payment accounts blocks online transactions from 1 January 2025 for accounts whose biometrics have not been matched against the chip ID card or VNeID. Technically it means NFC reading of the citizen ID chip, liveness detection, face matching against the chip or national database, anti-spoofing, full audit logging, and treating biometric data as sensitive personal data under the 2025 Personal Data Protection Law. The security side, attestation, anti-tamper and secure capture, I cover separately.
 **Follow-ups:** How do you handle devices without NFC? How do you store or not store the face template? How do you audit an eKYC session?
-**Điểm interviewer muốn nghe:** Biết khung, không bịa số hiệu, nói được kỹ thuật và phân loại dữ liệu.
+**Điểm interviewer muốn nghe:** Biết khung TT 16/2020, QĐ 2345 -> TT 50/2024, TT 17/2024, nói được kỹ thuật và phân loại dữ liệu.
 
 ### Q20. How do you prevent sensitive data from leaking into logs and crash reports?
 **A:** A logging layer with an allowlist and a redactor: release builds log warnings and above only, and everything passes through masking for card numbers, phone numbers, emails, tokens and OTPs. Crashlytics custom keys and breadcrumbs contain identifiers like content version and feature flags, never user data. A lint rule flags logging of objects from the user or payment packages. Retention follows the company policy set by legal, and logs are deletable by user id to honor erasure requests. I review this with a traffic capture on a test build once per release.
@@ -589,7 +741,7 @@ Template ngắn cho từng loại (ADR và RFC đầy đủ ở `11-Leadership-M
 **Điểm interviewer muốn nghe:** Tác động business, đòn bẩy kỹ thuật, gate trên PR, ví dụ thật.
 
 ### Q30. How do you decide whether to use Firebase A/B Testing or build your own experimentation?
-**A:** Firebase A/B Testing is enough when the variable is a Remote Config parameter, the metrics live in Firebase Analytics, and the team is small; it is free and integrated. It becomes limiting when you need metrics from your warehouse, custom statistics, mutually exclusive experiments at scale, or server-side experiments shared with backend. At that point a dedicated platform or an in-house flag service with a warehouse analysis pipeline pays off. I would start with Firebase, write the experiment doc discipline into the process from day one, and move when a concrete limitation blocks a decision, not before.
+**A:** Firebase A/B Testing is enough when the variable is a Remote Config parameter, the metrics live in Firebase Analytics, and the team is small; it is free, integrated, and uses frequentist tests at a 0.05 significance level with 95% confidence intervals. Remote Config fetches have been billed above 100,000 per day per project on Blaze since 1 September 2026, which is usually negligible but worth knowing. It becomes limiting when you need metrics from your warehouse, custom statistics, mutually exclusive experiments at scale, or server-side experiments shared with backend. At that point a dedicated platform or an in-house flag service with a warehouse analysis pipeline pays off. I would start with Firebase, write the experiment doc discipline into the process from day one, and move when a concrete limitation blocks a decision, not before.
 **Follow-ups:** How do you keep assignment consistent across client and server? How do you handle experiments across Android and iOS? What is your experiment doc template?
 **Điểm interviewer muốn nghe:** Biết giới hạn, bắt đầu rẻ, chuyển khi có lý do cụ thể.
 
@@ -641,34 +793,34 @@ Viết `docs/runbooks/crash-spike-during-rollout.md` theo template mục 7: trig
 
 - [ ] Tôi phân biệt được output và outcome, và viết được metric cho một feature với baseline, mục tiêu, guardrail.
 - [ ] Tôi giải thích được DAU/MAU, retention cohort, funnel, conversion, LTV và kỹ thuật mobile ảnh hưởng tới chúng thế nào.
-- [ ] Tôi gọi tên được hai core vitals, biết Play có ngưỡng theo model, và biết nơi kiểm tra ngưỡng.
+- [ ] Tôi gọi tên được core vitals và nhớ ngưỡng: crash 1,09% / ANR 0,47% overall, 8% mỗi phone model, cửa sổ 28 ngày.
 - [ ] Tôi có quy trình triage Crashlytics hằng ngày và biết so crash-free theo version ở cùng bậc rollout.
 - [ ] Tôi đề xuất được bộ SLO cho mobile với hành động gắn mỗi SLO.
 - [ ] Tôi thiết kế được event taxonomy với quy ước tên, registry trong code, không PII.
 - [ ] Tôi phân biệt được flag và experiment, giải thích được sample size và peeking cho PM.
 - [ ] Tôi đọc kết quả experiment theo thứ tự: SRM, exposure, metric chính + CI, guardrail, segment.
 - [ ] Tôi nói được GDPR ảnh hưởng tới code ở 4 điểm: lawful basis, consent trước SDK, quyền thành feature, DPIA.
-- [ ] Tôi nói được Nghị định 13 và Luật 2025 ở mức phân loại dữ liệu, consent, hồ sơ chuyển dữ liệu ra nước ngoài, và biết chỗ cần kiểm tra.
+- [ ] Tôi nói được Luật 91/2025/QH15, NĐ 356/2025 (thay NĐ 13) và NĐ 330/2026 ở mức phân loại dữ liệu, consent, hồ sơ chuyển dữ liệu xuyên biên giới, mức phạt tối đa.
 - [ ] Tôi có data inventory trong repo và biết cách đồng bộ lên Data safety form.
 - [ ] Tôi mô tả được ràng buộc Families/COPPA cho app trẻ em bằng danh sách cụ thể.
-- [ ] Tôi giải thích được cách giữ app ngoài scope PCI DSS, 3DS2 frictionless vs challenge, và khung eKYC VN (có "cần kiểm tra").
+- [ ] Tôi giải thích được cách giữ app ngoài scope PCI DSS, 3DS2 frictionless vs challenge, và khung eKYC VN (TT 17/2024, TT 50/2024 thay QĐ 2345).
 - [ ] Tôi có checklist đánh giá SDK, bảng license, và policy allowlist trong CI.
 - [ ] Tôi biết Gradle dependency verification, Dependabot/Renovate là gì và cấu hình ở đâu.
 - [ ] Tôi trình bày được một cost/benefit 1 trang với số đo được.
 
 ## Đọc thêm tổng hợp
 
-1. https://developer.android.com/topic/performance/vitals : core vitals, ngưỡng, cách đọc; đọc trước khi nói bất kỳ số nào.
+1. https://developer.android.com/topic/performance/vitals : core vitals, bảng bad behavior threshold, cửa sổ 28 ngày.
 2. https://play.google.com/about/developer-content-policy/ : Play policy center: User Data, Data safety, Families, Permissions, SDK.
 3. https://play.google.com/sdks : Google Play SDK Index.
 4. https://firebase.google.com/docs/analytics , https://firebase.google.com/docs/crashlytics , https://firebase.google.com/docs/remote-config , https://firebase.google.com/docs/ab-testing , https://firebase.google.com/docs/perf-mon
 5. https://developers.google.com/admob/android/privacy : UMP và yêu cầu consent cho AdMob.
-6. https://gdpr.eu/ : GDPR tóm tắt theo điều, checklist cho developer.
-7. https://vanban.chinhphu.vn/ : Nghị định 13/2023/NĐ-CP, Luật Bảo vệ dữ liệu cá nhân 2025; https://www.sbv.gov.vn/ cho văn bản eKYC và sinh trắc học.
-8. https://www.ftc.gov/ : COPPA rule và bản sửa đổi mới nhất.
+6. https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679 : GDPR văn bản chính thức (EUR-Lex), mỗi điều có anchor `#art_N`.
+7. https://vanban.chinhphu.vn/ : Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP, NĐ 330/2026/NĐ-CP; https://www.sbv.gov.vn/ cho văn bản eKYC và sinh trắc học.
+8. https://www.federalregister.gov/documents/2025/04/22/2025-05904/childrens-online-privacy-protection-rule : COPPA Rule sửa đổi 2025 (hiệu lực 23/6/2025, tuân thủ 22/4/2026).
 9. https://www.pcisecuritystandards.org/ : PCI DSS, MPoC; https://www.emvco.com/ cho EMV 3DS.
 10. https://choosealicense.com/licenses/ và https://opensource.org/licenses : license OSS; https://docs.gradle.org/current/userguide/dependency_verification.html ; https://docs.github.com/en/code-security/dependabot
-11. Trustworthy Online Controlled Experiments (Kohavi, Tang, Xu): ch. 1-3, 17; https://www.evanmiller.org/ab-testing/sample-size.html
+11. Trustworthy Online Controlled Experiments (Kohavi, Tang, Xu): ch. 1-3, 17 (thống kê), 21 (SRM); https://www.evanmiller.org/ab-testing/sample-size.html
 12. Lean Analytics (Croll, Yoskovitz), ch. 2-3; Accelerate (Forsgren, Humble, Kim), ch. 2 về đo lường.
 13. https://firebase.google.com/pricing và https://docs.github.com/en/billing : mô hình chi phí.
 14. `06-Mobile-System-Design.md` (Analytics SDK design), `08-Security.md` (eKYC client security), `10-AI-for-Mobile-Lead.md` (AI cost), `11-Leadership-Management.md` (ADR/RFC/postmortem), `21-UI-UX-Design-Adaptive.md` (a11y).

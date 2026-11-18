@@ -198,7 +198,7 @@ Report không tách Android/iOS, không có dòng Engineering Manager. Nhận x�
 - Stanford "Canaries in the Coal Mine": dev 22-25 tuổi giảm ~20% từ cuối 2022; mất việc tập trung ở nơi AI *thay thế*, không phải nơi AI *tăng cường*.
 - LinkedIn Skills on the Rise 2026: posting cần AI literacy +70% YoY; leadership và stakeholder communication cũng tăng.
 - ITviec Q1-2026: AI/Data/ML postings +96.6% YoY.
-- Meta (10/2025) và Canva (6/2025) cho dùng AI trong vòng coding.
+- Canva (11/6/2025) chính thức cho và yêu cầu dùng AI trong vòng coding: blog chính chủ https://www.canva.dev/blog/engineering/yes-you-can-use-ai-in-our-interviews/ . Meta thử nghiệm vòng "AI-enabled" từ 7/2025 theo tin nội bộ do 404 Media đăng (29/7/2025, https://www.404media.co/meta-is-going-to-let-job-candidates-use-ai-during-coding-tests/) và Meta xác nhận với Business Insider; chưa có trang chính thức của Meta mô tả format (kiểm tra 18/11/2026). Chi tiết ở `13-Coding-Interview.md` mục 8.
 
 **Cách kể:** "Nhu cầu đang dịch sang senior biết thẩm định output của AI, lead được team dùng AI, và vẫn hiểu hệ thống tới tận cùng. Đó là vị trí tôi nhắm."
 
@@ -206,14 +206,14 @@ Report không tách Android/iOS, không có dòng Engineering Manager. Nhận x�
 
 | Mục | Hiện trạng |
 |---|---|
-| Android OS | Android 17 (API 37), stable 16/6/2026. Target 37: lock-free MessageQueue, không sửa `static final` qua reflection/JNI, bỏ opt-out orientation trên large screen. Mọi app: per-app memory limit, Keystore key caps, background audio restrictions. |
+| Android OS | Android 17 (API 37), stable 16/6/2026. Target 37: lock-free MessageQueue, không sửa `static final` qua reflection/JNI, bỏ opt-out orientation trên large screen. Mọi app: per-app memory limit, giới hạn số key Keystore mỗi app (50.000 key cho app không phải system target 37+, 200.000 cho app khác; vượt thì `KeyStoreException`, https://developer.android.com/about/versions/17/behavior-changes-all#per-app-keystore-limits), background audio hardening. |
 | Android 16 (API 36) | Edge-to-edge bắt buộc; predictive back mặc định; sw600dp+ bỏ qua orientation/resizability; local network permission opt-in. |
 | Google Play | Target 36 bắt buộc từ 31/8/2026 (gia hạn 1/11/2026). 16 KB page size: AGP ≥8.5.1, NDK r28+; chặn update không hỗ trợ từ 1/2/2027 (theo trang chính thức). Developer verification từ 30/9/2026 ở BR/ID/SG/TH, global 2027. |
 | Kotlin | 2.4.21 (8/10/2026); 2.4.0 stable context parameters, explicit backing fields, UUID. K2 mặc định. |
-| Compose | 1.12.1, Material3 1.4.0; "Compose First" (5/2026): Views/Fragments/RecyclerView maintenance mode. Navigation 3 stable (11/2025). |
+| Compose | 1.12.1, Material3 1.4.0; "Android UI Development is Compose First" (Android Developers Blog, 19/5/2026, https://android-developers.googleblog.com/2026/05/android-ui-development-is-compose-first.html): View components mà Compose thay thế, cùng Fragments, RecyclerView, ViewPager vào maintenance mode (chỉ sửa lỗi nghiêm trọng, không tính năng mới, không deprecate). Navigation 3 stable (11/2025). |
 | KMP/CMP | CMP iOS stable từ 1.8 (5/2025); hiện 1.12.2; Hot Reload stable. |
 | Android Studio | Rabbit 1 (2026.2.1). Gemini Agent Mode, MCP, AGENTS.md, Journeys, Android CLI 1.0. |
-| Build | AGP 9.4.0, Gradle 9.6, JDK 17. Room 3.0 (`androidx.room3`, KSP bắt buộc). Coroutines 1.11.0. |
+| Build | AGP 9.4.0, Gradle 9.6, JDK 17. Room 3.0 (`androidx.room3`, KSP bắt buộc, chỉ sinh Kotlin, DAO phải `suspend` hoặc trả `Flow`; 3.0.0 stable 1/7/2026, hiện 3.0.3; https://developer.android.com/jetpack/androidx/releases/room3). Coroutines 1.11.0. |
 | AI on-device | ML Kit GenAI APIs (Gemini Nano): Summarization, Proofreading, Rewriting, Image description, Prompt API; Gemma 4 là base của Nano 4. LiteRT. Firebase AI Logic + hybrid inference. |
 | Cross-platform | Flutter 3.47 (8/2026), Impeller mặc định. React Native 0.88, New Architecture only. |
 

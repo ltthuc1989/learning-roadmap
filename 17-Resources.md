@@ -93,7 +93,7 @@ Sách KMP nếu vẫn muốn: *Kotlin Multiplatform by Tutorials* (Kodeco) hoặ
 - https://developer.mozilla.org/en-US/docs/Web/HTTP
 - https://www.cloudflare.com/learning/ (TLS, QUIC, DNS giải thích dễ)
 - https://www.rfc-editor.org/rfc/rfc9110 (HTTP semantics), https://www.rfc-editor.org/rfc/rfc8446 (TLS 1.3), https://www.rfc-editor.org/rfc/rfc9000 (QUIC)
-- https://github.com/square/okhttp , https://github.com/square/retrofit , https://ktor.io/docs/
+- https://lysine.dev/okhttp/ (docs OkHttp, trước ở square.github.io/okhttp nay 404; repo đã chuyển sang github.com/lysine-dev), https://github.com/square/retrofit , https://ktor.io/docs/
 - https://developer.android.com/develop/connectivity (Network Security Config, pinning, ConnectivityManager)
 
 ### Security

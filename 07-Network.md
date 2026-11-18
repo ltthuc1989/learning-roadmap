@@ -103,13 +103,13 @@ sequenceDiagram
 ```
 
 DNS truyền thống đi qua UDP port 53, không mã hóa, nhà mạng và WiFi công cộng đọc và sửa được. Hai cách mã hóa:
-- DoT (DNS over TLS, RFC 7858): DNS bọc trong TLS trên port 853. Android 9 trở lên có "Private DNS" trong Settings, dùng DoT, áp dụng cho toàn hệ thống, app không cần làm gì.
-- DoH (DNS over HTTPS, RFC 8484): DNS bọc trong HTTPS, khó bị chặn vì giống traffic web thường. OkHttp có module `okhttp-dnsoverhttps` (`DnsOverHttps.Builder()`) để app tự làm DoH tới resolver bạn chọn, bỏ qua resolver của nhà mạng. Android cũng có thêm hỗ trợ DoH ở mức hệ thống qua bản cập nhật module về sau, cần kiểm tra tại https://developer.android.com/ (tìm "Private DNS").
+- DoT (DNS over TLS, RFC 7858): DNS bọc trong TLS trên port 853. Android 9 (P) trở lên có chế độ "Private DNS" trong Settings, dùng DoT, áp dụng cho toàn hệ thống, app không cần làm gì (nguồn: https://android-developers.googleblog.com/2018/04/dns-over-tls-support-in-android-p.html).
+- DoH (DNS over HTTPS, RFC 8484): DNS bọc trong HTTPS, khó bị chặn vì giống traffic web thường. OkHttp có module `okhttp-dnsoverhttps` (`DnsOverHttps.Builder()`) để app tự làm DoH tới resolver bạn chọn, bỏ qua resolver của nhà mạng. Ở mức hệ thống: tháng 7/2022 Google phát hành DNS-over-HTTP/3 (DoH3) qua Google Play system update; thiết bị từ Android 11 trở lên đang bật Private DNS sẽ dùng DoH3 thay DoT cho các resolver "well-known" (lúc ra mắt là Google DNS và Cloudflare) (nguồn: https://security.googleblog.com/2022/07/dns-over-http3-in-android.html). (kiểm tra 18/11/2026)
 
 Tại sao Android dev cần biết:
 - `UnknownHostException` không có nghĩa là server chết. Có thể resolver của WiFi quán cà phê bị hỏng, captive portal đang trả IP giả, hoặc TTL cũ trỏ sai IP sau khi backend đổi IP.
 - Khi backend failover sang IP khác, client vẫn dùng IP cũ cho tới khi hết TTL. TTL dài (1 giờ) thì failover chậm, TTL ngắn thì tốn thêm query.
-- Server thường trả nhiều IP (IPv4 lẫn IPv6). OkHttp thử lần lượt từng route khi connect fail. OkHttp 5 có tùy chọn `fastFallback` để thử song song kiểu Happy Eyeballs (RFC 8305), cần kiểm tra tại https://github.com/square/okhttp/blob/master/CHANGELOG.md.
+- Server thường trả nhiều IP (IPv4 lẫn IPv6). OkHttp thử lần lượt từng route khi connect fail. OkHttp 5 có `OkHttpClient.Builder.fastFallback(Boolean)` theo kiểu Happy Eyeballs (RFC 8305, https://www.rfc-editor.org/rfc/rfc8305): thử IPv6 và IPv4 xen kẽ, mở kết nối dự phòng nếu kết nối đầu chậm, lấy cái nào xong trước. Mặc định là bật từ 5.0.0-alpha.11 (KDoc: "Defaults to enabled", đặt `fastFallback = false` để quay về hành vi 4.x). Nguồn: https://lysine.dev/okhttp/5.x/okhttp/okhttp3/-ok-http-client/-builder/fast-fallback.html và https://lysine.dev/okhttp/features/connections/#fast-fallback.
 - Resolver của nhà mạng có thể chèn trang quảng cáo hoặc chặn tên miền. DoH trong app là cách vượt qua, nhưng pinning và TLS mới là thứ bảo vệ nội dung.
 
 - **Lỗi hay gặp / trade-off**
@@ -117,8 +117,8 @@ Tại sao Android dev cần biết:
   - Dùng DoH tới một resolver cố định: nếu resolver đó chết thì app chết dù mạng vẫn tốt. OkHttp `DnsOverHttps` cho phép fallback về `Dns.SYSTEM`, hãy cấu hình.
 - **Đọc thêm:**
   - https://www.cloudflare.com/learning/dns/what-is-dns/
-  - https://github.com/square/okhttp (tìm module dnsoverhttps)
-  - https://www.rfc-editor.org/rfc/rfc8484
+  - https://lysine.dev/okhttp/5.x/okhttp-dnsoverhttps/okhttp3.dnsoverhttps/-dns-over-https/index.html (KDoc `DnsOverHttps`; lưu ý: theo changelog 5.5.0 (16/08/2026) OkHttp gia nhập Commonhaus Foundation, repo chuyển sang https://github.com/lysine-dev/okhttp và docs sang https://lysine.dev/okhttp/, trang square.github.io/okhttp đã trả 404, Maven coordinates `com.squareup.okhttp3` không đổi)
+  - https://www.rfc-editor.org/rfc/rfc8484 (DoH), https://www.rfc-editor.org/rfc/rfc7858 (DoT)
 
 ### 1.4 TCP: 3-way handshake
 
@@ -143,7 +143,7 @@ Ví dụ số: màn hình Home gọi 6 API, nếu mỗi API mở kết nối m�
 
 - **Lỗi hay gặp / trade-off**
   - Tạo `OkHttpClient` mới cho mỗi request (mỗi lần là pool mới, kết nối mới, handshake mới).
-  - Nghĩ `connectTimeout` bao gồm TLS. Trong OkHttp, `connectTimeout` tính cho TCP connect và TLS handshake của lần thử kết nối đó, còn thời gian đọc body thuộc `readTimeout`. Cần kiểm tra chi tiết tại https://github.com/square/okhttp mục Calls và Connections.
+  - Nghĩ `connectTimeout` bao gồm TLS. KDoc OkHttp: "The connect timeout is applied when connecting a TCP socket to the target host" (mặc định 10 giây), tức chỉ TCP connect. Trong source (`ConnectPlan.connectSocket()`), OkHttp đặt `rawSocket.soTimeout = readTimeout` trước khi gọi `sslSocket.startHandshake()`, nên TLS handshake bị chặn bởi `readTimeout` (và `callTimeout`), không phải `connectTimeout`. `callTimeout` (mặc định 0, không giới hạn) bao toàn bộ call: DNS, connect, ghi body, server xử lý, đọc body, kể cả redirect và retry. Nguồn: https://lysine.dev/okhttp/5.x/okhttp/okhttp3/-ok-http-client/-builder/connect-timeout.html, https://lysine.dev/okhttp/5.x/okhttp/okhttp3/-ok-http-client/-builder/call-timeout.html, https://github.com/lysine-dev/okhttp/blob/master/okhttp/src/commonJvmAndroid/kotlin/okhttp3/internal/connection/ConnectPlan.kt (kiểm tra 18/11/2026)
 - **Đọc thêm:**
   - https://hpbn.co/building-blocks-of-tcp/ (chương 2, phần Three-Way Handshake)
   - https://www.rfc-editor.org/rfc/rfc9293 (TCP, bản hợp nhất 2022)
@@ -194,11 +194,12 @@ MTU (Maximum Transmission Unit): kích thước gói lớn nhất tầng Link ch
 
 Vấn đề: nếu client gửi gói 1500 byte qua đường có MTU 1400, router phải cắt (fragmentation, IPv4) hoặc bỏ và báo lỗi ICMP "packet too big" (IPv6 và IPv4 với bit DF). Nhiều firewall chặn ICMP, nên bên gửi không biết gói bị bỏ, cứ gửi lại cùng kích thước. Đây là "MTU black hole": handshake thành công (gói nhỏ), request nhỏ thành công, nhưng upload ảnh hoặc response lớn treo tới timeout.
 
-Dấu hiệu nhận biết trong app: "login được, lấy danh sách được, nhưng upload avatar hoặc tải báo cáo PDF thì treo, chỉ xảy ra khi bật VPN công ty hoặc trên một nhà mạng". Cách xác nhận: Wireshark thấy segment 1460 byte bị retransmit liên tục, không có ACK. Cách xử lý: thường là phía hạ tầng (server bật PMTUD hoặc MSS clamping), app chỉ cần biết để không đổ lỗi cho backend hay OkHttp. QUIC quy định datagram tối thiểu 1200 byte phải đi lọt và tự dò MTU.
+Dấu hiệu nhận biết trong app: "login được, lấy danh sách được, nhưng upload avatar hoặc tải báo cáo PDF thì treo, chỉ xảy ra khi bật VPN công ty hoặc trên một nhà mạng". Cách xác nhận: Wireshark thấy segment 1460 byte bị retransmit liên tục, không có ACK. Cách xử lý: thường là phía hạ tầng (server bật PMTUD hoặc MSS clamping), app chỉ cần biết để không đổ lỗi cho backend hay OkHttp. QUIC quy định UDP datagram chứa gói Initial phải có payload ít nhất 1200 byte, nên đường truyền phải chịu được 1200 byte (RFC 9000 §14 "Datagram Size", https://www.rfc-editor.org/rfc/rfc9000#section-14), rồi tự dò MTU lớn hơn bằng DPLPMTUD (RFC 8899, https://www.rfc-editor.org/rfc/rfc8899) thay vì dựa vào ICMP.
 
 - **Đọc thêm:**
   - https://www.cloudflare.com/learning/network-layer/what-is-mtu/
   - https://hpbn.co/building-blocks-of-tcp/ (phần Optimizing for TCP)
+  - https://www.rfc-editor.org/rfc/rfc9000#section-14 (QUIC datagram size) và https://www.rfc-editor.org/rfc/rfc8899 (Packetization Layer PMTUD cho datagram)
 
 ### 1.8 Latency vs bandwidth trên mạng di động
 
@@ -214,6 +215,7 @@ Ví dụ: màn hình chi tiết sản phẩm gọi API chi tiết, rồi từ re
 - **Đọc thêm:**
   - https://hpbn.co/mobile-networks/
   - https://hpbn.co/optimizing-for-mobile-networks/
+  - https://developer.android.com/develop/connectivity/network-ops/network-access-optimization (trang chính chủ Android "Optimize network access": #radio-state, #bundle-transfers, #prefetch-data, #pool-connections)
 
 ## 2. TLS
 
@@ -235,7 +237,7 @@ sequenceDiagram
 ```
 
 Giải thích từng message:
-- ClientHello: client liệt kê phiên bản và cipher suite nó hỗ trợ, gửi luôn public key tạm thời (key_share) cho thuật toán trao đổi khóa đoán trước (thường x25519). SNI (Server Name Indication) cho server biết client muốn host nào, vì một IP có thể phục vụ nhiều tên miền. ALPN cho server biết client nói được HTTP/2 hay không. SNI đi dạng cleartext, nên nhà mạng thấy bạn kết nối tới host nào (không thấy nội dung). ECH (Encrypted ClientHello) đang được triển khai để giấu SNI, chưa phổ biến trên Android, cần kiểm tra.
+- ClientHello: client liệt kê phiên bản và cipher suite nó hỗ trợ, gửi luôn public key tạm thời (key_share) cho thuật toán trao đổi khóa đoán trước (thường x25519). SNI (Server Name Indication) cho server biết client muốn host nào, vì một IP có thể phục vụ nhiều tên miền. ALPN cho server biết client nói được HTTP/2 hay không. SNI đi dạng cleartext, nên nhà mạng thấy bạn kết nối tới host nào (không thấy nội dung). ECH (Encrypted Client Hello, RFC 9849) giấu SNI: Android 17 (API 37) hỗ trợ ECH ở mức platform và bật mặc định trong Network Security Config, nhưng chỉ có tác dụng khi thư viện mạng (HttpEngine, WebView, OkHttp 5.5.0+ opt-in) và server cùng hỗ trợ; opt out bằng `<domainEncryption mode="disabled"/>`. Nguồn: https://developer.android.com/privacy-and-security/security-config#EncryptedClientHelloSummary, https://developer.android.com/about/versions/17/behavior-changes-17#ech-by-default, https://lysine.dev/okhttp/changelogs/changelog/ (5.5.0). (kiểm tra 18/11/2026)
 - ServerHello: server chọn cipher suite và gửi key_share của nó. Hai bên nhân public key của bên kia với private key của mình, ra cùng một shared secret (Diffie-Hellman trên đường cong elliptic, ECDHE). Khóa này chỉ dùng cho phiên này (forward secrecy): dù private key dài hạn của server lộ sau này, traffic cũ không giải mã được.
 - Certificate + CertificateVerify: server gửi chuỗi chứng chỉ và ký lên transcript bằng private key tương ứng với public key trong chứng chỉ. Đây là bước chứng minh "tôi sở hữu private key của api.example.com".
 - Finished: MAC trên toàn bộ transcript để chắc chắn không ai sửa message handshake (chống downgrade).
@@ -264,7 +266,7 @@ Chứng chỉ (certificate) là public key kèm tên miền, thời hạn, và c
 Client verify: chữ ký leaf hợp lệ với public key của intermediate, chữ ký intermediate hợp lệ với root, root có trong trust store, còn hạn, hostname khớp SAN (Subject Alternative Name), key usage đúng. Server phải gửi leaf và intermediate; thiếu intermediate thì Chrome vẫn chạy (tự tải AIA) nhưng Android thường fail với `SSLHandshakeException: Trust anchor for certification path not found`. Đây là lỗi hay gặp số một khi backend đổi chứng chỉ.
 
 Trust store Android:
-- System store: do Google quản lý, cập nhật theo OS (và qua Mainline ở bản mới, cần kiểm tra). Thiết bị cũ không có root mới: ví dụ kinh điển là root ISRG của Let's Encrypt, thiết bị Android 7 trở xuống gặp vấn đề khi cross-sign cũ hết hạn (2021-2024). Lesson: test trên thiết bị cũ nhất bạn hỗ trợ khi đổi CA.
+- System store: do Google quản lý, cập nhật theo OS. Từ Android 14, root store nằm trong module Mainline Conscrypt (APEX) nên Google cập nhật root CA qua Google Play system update, không cần OTA của OEM ("Android 14 introduces an updatable root trust store within Conscrypt", https://source.android.com/docs/core/ota/modular-system/conscrypt#consrypt-u). Thiết bị cũ không có root mới: ví dụ kinh điển là root ISRG của Let's Encrypt, thiết bị Android 7 trở xuống gặp vấn đề khi cross-sign cũ hết hạn (2021-2024). Lesson: test trên thiết bị cũ nhất bạn hỗ trợ khi đổi CA.
 - User store: CA người dùng tự cài (ví dụ CA của Charles/Proxyman). Từ Android 7 (API 24), app mặc định không tin user CA. Muốn tin thì khai trong Network Security Config (xem phần 5.9 và `08-Security.md`). Đây là lý do bạn không bắt được traffic release build bằng Proxyman dù đã cài CA.
 
 - **Lỗi hay gặp / trade-off**
@@ -281,11 +283,24 @@ Nếu private key của server lộ, CA thu hồi chứng chỉ. Client biết b
 - OCSP (RFC 6960): client hỏi CA "chứng chỉ số X còn hiệu lực không?" cho từng kết nối. Tốn 1 round trip, lộ cho CA biết bạn đang truy cập site nào, và nếu OCSP server chậm hoặc chết thì client thường "soft-fail" (coi như hợp lệ), nên giá trị bảo mật thấp.
 - OCSP stapling: server tự hỏi CA định kỳ, lấy câu trả lời có chữ ký CA, đính kèm (staple) vào handshake. Client không cần hỏi ai. Đây là cách đúng về mặt latency và privacy.
 
-Thực tế Android: TrustManager mặc định không chủ động kiểm tra revocation qua OCSP/CRL (cần kiểm tra tại https://developer.android.com/privacy-and-security/security-ssl và tài liệu Conscrypt). Vì vậy với app ngân hàng, pinning và thời hạn chứng chỉ ngắn thực tế quan trọng hơn revocation. Certificate Transparency (CT): mọi chứng chỉ public được ghi vào log công khai, giúp phát hiện chứng chỉ cấp sai; Chrome ép CT, Android app muốn ép phải dùng thư viện ngoài (ví dụ `appmattus/certificatetransparency`, cần kiểm tra trạng thái maintain).
+Thực tế Android, trích docs chính chủ: "Android handles certificate revocation system-wide, through a combination of a blocklist and certificate transparency, without relying on on-line certificate verification. In addition, Android will validate OCSP responses stapled to the TLS handshake." Tức là: không tự hỏi OCSP/CRL online, có blocklist hệ thống, và có kiểm tra OCSP stapled (https://developer.android.com/privacy-and-security/security-ssl#certificate-validation). Muốn tự kiểm tra revocation (hiếm khi đáng) thì dùng `java.security.cert.PKIXRevocationChecker` (API 24+, https://developer.android.com/reference/java/security/cert/PKIXRevocationChecker) gắn vào `PKIXBuilderParameters` khi tạo `TrustManagerFactory`. Vì vậy với app ngân hàng, pinning và thời hạn chứng chỉ ngắn thực tế quan trọng hơn revocation.
+
+Certificate Transparency (CT, RFC 6962): mọi chứng chỉ public được ghi vào log công khai, giúp phát hiện chứng chỉ cấp sai. Trên Android, Network Security Config có phần tử `<certificateTransparency enabled="true"/>`: Android 16 (API 36) hỗ trợ nhưng mặc định tắt, app phải opt in; từ Android 17 (API 37) CT bật mặc định, opt out bằng `enabled="false"`. CT không được kiểm tra trên kết nối dùng custom trust anchors. Trên Android 15 trở xuống vẫn phải dùng thư viện ngoài (ví dụ `appmattus/certificatetransparency`) nếu muốn ép CT. Nguồn: https://developer.android.com/privacy-and-security/security-config#certificateTransparency, https://developer.android.com/about/versions/17/behavior-changes-17#ct-default, https://developer.android.com/privacy-and-security/certificate-transparency-policy. (kiểm tra 18/11/2026)
+
+```xml
+<!-- res/xml/network_security_config.xml, Android 16+ (API 36) -->
+<network-security-config>
+    <base-config>
+        <certificateTransparency enabled="true" />
+    </base-config>
+</network-security-config>
+```
 
 - **Đọc thêm:**
   - https://www.cloudflare.com/learning/ssl/what-is-ocsp-stapling/
   - https://www.rfc-editor.org/rfc/rfc6960
+  - https://developer.android.com/privacy-and-security/security-ssl#certificate-validation
+  - https://www.rfc-editor.org/rfc/rfc6962 (Certificate Transparency)
 
 ### 2.4 mTLS (mutual TLS)
 
@@ -302,7 +317,7 @@ Cách làm trên Android (phác thảo):
 4. Cấu hình OkHttp với `SSLContext` dùng một `X509KeyManager` tùy biến trả về `PrivateKey` từ Keystore và chain đã cấp.
 
 ```kotlin
-// Phác thảo, cần kiểm tra chi tiết API khi triển khai thật
+// Phác thảo dùng JSSE chuẩn (javax.net.ssl.X509ExtendedKeyManager); bản thật cần lọc theo keyType/issuers
 val keyManager = object : X509ExtendedKeyManager() {
     override fun chooseClientAlias(keyType: Array<String>?, issuers: Array<Principal>?, socket: Socket?) = ALIAS
     override fun getCertificateChain(alias: String?): Array<X509Certificate> = clientChain
@@ -352,11 +367,12 @@ Code và XML cụ thể ở phần 5.9.
 - **Lỗi hay gặp / trade-off**
   - Pin 1 key duy nhất, hardcode, không có expiration.
   - Pin trong release nhưng không có cơ chế tắt trong debug để dùng proxy, dev bèn comment code pinning rồi quên bật lại.
-  - Quên rằng WebView và SDK bên thứ ba có network stack riêng, không đi qua `CertificatePinner` của OkHttp. Network Security Config áp dụng rộng hơn, cần kiểm tra phạm vi cụ thể tại https://developer.android.com/privacy-and-security/security-config.
+  - Quên rằng WebView và SDK bên thứ ba có network stack riêng, không đi qua `CertificatePinner` của OkHttp. Network Security Config áp dụng cho các stack dùng platform TLS (HttpsURLConnection, OkHttp, phần lớn SDK Java/Kotlin) nên rộng hơn. Với WebView, docs chính chủ chỉ khẳng định WebView tôn trọng cấu hình cleartext (`usesCleartextTraffic`) với app target API 26+ (https://developer.android.com/guide/topics/manifest/application-element); trang security-config không nói WebView áp dụng `<pin-set>`, nên đừng khẳng định NSC pin bảo vệ WebView khi phỏng vấn, hãy kiểm thử bằng proxy.
 - **Đọc thêm:**
-  - https://github.com/square/okhttp/blob/master/docs/features/https.md (mục Certificate Pinning)
-  - https://developer.android.com/privacy-and-security/security-config
-  - https://mas.owasp.org/MASTG/ (tìm MASVS-NETWORK-2)
+  - https://lysine.dev/okhttp/features/https/#certificate-pinning-kt-java
+  - https://developer.android.com/privacy-and-security/security-config#CertificatePinning
+  - https://mas.owasp.org/MASVS/controls/MASVS-NETWORK-2/ ("The app performs identity pinning for all remote endpoints under the developer's control")
+  - MASTG test: https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0242/ (Missing Certificate Pinning in NSC), https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0243/ (Expired Certificate Pins in NSC), https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0244/ (Missing Certificate Pinning in Network Traffic)
 
 ## 3. HTTP
 
@@ -375,9 +391,11 @@ HTTP là giao thức request/response dạng text (HTTP/1.1) hoặc binary frame
 | PATCH | không | không đảm bảo | sửa một phần |
 | POST | không | không | tạo mới, hành động (chuyển tiền) |
 
-Idempotency là chìa khóa cho retry: GET/PUT/DELETE retry thoải mái, POST retry có thể tạo 2 đơn hàng hoặc chuyển tiền 2 lần. Giải pháp là `Idempotency-Key` header (phần 5.5).
+Định nghĩa chính chủ: safe methods ở RFC 9110 §9.2.1 (https://www.rfc-editor.org/rfc/rfc9110#section-9.2.1), idempotent methods ở §9.2.2 (https://www.rfc-editor.org/rfc/rfc9110#section-9.2.2). RFC 9110 §9.2.2 nói rõ client có thể tự động gửi lại request idempotent khi kết nối đứt trước khi đọc được response.
 
-**Status codes.** Nhớ theo hành động của client:
+Idempotency là chìa khóa cho retry: GET/PUT/DELETE retry thoải mái, POST retry có thể tạo 2 đơn hàng hoặc chuyển tiền 2 lần. Giải pháp là `Idempotency-Key` header (phần 5.5), đang được IETF chuẩn hóa ở draft-ietf-httpapi-idempotency-key-header (bản -08, 10/2026, https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/), chưa thành RFC.
+
+**Status codes.** Định nghĩa chuẩn ở RFC 9110 §15 (https://www.rfc-editor.org/rfc/rfc9110#section-15); riêng 429 nằm ở RFC 6585 §4 (https://www.rfc-editor.org/rfc/rfc6585#section-4); `Retry-After` (delta-seconds hoặc HTTP-date) ở RFC 9110 §10.2.3 (https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3). Nhớ theo hành động của client:
 
 | Mã | Nghĩa | App nên làm gì |
 |---|---|---|
@@ -402,7 +420,7 @@ Idempotency là chìa khóa cho retry: GET/PUT/DELETE retry thoải mái, POST r
 - Request: `Authorization: Bearer <token>`, `Accept: application/json`, `Accept-Encoding` (OkHttp tự thêm gzip), `Accept-Language`, `User-Agent` (đặt tên app/version để backend lọc log), `If-None-Match`, `Idempotency-Key`, `X-Request-Id`/`traceparent` (W3C Trace Context, nối log client-server), `X-App-Version`/`X-Device-Id` (tùy backend).
 - Response: `Content-Type`, `Content-Length`, `Content-Encoding`, `Cache-Control`, `ETag`, `Vary`, `Retry-After`, `Set-Cookie`, `Alt-Svc` (quảng cáo HTTP/3).
 
-**Cookies.** Trình duyệt dùng cookie, app mobile thường dùng bearer token nên OkHttp mặc định `CookieJar.NO_COOKIES` (bỏ qua `Set-Cookie`). Nếu backend dùng session cookie (hay gặp với BFF của web team), cấu hình `CookieJar` hoặc `JavaNetCookieJar`. Thuộc tính cookie cần biết khi review: `Secure` (chỉ gửi qua HTTPS), `HttpOnly` (JS không đọc được, chỉ ý nghĩa với WebView), `SameSite`, `Max-Age`, `Domain`, `Path`. WebView có `CookieManager` riêng, phải clear khi logout.
+**Cookies.** Trình duyệt dùng cookie, app mobile thường dùng bearer token nên OkHttp mặc định `CookieJar.NO_COOKIES` (bỏ qua `Set-Cookie`). Nếu backend dùng session cookie (hay gặp với BFF của web team), cấu hình `CookieJar` hoặc `JavaNetCookieJar`. Thuộc tính cookie cần biết khi review: `Secure` (chỉ gửi qua HTTPS), `HttpOnly` (JS không đọc được, chỉ ý nghĩa với WebView), `SameSite`, `Max-Age`, `Domain`, `Path`. WebView có `CookieManager` riêng, phải clear khi logout. Chuẩn hiện hành vẫn là RFC 6265 (2011, https://www.rfc-editor.org/rfc/rfc6265); `SameSite` chỉ có trong bản kế nhiệm draft-ietf-httpbis-rfc6265bis (bản -22, 10/2026, đang ở hàng đợi RFC Editor, https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/). (kiểm tra 18/11/2026)
 
 **Ví dụ thực tế:** bạn gọi `POST /transfers` 10 giây không thấy response rồi `SocketTimeoutException`. Server có thể đã chuyển tiền xong, chỉ là response không về kịp. Retry mù là chuyển lần 2. Đây là lý do mọi API "hành động" ở bank phải có idempotency key và client phải lưu key trước khi gửi.
 
@@ -410,7 +428,8 @@ Idempotency là chìa khóa cho retry: GET/PUT/DELETE retry thoải mái, POST r
   - Dùng POST cho mọi thứ "cho tiện", mất khả năng cache và retry an toàn.
   - Trả 200 với `{"success": false}`: client không phân biệt được với thành công, cache có thể lưu lỗi, monitoring không thấy error rate.
 - **Đọc thêm:**
-  - https://www.rfc-editor.org/rfc/rfc9110 (HTTP Semantics)
+  - https://www.rfc-editor.org/rfc/rfc9110 (HTTP Semantics: §9.2 method properties, §15 status codes, §10.2.3 Retry-After)
+  - https://www.rfc-editor.org/rfc/rfc6585#section-4 (429 Too Many Requests)
   - https://developer.mozilla.org/en-US/docs/Web/HTTP
   - https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/
 
@@ -424,7 +443,7 @@ OkHttp `ConnectionPool` mặc định giữ 5 kết nối rảnh trong 5 phút. 
 
 - **Đọc thêm:**
   - https://hpbn.co/http1x/
-  - https://github.com/square/okhttp/blob/master/docs/features/connections.md
+  - https://lysine.dev/okhttp/features/connections/
 
 ### 3.3 HTTP/2: multiplexing, HPACK
 
@@ -456,10 +475,24 @@ HTTP/3 (RFC 9114) chạy trên QUIC (RFC 9000) thay vì TCP. QUIC chạy trên U
 - Connection migration: kết nối định danh bằng Connection ID chứ không bằng bộ 5 (IP, port). Điện thoại từ WiFi sang 4G đổi IP mà kết nối QUIC vẫn sống, không cần handshake lại. Với TCP, đổi IP là đứt kết nối, mọi request đang chạy fail.
 - QPACK (RFC 9204) thay HPACK để nén header mà không gây HOL.
 
-Trạng thái trên Android (cần kiểm tra lại trước phỏng vấn vì thay đổi nhanh):
-- OkHttp: hỗ trợ HTTP/1.1 và HTTP/2, chưa có HTTP/3 trong các bản ổn định mà tài liệu này biết. Kiểm tra tại https://github.com/square/okhttp/blob/master/CHANGELOG.md.
-- Cronet (network stack của Chromium, có sẵn qua Google Play services hoặc nhúng): hỗ trợ QUIC/HTTP/3, có adapter cho OkHttp (`okhttp-cronet` hoặc `cronet-okhttp`), cần kiểm tra https://developer.android.com/develop/connectivity/cronet.
-- iOS: `URLSession` (engine Darwin của Ktor) tự dùng HTTP/3 khi server quảng cáo `Alt-Svc` (từ iOS 15), cần kiểm tra.
+Trạng thái trên Android (kiểm tra 18/11/2026):
+- OkHttp (bản mới nhất 5.5.1, 22/10/2026): HTTP/1.1 và HTTP/2, không hỗ trợ HTTP/3. Source `Protocol.kt`: "HTTP/3 is not natively supported by OkHttp, but provided to allow a theoretical interceptor". Changelog: https://lysine.dev/okhttp/changelogs/changelog/.
+- Cronet (network stack của Chromium): "natively supports the HTTP, HTTP/2, and HTTP/3 over QUIC protocols" (https://developer.android.com/develop/connectivity/cronet). Artifact: `com.google.android.gms:play-services-cronet` (provider từ Google Play services, docs ví dụ 18.0.1), `org.chromium.net:cronet-embedded` (nhúng trong APK, nặng thêm vài MB), `org.chromium.net:cronet-fallback` (JavaCronetProvider, không có QUIC). Hướng dẫn: https://developer.android.com/develop/connectivity/cronet/start. Cầu nối OkHttp: `com.google.net.cronet:cronet-okhttp` (`CronetInterceptor`, `CronetCallFactory`), https://github.com/google/cronet-transport-for-okhttp.
+- Platform: `android.net.http.HttpEngine` (API 34, cũng có qua S Extensions 7) là Cronet đóng gói trong platform, không cần thêm dependency; `HttpEngine.Builder` có `setEnableQuic(true)`, `addQuicHint(host, port, alternatePort)`, `setEnableHttp2`, `setEnableBrotli`. https://developer.android.com/reference/android/net/http/HttpEngine
+- iOS: `URLSession` (engine Darwin của Ktor) bật HTTP/3 mặc định từ iOS 15, không cần đổi code khi server bật HTTP/3 (WWDC21 "Accelerate networking with HTTP/3 and QUIC", https://developer.apple.com/videos/play/wwdc2021/10094/); `URLRequest.assumesHTTP3Capable` để thử HTTP/3 ngay request đầu.
+
+```kotlin
+// API 34+: HttpEngine với QUIC, dùng như Cronet (UrlRequest + callback)
+val engine = HttpEngine.Builder(context)
+    .setEnableQuic(true)
+    .addQuicHint("api.example.com", 443, 443) // biết trước host nói h3, khỏi chờ Alt-Svc
+    .setEnableBrotli(true)
+    .build()
+val request = engine.newUrlRequestBuilder(
+    "https://api.example.com/v1/feed", executor, callback // UrlRequest.Callback
+).build()
+request.start()
+```
 
 Deployment: server quảng cáo qua header `Alt-Svc: h3=":443"`; client lần đầu dùng HTTP/2, lần sau thử HTTP/3, nếu UDP bị chặn thì rơi về HTTP/2. CDN lớn (Cloudflare, Akamai, Google) đều bật HTTP/3.
 
@@ -469,6 +502,7 @@ Khi nào đáng quan tâm với app bạn: user hay di chuyển (grab/delivery a
   - https://www.rfc-editor.org/rfc/rfc9114
   - https://www.cloudflare.com/learning/performance/what-is-http3/
   - https://developer.android.com/develop/connectivity/cronet
+  - https://developer.android.com/reference/android/net/http/HttpEngine.Builder#setEnableQuic(boolean)
 
 ### 3.5 HTTP caching
 
@@ -483,11 +517,11 @@ Directive `Cache-Control` (RFC 9111) hay gặp:
 | `no-cache` | được lưu nhưng phải validate mỗi lần trước khi dùng |
 | `no-store` | không được lưu ở đâu cả (dữ liệu nhạy cảm: số dư, token) |
 | `private` | chỉ cache ở client, CDN không được lưu |
-| `public` | CDN được lưu (kể cả response có Authorization nếu ghi rõ) |
+| `public` | CDN được lưu (kể cả response cho request có `Authorization`, RFC 9111 §3.5: shared cache chỉ được lưu loại này khi có `public`, `s-maxage` hoặc `must-revalidate`) |
 | `must-revalidate` | hết hạn thì bắt buộc hỏi, không được dùng stale khi offline |
-| `immutable` | không bao giờ đổi (asset có hash trong tên) |
-| `stale-while-revalidate=60` | hết hạn vẫn trả cache ngay, đồng thời tải mới ở nền (RFC 5861) |
-| `stale-if-error=600` | server lỗi thì trả cache cũ |
+| `immutable` | không bao giờ đổi trong thời gian tươi (asset có hash trong tên), RFC 8246 |
+| `stale-while-revalidate=60` | hết hạn vẫn trả cache ngay, đồng thời tải mới ở nền (RFC 5861 §3) |
+| `stale-if-error=600` | server lỗi thì trả cache cũ (RFC 5861 §4) |
 
 Validation: server trả `ETag: "abc123"` (hash nội dung) hoặc `Last-Modified`. Client gửi `If-None-Match: "abc123"`. Server so, không đổi thì `304 Not Modified`, body rỗng, client dùng bản cũ và gia hạn freshness. Tiết kiệm băng thông nhưng vẫn tốn 1 RTT.
 
@@ -507,7 +541,7 @@ OkHttp `Cache`:
 - Chỉ cache GET, tuân thủ header server; `CacheInterceptor` nằm trước `ConnectInterceptor` nên cache hit không mở kết nối, network interceptor không chạy.
 - `CacheControl.FORCE_CACHE` (chỉ cache, offline mode; không có thì 504), `FORCE_NETWORK`, `maxStale(1, DAYS)` (chấp nhận cũ), `onlyIfCached`.
 - `response.cacheResponse` và `response.networkResponse` cho biết nguồn.
-- Lưu trên đĩa dạng plaintext. App bank: server phải trả `no-store` cho dữ liệu nhạy cảm và client không bật cache cho host đó, hoặc xóa cache lúc logout. Hỗ trợ `stale-while-revalidate` trong OkHttp cần kiểm tra tại docs, đừng khẳng định trong phỏng vấn.
+- Lưu trên đĩa dạng plaintext. App bank: server phải trả `no-store` cho dữ liệu nhạy cảm và client không bật cache cho host đó, hoặc xóa cache lúc logout. OkHttp không hỗ trợ `stale-while-revalidate` (và `stale-if-error`): không có trong trang caching, `CacheControl.kt` hay `CacheStrategy.kt`; issue #1083 đóng năm 2018 không triển khai (https://github.com/lysine-dev/okhttp/issues/1083). Muốn hành vi đó phải tự làm: trả cache bằng `FORCE_CACHE`/`maxStale` rồi bắn request nền. OkHttp có hỗ trợ `immutable` (`CacheControl.immutable`). (kiểm tra 18/11/2026)
 - Ktor có plugin `HttpCache` (in-memory mặc định, có file storage) với ngữ nghĩa tương tự.
 
 Thiết kế từ phía mobile lead: catalog/sản phẩm/config: `max-age` vài phút + ETag; avatar/ảnh với hash trong URL: `immutable, max-age=1 năm`; dữ liệu cá nhân: `private, no-store` hoặc `no-cache` + ETag; feed: `no-cache` + ETag để tiết kiệm băng thông nhưng luôn tươi. Cache HTTP không thay cho cache ứng dụng (Room): cache HTTP là tối ưu network, Room là nguồn dữ liệu offline có cấu trúc.
@@ -516,8 +550,9 @@ Thiết kế từ phía mobile lead: catalog/sản phẩm/config: `max-age` vài
   - Bật OkHttp cache rồi thấy "dữ liệu cũ": do server trả `max-age` dài. Phải phối hợp với backend, không hack bằng `FORCE_NETWORK` khắp nơi.
   - Quên `Vary: Accept-Language` nên cache trả tiếng Anh cho user đã đổi tiếng Việt.
 - **Đọc thêm:**
-  - https://github.com/square/okhttp/blob/master/docs/features/caching.md
-  - https://www.rfc-editor.org/rfc/rfc9111
+  - https://lysine.dev/okhttp/features/caching/
+  - https://www.rfc-editor.org/rfc/rfc9111 (§3.5 Storing Responses to Authenticated Requests: https://www.rfc-editor.org/rfc/rfc9111#section-3.5)
+  - https://www.rfc-editor.org/rfc/rfc8246 (immutable), https://www.rfc-editor.org/rfc/rfc5861 (stale-while-revalidate, stale-if-error)
   - https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
 
 ### 3.6 Compression: gzip, brotli
@@ -529,7 +564,7 @@ OkHttp: `BridgeInterceptor` tự thêm `Accept-Encoding: gzip` nếu bạn chưa
 Request body không tự nén. Upload JSON lớn (log batch, form eKYC) thì tự gzip và đặt `Content-Encoding: gzip`, và server phải hỗ trợ (nginx không tự giải nén request body, backend phải làm). Ảnh/video đã nén sẵn, gzip thêm chỉ tốn CPU; dùng định dạng tốt hơn (WebP, AVIF) và resize tại CDN. Protobuf nhỏ hơn JSON 3-10 lần cho dữ liệu số, lại nén tiếp được.
 
 - **Đọc thêm:**
-  - https://github.com/square/okhttp (tìm brotli)
+  - https://lysine.dev/okhttp/5.x/okhttp-brotli/okhttp3.brotli/-brotli-interceptor/index.html (`BrotliInterceptor`; OkHttp 5.3.0 có thêm module `okhttp-zstd`)
   - https://developer.mozilla.org/en-US/docs/Web/HTTP/Compression
 
 ### 3.7 CDN
@@ -543,6 +578,7 @@ Ví dụ: app delivery tải 50 ảnh món ăn mỗi màn hình. Đặt ảnh �
 - **Đọc thêm:**
   - https://www.cloudflare.com/learning/cdn/what-is-a-cdn/
   - https://hpbn.co/primer-on-web-performance/
+  - https://developer.android.com/develop/connectivity/network-ops/network-access-optimization (Android: gom transfer, prefetch, pool kết nối)
 
 ## 4. API protocols và khi nào chọn
 
@@ -555,7 +591,7 @@ Quy ước hay dùng: `GET /v1/accounts`, `GET /v1/accounts/{id}`, `GET /v1/acco
 **Versioning.** Mobile khác web: app version cũ sống hàng năm (user không cập nhật), nên API phải tương thích ngược lâu. Lựa chọn:
 - Path `/v1/`, `/v2/`: rõ ràng, dễ route ở gateway, dễ log. Phổ biến nhất.
 - Header (`Accept: application/vnd.example.v2+json` hoặc `X-API-Version`): URL sạch, khó thấy trong log.
-- Nguyên tắc: thêm field thì không bump version (client phải `ignoreUnknownKeys`); đổi nghĩa field, bỏ field, đổi kiểu thì bump; có header `Sunset` (RFC 8594) và `Deprecation` báo lịch tắt; server trả mã bắt cập nhật (ví dụ 426 hoặc mã riêng) khi app version dưới mức tối thiểu, client có màn hình force update không phụ thuộc API nào khác.
+- Nguyên tắc: thêm field thì không bump version (client phải `ignoreUnknownKeys`); đổi nghĩa field, bỏ field, đổi kiểu thì bump; có header `Sunset` (RFC 8594, https://www.rfc-editor.org/rfc/rfc8594) và `Deprecation` (RFC 9745, 3/2025, https://www.rfc-editor.org/rfc/rfc9745; giá trị là thời điểm dạng `@<epoch giây>`, ví dụ `Deprecation: @1767225600`) báo lịch tắt; server trả mã bắt cập nhật (ví dụ 426 hoặc mã riêng) khi app version dưới mức tối thiểu, client có màn hình force update không phụ thuộc API nào khác.
 
 **Pagination.** Offset: `?offset=40&limit=20`. Đơn giản, nhảy trang được, nhưng (1) chậm ở offset lớn vì DB vẫn phải đếm bỏ qua, (2) khi có item mới chèn vào đầu, trang kế bị trùng hoặc sót item. Cursor (keyset): `?cursor=eyJjcmVhdGVkIjoiMjAyNi0xMC0xOCIsImlkIjo5OTl9&limit=20`, cursor là base64 của (created_at, id) item cuối; server query `WHERE (created_at, id) < (?, ?) ORDER BY created_at DESC, id DESC LIMIT 20`. Ổn định khi dữ liệu đổi, nhanh nhờ index, nhưng không nhảy tới trang 7 được. Feed, lịch sử giao dịch, chat: cursor. Bảng admin cần nhảy trang: offset. Response nên có `next_cursor` (null khi hết) để client không tự đoán.
 
@@ -575,7 +611,7 @@ Quy ước hay dùng: `GET /v1/accounts`, `GET /v1/accounts/{id}`, `GET /v1/acco
 
 Client map `code` sang domain error (sealed class), `status` quyết định retry hay không, `errors[]` map vào form. Không parse `detail` để rẽ nhánh logic vì text đổi theo ngôn ngữ.
 
-Những thứ khác interviewer hay chạm: field selection (`?fields=id,name`) để giảm payload; `ETag` cho optimistic concurrency (`If-Match` khi PATCH, 412 nếu ai đó đã sửa); filtering/sorting chuẩn; bulk endpoint để tránh N request; rate limit header; OpenAPI làm hợp đồng, sinh model hoặc mock.
+Những thứ khác interviewer hay chạm: field selection (`?fields=id,name`) để giảm payload; `ETag` cho optimistic concurrency (`If-Match` khi PATCH, 412 nếu ai đó đã sửa); filtering/sorting chuẩn; bulk endpoint để tránh N request; rate limit header (xem 6.2); OpenAPI làm hợp đồng, sinh model hoặc mock.
 
 - **Lỗi hay gặp / trade-off**
   - Response "shape" theo DB thay vì theo màn hình, mobile phải gọi 5 API và join ở client (giải bằng BFF, phần 6.1).
@@ -584,6 +620,8 @@ Những thứ khác interviewer hay chạm: field selection (`?fields=id,name`) 
   - https://cloud.google.com/apis/design (Google API Design Guide)
   - https://github.com/microsoft/api-guidelines
   - https://www.rfc-editor.org/rfc/rfc9457
+  - https://www.rfc-editor.org/rfc/rfc9745 (Deprecation header), https://www.rfc-editor.org/rfc/rfc8594 (Sunset)
+  - https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/ (Idempotency-Key, draft -08)
 
 ### 4.2 GraphQL
 
@@ -603,7 +641,7 @@ Một endpoint `POST /graphql`, client gửi query mô tả chính xác field c�
 
 gRPC: định nghĩa service trong file `.proto`, sinh code client/server, chạy trên HTTP/2, payload protobuf (binary, có schema, field đánh số nên thêm field không vỡ). Bốn kiểu: unary, server streaming, client streaming, bidirectional streaming. Có deadline (timeout lan truyền qua các service), status code riêng (`UNAVAILABLE`, `DEADLINE_EXCEEDED`...), interceptor, metadata (header).
 
-Android: `grpc-kotlin` (coroutine stub, `Flow` cho streaming), transport `grpc-okhttp` (dùng OkHttp socket, không phải `OkHttpClient` của bạn), `protobuf-javalite` để nhẹ. KMP: Square Wire có gRPC client cho Kotlin Multiplatform, cần kiểm tra tại https://github.com/square/wire.
+Android: `grpc-kotlin` (coroutine stub, `Flow` cho streaming), transport `grpc-okhttp` (dùng OkHttp socket, không phải `OkHttpClient` của bạn), `protobuf-javalite` để nhẹ. KMP: Square Wire có `wire-grpc-client` multiplatform (JVM, JS, iOS, macOS...; bản 7.2.2), nhưng `GrpcClient.Builder().client(OkHttpClient)` có sẵn chỉ ở JVM/Android; trên iOS `GrpcClient` là abstract class, bạn phải tự viết transport (https://square.github.io/wire/wire_grpc/). (kiểm tra 18/11/2026)
 
 Khi chọn: service nội bộ, IoT, streaming dữ liệu lớn (ticker giá, telemetry), đội có sẵn proto. Khi không: public API mà web cũng dùng (cần gRPC-Web + proxy), đội backend bank dùng REST qua gateway, cần debug bằng proxy (binary khó đọc, Proxyman có hỗ trợ protobuf nếu có schema), CDN/WAF hỗ trợ kém hơn. Protobuf không cần gRPC: bạn có thể dùng protobuf qua REST (`Content-Type: application/x-protobuf`) với Retrofit converter.
 
@@ -628,7 +666,7 @@ Việc bạn phải tự làm (OkHttp không làm):
 Khi dùng: chat, giá realtime, trạng thái tài xế, collaborative. Khi không: chỉ cần server đẩy một chiều ít tần suất (SSE hoặc push rẻ hơn), hoặc dữ liệu đổi vài phút một lần (polling đủ).
 
 - **Đọc thêm:**
-  - https://github.com/square/okhttp (tìm WebSocket)
+  - https://lysine.dev/okhttp/5.x/okhttp/okhttp3/-web-socket/index.html
   - https://hpbn.co/websocket/
   - https://www.rfc-editor.org/rfc/rfc6455
 
@@ -651,14 +689,17 @@ FCM (Firebase Cloud Messaging) giữ một kết nối từ Google Play services
 Cần biết:
 - Token: `FirebaseMessagingService.onNewToken` khi token đổi (cài lại, xóa data), gửi lên server; token cũ hết hạn.
 - Loại message: notification message (hệ thống hiện khi app background, app không chạy code) vs data message (luôn gọi `onMessageReceived`, app tự xử lý). App bank thường dùng data message để tự dựng notification và không lộ nội dung qua hệ thống.
-- Priority: `high` đánh thức app kể cả trong Doze (có hạn ngạch, lạm dụng sẽ bị hạ), `normal` bị gom lại khi Doze.
-- TTL và collapse key: tin "có 3 tin nhắn mới" không cần gửi 3 lần; đặt collapse để chỉ giữ cái mới nhất.
+- Payload: tối đa 4096 byte cho cả notification lẫn data message (riêng Firebase console giới hạn 1000 ký tự) (https://firebase.google.com/docs/cloud-messaging/customize-messages/set-message-type).
+- Priority: `high` đánh thức app kể cả trong Doze, `normal` bị gom lại khi Doze. Luật hạ cấp: nếu message high priority không dẫn tới notification hiển thị cho user, FCM có thể hạ chúng xuống normal hoặc giao cho Google Play services xử lý; FCM đánh giá theo hành vi message của 7 ngày gần nhất, quyết định theo từng app instance (https://firebase.google.com/docs/cloud-messaging/android-message-priority#deprioritize).
+- TTL: từ 0 tới 2.419.200 giây (28 ngày), mặc định 4 tuần; TTL = 0 nghĩa là "giao ngay hoặc bỏ", hợp với cuộc gọi đến (https://firebase.google.com/docs/cloud-messaging/customize-messages/setting-message-lifespan#message-lifetime).
+- Collapse key: tin "có 3 tin nhắn mới" không cần gửi 3 lần; đặt `collapse_key` để chỉ giữ cái mới nhất. Tối đa 4 collapse key khác nhau cho mỗi registration token cùng lúc; quá 4 thì FCM không đảm bảo giữ cái nào (https://firebase.google.com/docs/cloud-messaging/customize-messages/collapsible-message-types). (kiểm tra 18/11/2026)
 - Không đảm bảo giao: thiết bị tắt, không có Google Play services (máy Huawei đời mới ở VN cần HMS Push), user tắt notification, OEM giết tiến trình. Thiết kế đúng: push là tín hiệu "có gì mới, lên server mà lấy", không phải kênh truyền dữ liệu chính. Chat nhận push rồi gọi REST lấy tin nhắn theo `last_seq`.
 - Android 13+ cần runtime permission `POST_NOTIFICATIONS` để hiện notification; data message vẫn tới.
 
 - **Đọc thêm:**
   - https://firebase.google.com/docs/cloud-messaging/android/client
-  - https://firebase.google.com/docs/cloud-messaging/android/client
+  - https://firebase.google.com/docs/cloud-messaging/android-message-priority
+  - https://firebase.google.com/docs/cloud-messaging/customize-messages/set-message-type
 
 ### 4.7 Bảng quyết định
 
@@ -713,13 +754,26 @@ Application vs network interceptor:
 | Truy cập `chain.connection()` | null | có (biết TLS version, protocol, IP) |
 | Dùng cho | auth header, retry, idempotency key, logging mức logic, mock | logging byte thật, metrics mạng, đo kích thước nén |
 
-**Timeouts.** `connectTimeout` (TCP + TLS cho một lần thử route), `readTimeout` (khoảng im lặng tối đa giữa hai lần nhận byte, không phải tổng), `writeTimeout` (tương tự khi gửi), `callTimeout` (tổng toàn bộ call gồm DNS, connect, mọi interceptor, retry, redirect; mặc định 0 = vô hạn). Mặc định 10 giây cho 3 cái đầu. Response stream 2 phút vẫn ổn với `readTimeout` 10 giây miễn mỗi 10 giây có byte. Muốn "tối đa 15 giây cho một API thường" thì đặt `callTimeout`; muốn upload 5 phút thì `newBuilder().callTimeout(5, MINUTES)` cho client riêng, hoặc per-request qua `chain.withConnectTimeout` trong interceptor hoặc Retrofit `@Tag`.
+**Timeouts.** `connectTimeout` (chỉ TCP connect tới host cho một lần thử route; KDoc: "applied when connecting a TCP socket to the target host"), `readTimeout` (khoảng im lặng tối đa giữa hai lần nhận byte, không phải tổng; OkHttp cũng dùng nó làm socket timeout trong lúc TLS handshake, xem 1.4), `writeTimeout` (tương tự khi gửi), `callTimeout` (tổng toàn bộ call gồm DNS, connect, mọi interceptor, retry, redirect; mặc định 0 = vô hạn). Mặc định 10 giây cho 3 cái đầu. Response stream 2 phút vẫn ổn với `readTimeout` 10 giây miễn mỗi 10 giây có byte. Muốn "tối đa 15 giây cho một API thường" thì đặt `callTimeout`; muốn upload 5 phút thì `newBuilder().callTimeout(5, MINUTES)` cho client riêng, hoặc per-request qua `chain.withConnectTimeout` trong interceptor hoặc Retrofit `@Tag`.
 
 **Silent retry.** `retryOnConnectionFailure(true)` mặc định: nếu kết nối từ pool đã chết, hoặc host có nhiều IP và IP đầu không tới được, OkHttp tự thử lại. Điểm Staff: OkHttp có thể gửi lại request kể cả POST nếu lỗi xảy ra theo cách mà nó cho là "an toàn" (ví dụ lỗi trước khi gửi body, hoặc body không phải one-shot). Chi tiết logic nằm trong `RetryAndFollowUpInterceptor.recover`. Hệ quả: POST không idempotent có thể được gửi 2 lần mà bạn không viết dòng retry nào. Cách phòng: idempotency key cho mọi POST quan trọng, hoặc `RequestBody.isOneShot()` trả true cho body không được gửi lại, hoặc tắt `retryOnConnectionFailure` cho client dùng cho giao dịch (đổi lại là kết nối pool chết sẽ nổi lỗi lên app).
 
 **EventListener.** Hook mọi mốc: `dnsStart/End`, `connectStart`, `secureConnectStart/End`, `connectEnd`, `requestHeadersStart`, `responseHeadersEnd`, `responseBodyEnd`, `callEnd/Failed`. Dùng `EventListener.Factory` để đo per-call và đẩy sang Datadog/Firebase Performance; đây là nguồn số liệu "DNS mất bao lâu, TLS mất bao lâu" từ thiết bị thật.
 
-**Protocol.** HTTP/2 mặc định qua ALPN; `protocols(listOf(Protocol.HTTP_1_1))` để ép 1.1 (dùng khi đo hoặc khi server có bug h2). HTTP/3: chưa, xem 3.4. OkHttp 5.x có module `okhttp-coroutines` (`Call.executeAsync()`), artifact `okhttp-android` với tích hợp Android (logging, DNS); chi tiết từng bản cần kiểm tra changelog.
+**Protocol.** HTTP/2 mặc định qua ALPN; `protocols(listOf(Protocol.HTTP_1_1))` để ép 1.1 (dùng khi đo hoặc khi server có bug h2). HTTP/3: không hỗ trợ, xem 3.4.
+
+**OkHttp 5 (stable).** 5.0.0 phát hành 02/07/2025, bản stable đầu tiên kể từ 2023; bản mới nhất 5.5.1 (22/10/2026). Những điểm đáng nói (changelog https://lysine.dev/okhttp/changelogs/changelog/#version-500):
+- Artifact tách JVM và Android: `com.squareup.okhttp3:okhttp-android` là biến thể AAR, Gradle tự chọn qua module metadata khi bạn khai `okhttp`.
+- `fastFallback` (Happy Eyeballs) bật mặc định, xem 1.3.
+- `okhttp-coroutines`: `suspend fun Call.executeAsync(): Response`, không còn annotation experimental, hủy coroutine thì hủy call (https://lysine.dev/okhttp/5.x/okhttp-coroutines/okhttp3.coroutines/execute-async.html).
+- `mockwebserver3` thay `mockwebserver` cũ; 5.3.0 thêm `okhttp-zstd`; 5.4.0 cho interceptor override cấu hình client; 5.5.0 thêm ECH opt-in trên Android 17.
+- Repo chuyển sang https://github.com/lysine-dev/okhttp (OkHttp, Retrofit, Okio gia nhập Commonhaus Foundation, ghi ở 5.5.0), Maven group `com.squareup.okhttp3` giữ nguyên. (kiểm tra 18/11/2026)
+
+```kotlin
+// okhttp-coroutines 5.x
+val response = client.newCall(request).executeAsync()
+response.use { if (!it.isSuccessful) throw HttpError(it.code) else it.body.string() }
+```
 
 Ví dụ cấu hình chuẩn mình hay dùng:
 
@@ -754,9 +808,10 @@ fun buildOkHttp(appContext: Context, auth: TokenAuthenticator, debug: Boolean): 
   - Đọc `response.body` hai lần (body là stream một lần); interceptor muốn xem body phải `peekBody(limit)`.
   - Quên `response.close()` trong interceptor retry, rò kết nối, pool cạn, call sau treo tới timeout.
 - **Đọc thêm:**
-  - https://github.com/square/okhttp/blob/master/docs/features/interceptors.md
-  - https://github.com/square/okhttp/blob/master/docs/features/calls.md
-  - https://github.com/square/okhttp/blob/master/docs/features/events.md
+  - https://lysine.dev/okhttp/features/interceptors/
+  - https://lysine.dev/okhttp/features/calls/
+  - https://lysine.dev/okhttp/features/events/
+  - https://lysine.dev/okhttp/recipes/#timeouts-kt-java
 
 ### 5.2 Retrofit
 
@@ -791,7 +846,7 @@ val retrofit = Retrofit.Builder()
 - Suspend: Retrofit hỗ trợ `suspend fun` trực tiếp, bên dưới dùng `enqueue` và `suspendCancellableCoroutine`; khi coroutine bị cancel, Retrofit gọi `call.cancel()`, OkHttp đóng socket. Kiểu trả về `T` ném `HttpException` cho non-2xx và `IOException` cho lỗi mạng; `Response<T>` không ném cho non-2xx; `Call<T>` cho API cũ.
 - Call adapter: viết `CallAdapter.Factory` trả `ApiResult<T>` (sealed: Success/HttpError/NetworkError) để repository không rải try/catch; hoặc đơn giản hơn là một hàm `safeApiCall` trong repository. Cả hai cách đều được hỏi "bạn map lỗi ở đâu".
 - `@Tag` truyền object vào `Request.tag(Class)` để interceptor đọc (idempotency key, timeout riêng, cờ "không retry").
-- Retrofit 3.x đã phát hành (2025); thay đổi cụ thể cần kiểm tra tại https://github.com/square/retrofit/blob/trunk/CHANGELOG.md.
+- Retrofit 3.0.0 phát hành 15/05/2025 (cùng ngày 2.12.0). Thay đổi duy nhất được ghi: nâng phụ thuộc lên OkHttp 4.12 (từ 3.14), nên Retrofit giờ kéo Kotlin stdlib theo OkHttp; vẫn tương thích nhị phân tiến với 2.x, nên nâng cấp thường chỉ là đổi version. 2.12.0 thêm converter `withStreaming()`. Tới 18/11/2026 bản mới nhất trên Maven vẫn là 3.0.0. Nguồn: https://github.com/lysine-dev/retrofit/blob/trunk/CHANGELOG.md (repo cũ square/retrofit redirect về đây).
 
 ```kotlin
 sealed interface ApiResult<out T> {
@@ -816,8 +871,8 @@ Lưu ý `CancellationException` kế thừa `IllegalStateException` chứ không
   - `baseUrl` thiếu `/` cuối hoặc path bắt đầu bằng `/` làm mất prefix.
   - Trả `T` rồi `catch (e: Exception)` nuốt luôn `CancellationException`, coroutine không hủy được.
 - **Đọc thêm:**
-  - https://github.com/square/retrofit
-  - https://github.com/square/retrofit (CHANGELOG)
+  - https://github.com/lysine-dev/retrofit (repo, trước là square/retrofit)
+  - https://github.com/lysine-dev/retrofit/blob/trunk/CHANGELOG.md
 
 ### 5.3 Ktor client cho KMP
 
@@ -829,8 +884,10 @@ Engine:
 |---|---|---|
 | OkHttp | Android, JVM | dùng OkHttp bên dưới, HTTP/2, WebSocket, có thể truyền `preconfigured` OkHttpClient (pinner, interceptor) |
 | Darwin | iOS, macOS | dùng `NSURLSession`; HTTP/2, HTTP/3 do OS; pinning qua `handleChallenge` |
-| CIO | JVM, Native | thuần Kotlin coroutine; không có mọi tính năng (HTTP/2 client cần kiểm tra) |
+| CIO | JVM, Android 7.0+, Native | thuần Kotlin coroutine; chỉ HTTP/1.x ("currently supports HTTP/1.x only") |
 | Android | Android | `HttpURLConnection`, chỉ HTTP/1.1, hiếm dùng |
+
+Theo bảng giới hạn chính chủ (https://ktor.io/docs/client-engines.html#limitations): HTTP/2 có ở OkHttp, Darwin, Java, Apache5; không có ở CIO và Android. Trên Android, engine duy nhất có HTTP/2 là OkHttp. (kiểm tra 18/11/2026)
 | Js | Web | fetch |
 
 Cách cấu trúc: `commonMain` có `fun createHttpClient(engine: HttpClientEngine, tokenStore, ...)`; `androidMain` cung cấp `OkHttp.create { preconfigured = okHttpClient }`, `iosMain` cung cấp `Darwin.create { handleChallenge { ... } }`; Koin module per platform (xem `05-Cross-Platform-iOS-KMP-Flutter.md`).
@@ -879,7 +936,7 @@ fun createHttpClient(engine: HttpClientEngine, tokens: TokenStore, authApi: Auth
 
 Giải thích để trả lời interviewer:
 - `expectSuccess = true` và `HttpResponseValidator { handleResponseExceptionWithRequest { ... } }` là chỗ map lỗi HTTP sang domain error một lần.
-- `HttpRequestRetry`: có `retryOnServerErrors`, `retryIf`, `retryOnExceptionIf`, `delayMillis`, `exponentialDelay`, `modifyRequest` (ví dụ gắn header `X-Retry-Attempt`). Tùy chọn tôn trọng `Retry-After` cần kiểm tra tham số tại https://ktor.io/docs/client-request-retry.html.
+- `HttpRequestRetry` (https://ktor.io/docs/client-request-retry.html#configure_retry): `maxRetries`, `retryIf`, `retryOnExceptionIf`, `retryOnException(maxRetries, retryOnTimeout)`, `retryOnServerErrors`, `retryOnExceptionOrServerErrors`, `noRetry`, `delayMillis`, `constantDelay`, `exponentialDelay(base, baseDelayMs, maxDelayMs, randomizationMs, respectRetryAfterHeader)`, `delay`, `modifyRequest` (ví dụ gắn header `X-Retry-Attempt`). `Retry-After` được tôn trọng sẵn: các hàm delay có tham số `respectRetryAfterHeader = true` mặc định, nhưng chỉ parse dạng delta-seconds, không parse HTTP-date (API ref: https://api.ktor.io/ktor-client-core/io.ktor.client.plugins/-http-request-retry-config/exponential-delay.html; trang docs không nhắc điều này).
 - `Auth` bearer: `loadTokens` gọi khi cần token lần đầu, `refreshTokens` khi nhận 401 (và header `WWW-Authenticate` hoặc khi `sendWithoutRequest` đúng). Request refresh phải dùng client không cài `Auth` (hoặc `markAsRefreshTokenRequest()`) để không đệ quy. Plugin có cơ chế gom các request 401 đồng thời, nhưng bạn vẫn nên có single-flight của riêng mình trong `TokenStore` (phần 5.10) vì token store là của bạn, và vì iOS/Android dùng chung code này.
 - Plugin tùy biến: `createClientPlugin("TraceId") { onRequest { req, _ -> req.headers.append("X-Request-Id", uuid()) } }`. Đây là tương đương interceptor.
 - Pinning: không có API chung. Android: `OkHttp.create { config { certificatePinner(...) } }` hoặc `preconfigured`. iOS: `Darwin.create { handleChallenge { session, task, challenge, completion -> ... } }` tự so SPKI hoặc dùng TrustKit. Phải test cả hai.
@@ -889,7 +946,9 @@ Giải thích để trả lời interviewer:
   - Cài `Auth` nhưng refresh request lại đi qua chính client có `Auth`, 401 của refresh gọi refresh tiếp.
   - Dùng `HttpClient` khác nhau cho mỗi repository, mất pool và plugin chung. Ktor `HttpClient` cũng cần `close()` nếu tạo tạm.
 - **Đọc thêm:**
-  - https://ktor.io/docs/client-engines.html
+  - https://ktor.io/docs/client-engines.html#limitations
+  - https://ktor.io/docs/client-request-retry.html
+  - https://api.ktor.io/ktor-client-darwin/io.ktor.client.engine.darwin/-darwin-client-engine-config/handle-challenge.html (`handleChallenge` của Darwin engine)
   - https://ktor.io/docs/client-auth.html
   - https://ktor.io/docs/client-plugins.html
 
@@ -1097,7 +1156,19 @@ WorkManager.getInstance(context).enqueueUniqueWork("sync-outbox", ExistingWorkPo
 - Unique work + `KEEP`/`REPLACE`/`APPEND_OR_REPLACE` để không chạy trùng.
 - Periodic tối thiểu 15 phút, thời điểm không chính xác (hệ thống gom với app khác để tiết kiệm pin). Cần đúng giờ thì AlarmManager, cần tức thời thì FCM.
 - Expedited work cho việc user đang chờ (gửi tin nhắn); hết quota thì rơi về thường.
-- Upload dài: `setForeground` với foreground service type `dataSync` (Android 14+ phải khai type trong manifest).
+- Upload dài: `setForeground` với foreground service type `dataSync` (Android 14+ phải khai type trong manifest). Android 15 (target 35) giới hạn `dataSync` (và `mediaProcessing`) tổng 6 giờ trong 24 giờ: hết hạn mức hệ thống gọi `Service.onTimeout(int, int)`, app phải `stopSelf()` trong vài giây, và lần start mới ném `ForegroundServiceStartNotAllowedException`; bộ đếm reset khi user đưa app ra foreground (https://developer.android.com/about/versions/15/behavior-changes-15#datasync-timeout).
+- Truyền dữ liệu lớn do user bấm (tải sao kê, upload video): Android 14 (API 34) có user-initiated data transfer job: `JobInfo.Builder.setUserInitiated(true)`, quyền `android.permission.RUN_USER_INITIATED_JOBS`, nên gọi `setEstimatedNetworkBytes()`, phải gắn notification qua `setNotification()`, được chạy lâu hơn job thường tùy điều kiện hệ thống và không tính vào hạn mức 6 giờ của FGS dataSync (https://developer.android.com/develop/background-work/background-tasks/uidt). (kiểm tra 18/11/2026)
+
+```kotlin
+// API 34+: UIDT cho upload do user khởi động
+val job = JobInfo.Builder(JOB_ID, ComponentName(context, UploadJobService::class.java))
+    .setUserInitiated(true)
+    .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+    .setEstimatedNetworkBytes(0, 50L * 1024 * 1024)   // (download, upload) bytes
+    .build()
+context.getSystemService(JobScheduler::class.java).schedule(job)
+// UploadJobService.onStartJob phải gọi setNotification(...) ngay
+```
 
 Doze và App Standby: màn hình tắt, máy đứng yên một lúc thì Doze cắt mạng và hoãn job, chỉ mở "maintenance window" định kỳ (thưa dần). FCM high priority được phép đánh thức app trong thời gian ngắn. App Standby Buckets (active/working set/frequent/rare/restricted) giới hạn số job và alarm theo mức độ user dùng app. Hệ quả: đừng hứa "đồng bộ mỗi 5 phút ở background"; thiết kế sync khi app mở, khi có push, và khi WorkManager được hệ thống cho chạy. Test bằng `adb shell dumpsys deviceidle force-idle` (xem 7.3).
 
@@ -1106,6 +1177,8 @@ Outbox pattern cho chat/giao dịch offline: bảng `outbox` trong Room (id, pay
 - **Đọc thêm:**
   - https://developer.android.com/develop/background-work/background-tasks/persistent
   - https://developer.android.com/training/monitoring-device-state/doze-standby
+  - https://developer.android.com/about/versions/15/behavior-changes-15#datasync-timeout
+  - https://developer.android.com/develop/background-work/background-tasks/uidt
 
 ### 5.9 Certificate pinning: implementation và rotation
 
@@ -1167,9 +1240,10 @@ Rotation runbook (Lead phải nói được):
 Debug build: không pin, cho phép user CA, để dùng Proxyman. Flavor hoặc `BuildConfig.DEBUG` quyết định, không comment code.
 
 - **Đọc thêm:**
-  - https://github.com/square/okhttp/blob/master/docs/features/https.md
-  - https://developer.android.com/privacy-and-security/security-config
-  - https://mas.owasp.org/MASTG/ (MASVS-NETWORK-2, kỹ thuật test pinning)
+  - https://lysine.dev/okhttp/features/https/#certificate-pinning-kt-java
+  - https://developer.android.com/privacy-and-security/security-config#CertificatePinning (thuộc tính `<pin-set expiration="yyyy-MM-dd">`: "If the attribute is not set, then the pins do not expire")
+  - https://mas.owasp.org/MASVS/controls/MASVS-NETWORK-2/
+  - https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0242/, https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0243/, https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0244/ (test pinning theo MASTG v2), https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0286/ (NSC tin user CA)
 
 ### 5.10 Token refresh với Authenticator và refresh race
 
@@ -1266,7 +1340,8 @@ class TokenStore(private val mutex: Mutex = Mutex()) {
   - Lưu token mới nhưng request đang xếp hàng vẫn dùng token cũ từ biến local: `AuthHeaderInterceptor` phải đọc token tại thời điểm gửi, không phải lúc tạo request.
   - Xóa token khi refresh fail vì timeout.
 - **Đọc thêm:**
-  - https://github.com/square/okhttp (tìm Authenticator, `priorResponse`)
+  - https://lysine.dev/okhttp/5.x/okhttp/okhttp3/-authenticator/index.html (KDoc `Authenticator`, ví dụ đếm `priorResponse`)
+  - https://lysine.dev/okhttp/recipes/#handling-authentication-kt-java
   - https://ktor.io/docs/client-auth.html#bearer
   - https://www.rfc-editor.org/rfc/rfc9700 (OAuth 2.0 Security Best Current Practice, refresh token rotation)
 
@@ -1298,7 +1373,7 @@ Trade-off: thêm service phải vận hành, logic trùng giữa BFF mobile và 
 
 ### 6.2 Rate limiting và versioning ở gateway
 
-Rate limit bảo vệ backend và chống abuse. Thuật toán: token bucket (cho burst, nạp đều), leaky bucket (đầu ra đều), fixed window (đơn giản, có "biên cửa sổ" cho phép gấp đôi), sliding window (chính xác hơn). Khóa giới hạn: theo user, theo device, theo IP (kém vì CGNAT), theo endpoint (login chặt hơn, OTP chặt nhất). Phản hồi chuẩn: `429 Too Many Requests` + `Retry-After` + có thể `RateLimit-Limit/Remaining/Reset` (IETF draft).
+Rate limit bảo vệ backend và chống abuse. Thuật toán: token bucket (cho burst, nạp đều), leaky bucket (đầu ra đều), fixed window (đơn giản, có "biên cửa sổ" cho phép gấp đôi), sliding window (chính xác hơn). Khóa giới hạn: theo user, theo device, theo IP (kém vì CGNAT), theo endpoint (login chặt hơn, OTP chặt nhất). Phản hồi chuẩn: `429 Too Many Requests` (RFC 6585 §4, https://www.rfc-editor.org/rfc/rfc6585#section-4) + `Retry-After` (RFC 9110 §10.2.3). Header báo hạn mức đang được chuẩn hóa ở draft-ietf-httpapi-ratelimit-headers (bản -11, 05/2026, chưa thành RFC): các bản draft cũ dùng `RateLimit-Limit/Remaining/Reset`, bản hiện tại đổi thành hai structured field `RateLimit-Policy: "default";q=100;w=60` (quota 100 request mỗi 60 giây) và `RateLimit: "default";r=50;t=30` (còn 50, reset sau 30 giây). Client nên đọc được cả hai dạng nếu gateway chưa cập nhật. (kiểm tra 18/11/2026)
 
 Phía client: tôn trọng `Retry-After`, không retry 429 dồn dập, hiện thông báo phù hợp với login/OTP ("thử lại sau 60 giây"), và quan trọng nhất là không tự tạo burst (analytics, polling, retry không jitter). Lead nên xin backend số giới hạn cụ thể để test.
 
@@ -1392,7 +1467,7 @@ adb reverse tcp:8080 tcp:8080
 # bật tắt mạng để test offline / resume
 adb shell svc wifi disable && adb shell svc data disable
 adb shell svc wifi enable && adb shell svc data enable
-adb shell cmd connectivity airplane-mode enable   # bản Android mới, cần kiểm tra
+adb shell cmd connectivity airplane-mode enable   # lệnh shell của ConnectivityService (AOSP), không có trong trang adb docs; không tham số thì in trạng thái
 
 # trạng thái mạng, DNS, VPN
 adb shell dumpsys connectivity
@@ -1512,7 +1587,7 @@ Cách dùng: đọc câu hỏi, trả lời thành tiếng trong 60-90 giây, r�
 **Điểm interviewer muốn nghe:** Nối NAT với push, keep-alive và rate limit, không chỉ định nghĩa.
 
 ### Q6. How does DNS resolution work on Android and what can go wrong? Where does DoH fit?
-**A:** The app, through OkHttp's Dns.SYSTEM, asks the platform resolver; the resolver asks the recursive resolver the network handed out via DHCP, which walks root, TLD and authoritative servers unless cached, and returns the addresses with a TTL. Failures show up as UnknownHostException and do not mean the server is down: a broken coffee-shop resolver, a captive portal returning fake answers, an ISP injecting ads, or a stale cache after a backend IP change are all common. Also, mobile networks here are often IPv6-only with NAT64, so hardcoded IPv4 breaks. DNS over TLS is built into Android 9+ as Private DNS, system-wide, nothing to do in the app. DNS over HTTPS can be done per app with OkHttp's DnsOverHttps module, which bypasses the carrier resolver and resists blocking because it looks like normal HTTPS; it should be configured with a fallback to the system resolver so a dead DoH endpoint does not take the app down. Neither protects the content, that is TLS and pinning; they protect the lookup from tampering and snooping.
+**A:** The app, through OkHttp's Dns.SYSTEM, asks the platform resolver; the resolver asks the recursive resolver the network handed out via DHCP, which walks root, TLD and authoritative servers unless cached, and returns the addresses with a TTL. Failures show up as UnknownHostException and do not mean the server is down: a broken coffee-shop resolver, a captive portal returning fake answers, an ISP injecting ads, or a stale cache after a backend IP change are all common. Also, mobile networks here are often IPv6-only with NAT64, so hardcoded IPv4 breaks. DNS over TLS is built into Android 9+ as Private DNS, system-wide, nothing to do in the app, and since a 2022 Play system update Android 11+ devices use DNS-over-HTTP/3 instead of DoT for well-known resolvers such as Google and Cloudflare. DNS over HTTPS can be done per app with OkHttp's DnsOverHttps module, which bypasses the carrier resolver and resists blocking because it looks like normal HTTPS; it should be configured with a fallback to the system resolver so a dead DoH endpoint does not take the app down. Neither protects the content, that is TLS and pinning; they protect the lookup from tampering and snooping.
 **Follow-ups:** How does TTL affect failover speed? What is Happy Eyeballs and does OkHttp do it? Would you ship DoH in a banking app?
 **Điểm interviewer muốn nghe:** Phân biệt lỗi DNS với lỗi server, biết Private DNS của hệ thống và DoH trong OkHttp.
 
@@ -1544,7 +1619,7 @@ Cách dùng: đọc câu hỏi, trả lời thành tiếng trong 60-90 giây, r�
 **Điểm interviewer muốn nghe:** Đúng thứ tự message, hiểu vai trò CertificateVerify và Finished, biết 0-RTT có rủi ro replay.
 
 ### Q12. How does the client verify a server certificate, and what breaks most often?
-**A:** The client builds a chain from the leaf the server sent through intermediates to a root in its trust store, verifying each signature, validity dates, key usage and that the hostname matches a SAN entry. Android uses the system store, which the app cannot extend, and since Android 7 ignores user-installed CAs unless Network Security Config opts in. The most common breakages: the server forgets to send the intermediate, which browsers tolerate by fetching it but Android reports as "Trust anchor for certification path not found"; a new root that old devices do not have, like the Let's Encrypt ISRG root on Android 7 and older; an expired certificate nobody had an alert for; or a hostname mismatch after a domain change. The wrong fix is a trust-all TrustManager, which Play flags and which disables authentication entirely. The right practices are: test certificate changes on the oldest supported device, monitor expiry, and keep pinning rotation in the same runbook.
+**A:** The client builds a chain from the leaf the server sent through intermediates to a root in its trust store, verifying each signature, validity dates, key usage and that the hostname matches a SAN entry. Android uses the system store, which since Android 14 lives in the updatable Conscrypt module; the app cannot modify the system store, but Network Security Config lets it add its own bundled trust anchors alongside or instead of the system ones, and since Android 7 user-installed CAs are ignored unless Network Security Config opts in. The most common breakages: the server forgets to send the intermediate, which browsers tolerate by fetching it but Android reports as "Trust anchor for certification path not found"; a new root that old devices do not have, like the Let's Encrypt ISRG root on Android 7 and older; an expired certificate nobody had an alert for; or a hostname mismatch after a domain change. The wrong fix is a trust-all TrustManager, which Play flags and which disables authentication entirely. The right practices are: test certificate changes on the oldest supported device, monitor expiry, and keep pinning rotation in the same runbook.
 **Follow-ups:** What is OCSP stapling? How do you detect a missing intermediate quickly? What does Network Security Config let you do that code does not?
 **Điểm interviewer muốn nghe:** Biết lỗi thiếu intermediate, trust store cũ và từ chối fix bằng trust-all.
 
@@ -1554,7 +1629,7 @@ Cách dùng: đọc câu hỏi, trả lời thành tiếng trong 60-90 giây, r�
 **Điểm interviewer muốn nghe:** Nêu được 1 RTT, forward secrecy, mã hóa chứng chỉ, và ảnh hưởng tới cấu hình thật.
 
 ### Q14. What is OCSP stapling, and does Android check certificate revocation?
-**A:** Revocation answers "was this certificate cancelled before expiry". CRLs are big lists downloaded periodically; OCSP is a per-connection query to the CA, which adds a round trip, leaks browsing to the CA, and is usually soft-fail, so an attacker who can block the OCSP server defeats it. Stapling fixes that: the server periodically fetches a signed OCSP response and attaches it to the handshake, so the client verifies freshness without contacting anyone. On Android, the default trust manager does not perform online revocation checks by default as far as I know, and I would verify that against the current platform docs before stating it in a design doc. The practical consequence for a banking app is that revocation is not a control you can rely on from the client; you rely on short-lived certificates, certificate pinning with a rotation plan, and server-side monitoring, and you can add Certificate Transparency checking with a library if the threat model includes mis-issued certificates.
+**A:** Revocation answers "was this certificate cancelled before expiry". CRLs are big lists downloaded periodically; OCSP is a per-connection query to the CA, which adds a round trip, leaks browsing to the CA, and is usually soft-fail, so an attacker who can block the OCSP server defeats it. Stapling fixes that: the server periodically fetches a signed OCSP response and attaches it to the handshake, so the client verifies freshness without contacting anyone. On Android, the platform docs state that revocation is handled system-wide through a blocklist and Certificate Transparency, without online OCSP or CRL checks, and that OCSP responses stapled to the handshake are validated; an app that really needs online checks can wire PKIXRevocationChecker into its own TrustManagerFactory. The practical consequence for a banking app is that revocation is not a control you can rely on from the client; you rely on short-lived certificates, certificate pinning with a rotation plan, and server-side monitoring. For mis-issued certificates, Network Security Config supports a certificateTransparency element: opt-in on Android 16, on by default from Android 17; on older versions you need a library.
 **Follow-ups:** How does Certificate Transparency help? What is the risk of soft-fail? How short can certificate lifetimes go?
 **Điểm interviewer muốn nghe:** Thành thật về giới hạn của Android, và chuyển sang control thực tế (pinning, cert ngắn hạn).
 
@@ -1581,7 +1656,7 @@ Cách dùng: đọc câu hỏi, trả lời thành tiếng trong 60-90 giây, r�
 **Điểm interviewer muốn nghe:** Lợi ích cụ thể (handshake, HPACK, radio), điểm yếu (TCP HOL, GOAWAY), và việc chia sẻ client.
 
 ### Q19. How does HTTP caching work, and how would you set cache headers for a product catalog versus an account balance?
-**A:** Two mechanisms: freshness, where Cache-Control max-age says how long a stored response may be used without asking, and validation, where ETag or Last-Modified let the client ask "still valid?" with If-None-Match and get a 304 with no body. OkHttp's Cache implements RFC 9111 for GET requests, sits before the connect step so hits never touch the network, and supports FORCE_CACHE for offline reads. For a product catalog I would use max-age of a few minutes plus an ETag, so repeat views are instant and background refreshes cost a 304; images with a content hash in the URL get immutable with a one-year max-age. For account balance I want Cache-Control: no-store, private, so neither OkHttp's disk cache nor any CDN keeps it; if the backend wants bandwidth savings it can use no-cache plus ETag, which forces validation every time but can still return 304. Vary must include Accept-Language if responses are localized. Separately from HTTP cache, the app keeps its own Room cache for offline-first screens; HTTP cache is a network optimization, Room is the data source.
+**A:** Two mechanisms: freshness, where Cache-Control max-age says how long a stored response may be used without asking, and validation, where ETag or Last-Modified let the client ask "still valid?" with If-None-Match and get a 304 with no body. OkHttp's Cache implements RFC 9111 for GET requests, sits before the connect step so hits never touch the network, and supports FORCE_CACHE for offline reads. For a product catalog I would use max-age of a few minutes plus an ETag, so repeat views are instant and background refreshes cost a 304; images with a content hash in the URL get immutable with a one-year max-age. For account balance I want Cache-Control: no-store, private, so neither OkHttp's disk cache nor any CDN keeps it; if the backend wants bandwidth savings it can use no-cache plus ETag, which forces validation every time but can still return 304. Vary must include Accept-Language if responses are localized. Note that OkHttp does not implement stale-while-revalidate or stale-if-error from RFC 5861, so that behavior needs a custom interceptor. Separately from HTTP cache, the app keeps its own Room cache for offline-first screens; HTTP cache is a network optimization, Room is the data source.
 **Follow-ups:** What does stale-while-revalidate do and does OkHttp support it? How do you invalidate on logout? What happens with Authorization headers and shared caches?
 **Điểm interviewer muốn nghe:** Phân biệt freshness/validation, chọn header theo loại dữ liệu, biết OkHttp cache nằm trên đĩa.
 
@@ -1638,7 +1713,7 @@ Cách dùng: đọc câu hỏi, trả lời thành tiếng trong 60-90 giây, r�
 **Điểm interviewer muốn nghe:** Ba kênh phối hợp, dedupe và ordering, outbox, lifecycle.
 
 ### Q30. How does FCM actually deliver a message, and why can you not rely on it?
-**A:** Google Play services keeps one long-lived connection from the device to FCM; your server calls the FCM HTTP v1 API with the device token, and FCM pushes the message down that connection, so apps do not keep their own sockets and the OS can batch wake-ups. Notification messages are displayed by the system when the app is in the background without running app code; data messages always invoke onMessageReceived, which is what a bank wants so content is rendered by the app and never sits in the system tray unencrypted. High priority can wake the app in Doze within quota; normal priority is deferred. Delivery is best effort: the device may be off, the OEM may have killed the process, the user may have revoked notifications, the device may lack Google services, which is a real share of phones in Vietnam, and tokens rotate, so onNewToken must re-register. Therefore the design rule is push as a trigger to sync from the server, with the server as the source of truth, collapse keys for "you have new messages", and TTLs so stale pushes are dropped.
+**A:** Google Play services keeps one long-lived connection from the device to FCM; your server calls the FCM HTTP v1 API with the device token, and FCM pushes the message down that connection, so apps do not keep their own sockets and the OS can batch wake-ups. Notification messages are displayed by the system when the app is in the background without running app code; data messages always invoke onMessageReceived, which is what a bank wants so content is rendered by the app and never sits in the system tray unencrypted. High priority can wake the app in Doze, but if high-priority messages do not lead to a visible notification FCM may deprioritize them to normal, judged on the last seven days per app instance; normal priority is deferred. Payload is capped at 4096 bytes, TTL at 28 days, and a token can hold at most four collapse keys at once. Delivery is best effort: the device may be off, the OEM may have killed the process, the user may have revoked notifications, the device may lack Google services, which is a real share of phones in Vietnam, and tokens rotate, so onNewToken must re-register. Therefore the design rule is push as a trigger to sync from the server, with the server as the source of truth, collapse keys for "you have new messages", and TTLs so stale pushes are dropped.
 **Follow-ups:** How do you support Huawei devices? What is the difference between topic and token messaging? How do you measure push delivery rate?
 **Điểm interviewer muốn nghe:** Cơ chế một kết nối của Play services, notification vs data, và "push là tín hiệu".
 
@@ -1660,7 +1735,7 @@ Cách dùng: đọc câu hỏi, trả lời thành tiếng trong 60-90 giây, r�
 **Điểm interviewer muốn nghe:** Lý do chia sẻ pool/handshake và cách tạo biến thể bằng newBuilder.
 
 ### Q34. connectTimeout, readTimeout, writeTimeout, callTimeout: what does each measure and what do you set?
-**A:** connectTimeout bounds a single attempt to establish TCP and TLS to one route; OkHttp may try several routes, each with its own budget. readTimeout is the maximum silence between two reads of the response, not the total time, so a streaming response can run for minutes as long as bytes keep flowing. writeTimeout mirrors that for sending. callTimeout caps the entire call: DNS, connect, every interceptor including any sleep in a retry interceptor, redirects, and reading the body; its default is zero, unlimited, which surprises people. My standard: connect 10 s, read and write 15 s, callTimeout 30 s for ordinary API calls, a derived client with callTimeout of several minutes for uploads and downloads with Streaming, and per-request overrides via a request tag read by an interceptor using chain.withReadTimeout. The important principle is one place decides timeouts; stacking withTimeout in coroutines on top of OkHttp timeouts produces confusing errors. Ktor mirrors this with HttpTimeout: connect, socket and request timeouts.
+**A:** connectTimeout bounds the TCP connect of a single attempt to one route, default 10 seconds; OkHttp may try several routes, each with its own budget. A common misconception is that it covers TLS: OkHttp sets the socket timeout to readTimeout before the TLS handshake, so a slow handshake is bounded by readTimeout and callTimeout, not connectTimeout. readTimeout is the maximum silence between two reads of the response, not the total time, so a streaming response can run for minutes as long as bytes keep flowing. writeTimeout mirrors that for sending. callTimeout caps the entire call: DNS, connect, every interceptor including any sleep in a retry interceptor, redirects, and reading the body; its default is zero, unlimited, which surprises people. My standard: connect 10 s, read and write 15 s, callTimeout 30 s for ordinary API calls, a derived client with callTimeout of several minutes for uploads and downloads with Streaming, and per-request overrides via a request tag read by an interceptor using chain.withReadTimeout. The important principle is one place decides timeouts; stacking withTimeout in coroutines on top of OkHttp timeouts produces confusing errors. Ktor mirrors this with HttpTimeout: connect, socket and request timeouts.
 **Follow-ups:** Which exception do you get for each? Does callTimeout include the Authenticator refresh? How do you choose values from data rather than guessing?
 **Điểm interviewer muốn nghe:** readTimeout là khoảng im lặng, callTimeout là tổng và mặc định vô hạn.
 
@@ -1675,7 +1750,7 @@ Cách dùng: đọc câu hỏi, trả lời thành tiếng trong 60-90 giây, r�
 **Điểm interviewer muốn nghe:** Proxy + RequestFactory, suspend cancel OkHttp call, thứ tự converter, chỗ map lỗi.
 
 ### Q37. How did you structure networking with Ktor in your KMP template, and what are the engine differences?
-**A:** The HttpClient factory lives in commonMain and takes an HttpClientEngine; androidMain supplies the OkHttp engine built from the shared OkHttpClient via preconfigured, so pinning and Android interceptors stay in Android code, and iosMain supplies Darwin, where I implement pinning in handleChallenge against NSURLSession. The common configuration installs ContentNegotiation with kotlinx.serialization, HttpTimeout, HttpRequestRetry limited to idempotent methods and retryable statuses with exponential delay and jitter, Auth bearer with loadTokens and refreshTokens backed by a TokenStore that does single-flight refresh with a Mutex, DefaultRequest for base URL and version headers, Logging gated by build type, and expectSuccess with a HttpResponseValidator that maps errors once. Engine differences that bit me: Darwin follows the OS for HTTP/2 and HTTP/3 and uses the system proxy settings, CIO lacks some features, and only the OkHttp engine is visible in Android Studio's Network Inspector. Custom plugins via createClientPlugin replace OkHttp interceptors for cross-platform concerns like request IDs.
+**A:** The HttpClient factory lives in commonMain and takes an HttpClientEngine; androidMain supplies the OkHttp engine built from the shared OkHttpClient via preconfigured, so pinning and Android interceptors stay in Android code, and iosMain supplies Darwin, where I implement pinning in handleChallenge against NSURLSession. The common configuration installs ContentNegotiation with kotlinx.serialization, HttpTimeout, HttpRequestRetry limited to idempotent methods and retryable statuses with exponential delay and jitter, Auth bearer with loadTokens and refreshTokens backed by a TokenStore that does single-flight refresh with a Mutex, DefaultRequest for base URL and version headers, Logging gated by build type, and expectSuccess with a HttpResponseValidator that maps errors once. Engine differences that bit me: Darwin follows the OS for HTTP/2 and HTTP/3 and uses the system proxy settings, CIO and the Android engine speak only HTTP/1.x according to Ktor's engine limitations table, so OkHttp is the only HTTP/2 engine on Android, and only the OkHttp engine is visible in Android Studio's Network Inspector. HttpRequestRetry honors Retry-After by default through respectRetryAfterHeader, though only in delta-seconds form. Custom plugins via createClientPlugin replace OkHttp interceptors for cross-platform concerns like request IDs.
 **Follow-ups:** How does the Auth plugin avoid recursive refresh? How do you test the common client with MockEngine? What do you do differently for WebSockets per platform?
 **Điểm interviewer muốn nghe:** Engine per platform, plugin cụ thể và lý do, pinning hai nơi, MockEngine cho test.
 
@@ -1705,12 +1780,12 @@ Cách dùng: đọc câu hỏi, trả lời thành tiếng trong 60-90 giây, r�
 **Điểm interviewer muốn nghe:** VALIDATED, một callback cho toàn app, trạng thái mạng chỉ là gợi ý.
 
 ### Q43. How do you do background sync given Doze and App Standby?
-**A:** I assume the system decides when background work runs. User-visible deferred work, sending a queued message, uploading KYC photos, goes through WorkManager with a network constraint, exponential backoff by returning Result.retry, unique work names to avoid duplicates, expedited when the user is waiting, and a foreground service with the dataSync type for long uploads. Periodic refresh is a 15-minute-minimum PeriodicWorkRequest and I treat its timing as approximate because Doze batches it into maintenance windows and standby buckets throttle rarely-used apps. For timely events I rely on FCM: a high-priority data message gets a short network window even in Doze, and the app syncs from the server. Sync also runs on app foreground. The data model is an outbox table with idempotency keys so retries are safe. I test with adb deviceidle force-idle and standby bucket commands, and I watch the Android 15 to 17 restrictions on foreground services and background work in the behavior-changes docs before each targetSdk bump.
+**A:** I assume the system decides when background work runs. User-visible deferred work, sending a queued message, uploading KYC photos, goes through WorkManager with a network constraint, exponential backoff by returning Result.retry, unique work names to avoid duplicates, expedited when the user is waiting, and a foreground service with the dataSync type for long uploads, keeping in mind that on Android 15 dataSync is capped at six hours per 24 hours, after which onTimeout fires; for large user-started transfers on Android 14+ a user-initiated data transfer job with setUserInitiated is the better fit. Periodic refresh is a 15-minute-minimum PeriodicWorkRequest and I treat its timing as approximate because Doze batches it into maintenance windows and standby buckets throttle rarely-used apps. For timely events I rely on FCM: a high-priority data message gets a short network window even in Doze, and the app syncs from the server. Sync also runs on app foreground. The data model is an outbox table with idempotency keys so retries are safe. I test with adb deviceidle force-idle and standby bucket commands, and I watch the Android 15 to 17 restrictions on foreground services and background work in the behavior-changes docs before each targetSdk bump.
 **Follow-ups:** When is AlarmManager justified? How do you handle a worker that keeps failing? How does the outbox survive reinstall?
 **Điểm interviewer muốn nghe:** WorkManager + FCM + sync lúc mở app, không hứa chu kỳ chính xác.
 
 ### Q44. What is the HTTP/2 and HTTP/3 status in OkHttp, and what would you do if you needed HTTP/3?
-**A:** OkHttp speaks HTTP/1.1 and HTTP/2, negotiating h2 through ALPN on TLS and supporting cleartext h2 only with prior knowledge; it does not implement HTTP/3 in the versions I know, and I would check the changelog before claiming otherwise. If I needed HTTP/3, the practical route is Cronet, Chromium's stack, available through Google Play services or embedded, which supports QUIC and has an OkHttp-style adapter so Retrofit can keep working, at the cost of losing OkHttp interceptors, CertificatePinner and EventListener in the same form, so pinning and logging must be redone. On iOS, URLSession, hence Ktor's Darwin engine, uses HTTP/3 when the server advertises Alt-Svc. Before switching I would want evidence: EventListener data showing handshake and loss-dominated latency for users on the move. For most apps, a warm HTTP/2 connection pool and a BFF deliver more than HTTP/3 would.
+**A:** OkHttp speaks HTTP/1.1 and HTTP/2, negotiating h2 through ALPN on TLS and supporting cleartext h2 only with prior knowledge; it does not implement HTTP/3, including the stable 5.x line that started with 5.0.0 in July 2025, whose source says HTTP/3 is not natively supported. If I needed HTTP/3, the practical routes are Cronet, Chromium's stack, available through Google Play services or embedded, which supports QUIC and has the cronet-okhttp bridge with CronetInterceptor so Retrofit can keep working, or on API 34+ the platform HttpEngine, which is Cronet built into Android with setEnableQuic, at the cost of losing OkHttp interceptors, CertificatePinner and EventListener in the same form, so pinning and logging must be redone. On iOS, URLSession, hence Ktor's Darwin engine, has HTTP/3 enabled by default since iOS 15, so it is used once the server advertises it. Before switching I would want evidence: EventListener data showing handshake and loss-dominated latency for users on the move. For most apps, a warm HTTP/2 connection pool and a BFF deliver more than HTTP/3 would.
 **Follow-ups:** What is H2_PRIOR_KNOWLEDGE used for? How would you A/B test Cronet? What breaks in your pinning strategy with Cronet?
 **Điểm interviewer muốn nghe:** Thành thật về trạng thái, biết Cronet là đường đi và cái giá phải trả.
 
@@ -1722,7 +1797,7 @@ Cách dùng: đọc câu hỏi, trả lời thành tiếng trong 60-90 giây, r�
 **Điểm interviewer muốn nghe:** Lý do tồn tại cụ thể, ownership mobile, và chi phí vận hành.
 
 ### Q46. How does rate limiting work at the gateway, and what should the client do about it?
-**A:** The gateway counts requests per key, user, device, endpoint, rarely IP alone because of carrier NAT, using token bucket for burst tolerance or sliding windows for accuracy, and returns 429 with Retry-After and optionally RateLimit headers. Sensitive endpoints such as login and OTP get stricter limits and lockouts. On the client, the rules are: never retry 429 immediately, honor Retry-After with jitter, surface a clear message for user-triggered flows, and above all do not generate bursts: batch analytics, avoid polling storms after reconnection, use jitter in reconnection logic, and avoid N parallel identical calls caused by recomposition or duplicate ViewModels. As a lead I ask backend for the actual limits so we can test against them and so our retry budget is below them, and I monitor 429 rates per app version because a release that accidentally doubles calls shows up there first.
+**A:** The gateway counts requests per key, user, device, endpoint, rarely IP alone because of carrier NAT, using token bucket for burst tolerance or sliding windows for accuracy, and returns 429, defined in RFC 6585, with Retry-After and optionally the RateLimit-Policy and RateLimit headers from the IETF httpapi draft, which replaced the older RateLimit-Limit, Remaining and Reset names. Sensitive endpoints such as login and OTP get stricter limits and lockouts. On the client, the rules are: never retry 429 immediately, honor Retry-After with jitter, surface a clear message for user-triggered flows, and above all do not generate bursts: batch analytics, avoid polling storms after reconnection, use jitter in reconnection logic, and avoid N parallel identical calls caused by recomposition or duplicate ViewModels. As a lead I ask backend for the actual limits so we can test against them and so our retry budget is below them, and I monitor 429 rates per app version because a release that accidentally doubles calls shows up there first.
 **Follow-ups:** Token bucket versus leaky bucket? How do you rate limit a WebSocket? How do you test your client against limits?
 **Điểm interviewer muốn nghe:** 429 + Retry-After, client không tạo burst, phối hợp số liệu với backend.
 
@@ -1880,7 +1955,7 @@ Tự hỏi về network layer trong repo của bạn, trả lời thành tiếng
 
 Ưu tiên theo thứ tự:
 1. https://hpbn.co/ : High Performance Browser Networking (Ilya Grigorik, free). Đọc chương Building Blocks of TCP, Transport Layer Security, Mobile Networks, Optimizing for Mobile Networks, HTTP/2, WebSocket. Đây là nền cho toàn bộ file này.
-2. https://github.com/square/okhttp : docs OkHttp, đọc Calls, Connections, Interceptors, Caching, HTTPS, Events, và changelog.
+2. https://lysine.dev/okhttp/ : docs OkHttp (trước là square.github.io/okhttp, nay 404; repo https://github.com/lysine-dev/okhttp), đọc Calls, Connections, Interceptors, Caching, HTTPS, Events, và changelog https://lysine.dev/okhttp/changelogs/changelog/.
 3. https://github.com/square/retrofit : Retrofit.
 4. https://ktor.io/docs/client-create-new-application.html : Ktor client, rồi client-engines, client-auth, client-request-retry, client-plugins.
 5. https://developer.android.com/privacy-and-security/security-config : Network Security Config.

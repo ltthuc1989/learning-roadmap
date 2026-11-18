@@ -2,6 +2,7 @@
 
 > File này là **bản làm theo**. `24-AI-SDLC-1-Month.md` giải thích cơ chế (context, permission, hook, skill, subagent, MCP, CI). `25-AI-SDLC-Company-Playbooks.md` kể các công ty làm gì. Ở đây ghép hai thứ đó thành **10 pha có thứ tự**. Mỗi pha trả lời 7 câu: bước này để làm gì, đầu vào/đầu ra là gì, làm từng bước ra sao, phải học kiến thức gì (sách + chương), artifact AI nào phục vụ pha này và tối ưu nó thế nào, người khác làm ra sao, lab thực hành.
 > Quy tắc giữ nguyên như file 24: **file này không có skill, hook hay config viết sẵn để copy**. Mỗi artifact chỉ có spec yêu cầu, rubric và golden set để bạn tự viết rồi tự đo. Đáp án tham khảo nằm ở `ai-sdlc-kit/` và Talk Buddies (`docs/ai-workflow/`), chỉ mở sau khi làm xong lab.
+> **Kiến thức chuyên môn của từng pha** (thế nào là spec/PR/unit test/review/CI/release tốt, rule từ nguồn chính chủ, rubric để chấm skill/agent) nằm ở `27-Engineering-Standards-Per-Phase.md`. Học `27` trước, rồi mới viết artifact theo file này.
 > Nguồn đã fetch và kiểm tra ngày 18/11/2026: docs Anthropic/Claude Code, Google eng-practices, Thoughtworks Technology Radar Vol. 35 (11/2026), martinfowler.com (loạt "Exploring Gen AI"), Hamel Husain, DORA 2025, cùng các thread Hacker News. Tên lệnh và cờ của công cụ AI đổi theo tháng, nên kiểm tra lại link trước khi nói trong phỏng vấn.
 
 ## 0. Bản đồ
@@ -162,6 +163,7 @@ Khi một case fail, mở transcript (trong Claude Code: lịch sử session, ho
 | **L** (lớn/rủi ro) | Billing, migration Nav2 → Nav3, đổi DB | Cả 10 pha, spec đầy đủ + ADR + review 2 người | Spec (có PM), plan (code owner), PR (senior) |
 
 **Kiến thức nền.**
+> Đầy đủ (link đúng mục, rule có nguồn, pattern, ví dụ xấu → tốt, **rubric chấm artifact**): `27-Engineering-Standards-Per-Phase.md` chủ đề 1. Danh sách dưới đây chỉ là tóm tắt.
 - *User Story Mapping* (Jeff Patton, O'Reilly 2014). Ch2 "Plan to Build Less" ("Don't Prioritize Features, Prioritize Outcomes"), Ch3 "Plan to Learn Faster". Đưa vào checklist intake: "ghi outcome, không ghi feature".
 - Spec Kit có extension `assess` làm cổng trước spec: kết quả là go, needs-clarification hoặc kill (https://github.com/github/spec-kit).
 
@@ -195,6 +197,7 @@ Khi một case fail, mở transcript (trong Claude Code: lịch sử session, ho
 4. Duyệt rồi commit spec vào repo, **trước** khi có dòng code nào.
 
 **Kiến thức nền (đưa vào template và checklist của skill).**
+> Đầy đủ (link đúng mục, rule có nguồn, pattern, ví dụ xấu → tốt, **rubric chấm artifact**): `27-Engineering-Standards-Per-Phase.md` chủ đề 1. Danh sách dưới đây chỉ là tóm tắt.
 - *Specification by Example* (Gojko Adzic, Manning 2011). Ch5 "Deriving scope from goals", Ch6 "Specifying collaboratively", Ch7 "Illustrating using examples", Ch8 "Refining the specification". Thành checklist: mỗi criterion là **một ví dụ cụ thể** có dữ liệu thật, không phải câu chung chung kiểu "hệ thống phải nhanh".
 - *User Story Mapping* (Patton), Ch6 "The Real Story About Stories": Card, Conversation, Confirmation. Thành checklist: "Confirmation" chính là acceptance criteria.
 - Gherkin reference (https://cucumber.io/docs/gherkin/reference/): `Rule` gom các `Example`, mỗi example 3-5 bước. Background dài hơn 4 dòng thì nên gộp lên bước cấp cao hơn.
@@ -232,6 +235,7 @@ Khi một case fail, mở transcript (trong Claude Code: lịch sử session, ho
 5. Quyết định khó đảo ngược thì ghi ADR.
 
 **Kiến thức nền.**
+> Đầy đủ (link đúng mục, rule có nguồn, pattern, ví dụ xấu → tốt, **rubric chấm artifact**): `27-Engineering-Standards-Per-Phase.md` chủ đề 2. Danh sách dưới đây chỉ là tóm tắt.
 - *A Philosophy of Software Design* 2e (John Ousterhout, 2021). Ch4 "Modules Should Be Deep", Ch11 "Design it Twice" (số chương theo bản 1e, bản 2e có thêm chương "Decide What Matters"). Thành checklist của plan: "có ít nhất 2 phương án khác nhau về cơ bản"; "interface đơn giản, nhiều chức năng ẩn bên trong".
 - *Design It!* (Michael Keeling, Pragmatic Bookshelf 2017): "Dig for Architecturally Significant Requirements", "Give the Architecture a Report Card". Thành checklist: plan nêu yêu cầu nào quyết định kiến trúc (offline-first, đồng bộ hai nền tảng).
 - Michael Nygard, *Documenting Architecture Decisions* (2011), https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions. ADR gồm Title, Context, Decision ("We will…"), Status, Consequences (cả tốt, xấu, trung tính). ADR đánh số không tái sử dụng, khi bị thay thì ghi superseded chứ không xoá. Tham khảo thêm https://adr.github.io/
@@ -271,6 +275,7 @@ Khi một case fail, mở transcript (trong Claude Code: lịch sử session, ho
 6. Session dài thì `/clear` giữa các bước lớn. Ghi tiến độ vào `todo.md` để session mới đọc tiếp được.
 
 **Kiến thức nền.**
+> Đầy đủ (link đúng mục, rule có nguồn, pattern, ví dụ xấu → tốt, **rubric chấm artifact**): `27-Engineering-Standards-Per-Phase.md` chủ đề 3. Danh sách dưới đây chỉ là tóm tắt.
 - *Refactoring* 2e (Martin Fowler, 2018). Ch2 "Principles in Refactoring" (mục "The Two Hats": refactor thì không đổi hành vi), Ch3 "Bad Smells in Code". Thành luật cho agent: "commit refactor riêng, commit hành vi riêng".
 - *Tidy First?* (Kent Beck, O'Reilly 2023). Ch18 "Batch Sizes", Ch21 "First, After, Later, Never". Thành bước trong skill: "trước khi đổi hành vi, có cần tidy không? Nếu có thì làm thành commit riêng".
 - *Working Effectively with Legacy Code* (Michael Feathers, 2004). Ch4 "The Seam Model", Ch13 "I Need To Make a Change but I Don't Know What Tests To Write". Thành luật: "code cũ chưa có test thì viết characterization test trước khi sửa".
@@ -312,6 +317,7 @@ Khi một case fail, mở transcript (trong Claude Code: lịch sử session, ho
 6. Thỉnh thoảng (mỗi feature một lần) đo chất lượng test bằng mutation testing (PIT trên module JVM) hoặc cấy bug bằng tay.
 
 **Kiến thức nền.**
+> Đầy đủ (link đúng mục, rule có nguồn, pattern, ví dụ xấu → tốt, **rubric chấm artifact**): `27-Engineering-Standards-Per-Phase.md` chủ đề 4. Danh sách dưới đây chỉ là tóm tắt.
 - *Unit Testing Principles, Practices, and Patterns* (Vladimir Khorikov, Manning 2020). Ch4 "The four pillars of a good unit test" (protection against regressions, resistance to refactoring, fast feedback, maintainability), Ch5 "Mocks and test fragility". Thành rubric chấm test agent viết: "test kiểm hành vi quan sát được, không kiểm chi tiết implementation".
 - *Test-Driven Development: By Example* (Kent Beck, 2002). Part III Ch26 "Red Bar Patterns", Ch28 "Green Bar Patterns". Thành luật trong skill: "red trước, test đơn giản nhất trước, bước nhỏ".
 - *Software Engineering at Google* (miễn phí, https://abseil.io/resources/swe-book/html/toc.html). Ch11 "Testing Overview", Ch12 "Unit Testing", Ch13 "Test Doubles", Ch14 "Larger Testing".
@@ -351,6 +357,7 @@ Khi một case fail, mở transcript (trong Claude Code: lịch sử session, ho
 4. Agent soạn **nháp** mô tả PR từ diff + spec. Bạn sửa rồi tự tạo PR. Agent không tự push.
 
 **Kiến thức nền.**
+> Đầy đủ (link đúng mục, rule có nguồn, pattern, ví dụ xấu → tốt, **rubric chấm artifact**): `27-Engineering-Standards-Per-Phase.md` chủ đề 5 (commit) và 6 (PR). Danh sách dưới đây chỉ là tóm tắt.
 - Google eng-practices, *Small CLs*: https://google.github.io/eng-practices/review/developer/small-cls.html . Một CL là một thay đổi tự đứng được, khoảng 100 dòng là hợp lý, 1000 dòng thường quá lớn, kèm test, không làm hỏng hệ thống. Refactor để riêng. Thành luật của skill: "đề xuất tách khi diff trộn refactor với hành vi".
 - Google eng-practices, *Writing good CL descriptions*: https://google.github.io/eng-practices/review/developer/cl-descriptions.html . Dòng đầu là câu mệnh lệnh ngắn, tự đứng được ("Delete the FizzBuzz RPC", không phải "Fix bug"). Thân nói what và why, hạn chế đã biết, context. Không chỉ dán link. Thành template mô tả PR.
 - Conventional Commits 1.0.0: https://www.conventionalcommits.org/en/v1.0.0/ . Dạng `<type>[scope]: <description>`; `feat` ứng với MINOR, `fix` với PATCH, `!` hoặc `BREAKING CHANGE:` với MAJOR. Có format cố định thì release notes ở pha 9 sinh tự động được.
@@ -388,6 +395,7 @@ Khi một case fail, mở transcript (trong Claude Code: lịch sử session, ho
 4. Comment theo Conventional Comments, ghi rõ chặn hay không chặn.
 
 **Kiến thức nền.**
+> Đầy đủ (link đúng mục, rule có nguồn, pattern, ví dụ xấu → tốt, **rubric chấm artifact**): `27-Engineering-Standards-Per-Phase.md` chủ đề 7. Danh sách dưới đây chỉ là tóm tắt.
 - Google eng-practices, *The Standard of Code Review*: https://google.github.io/eng-practices/review/reviewer/standard.html . Approve khi CL "definitely improves the overall code health", không có code hoàn hảo. Điểm không bắt buộc thì ghi tiền tố `Nit:`.
 - Google eng-practices, *What to look for in a code review*: https://google.github.io/eng-practices/review/reviewer/looking-for.html . Thứ tự Design, Functionality, Complexity, Tests, Naming, Comments, Style, Consistency, Documentation, Every Line, Context, Good Things. Đây là **khung có sẵn cho system prompt của reviewer**, bạn chỉ cần thêm phần đặc thù mobile.
 - Google eng-practices, *How to write code review comments*: https://google.github.io/eng-practices/review/reviewer/comments.html . Giải thích vì sao; nói về code, không nói về người; code cần giải thích thì yêu cầu viết lại code, không giải thích trong review.
@@ -430,7 +438,8 @@ Khi một case fail, mở transcript (trong Claude Code: lịch sử session, ho
 4. Đo: thời gian CI, chi phí mỗi PR, tỷ lệ comment AI được tác giả chấp nhận.
 
 **Kiến thức nền.**
-- *Continuous Delivery* (Jez Humble & David Farley, 2010): "Anatomy of the Deployment Pipeline", "Commit Testing Stage". Mọi commit đi qua pipeline, commit stage phải nhanh. Thành luật: phần tất định phải xong trong vài phút, không bị AI làm chậm.
+> Đầy đủ (link đúng mục, rule có nguồn, pattern, ví dụ xấu → tốt, **rubric chấm artifact**): `27-Engineering-Standards-Per-Phase.md` chủ đề 8. Danh sách dưới đây chỉ là tóm tắt.
+- *Continuous Delivery* (Jez Humble & David Farley, 2010): "Anatomy of the Deployment Pipeline", "The Commit Stage". Mọi commit đi qua pipeline, commit stage phải nhanh. Thành luật: phần tất định phải xong trong vài phút, không bị AI làm chậm.
 - *Modern Software Engineering* (Farley, 2021): Ch5 "Feedback", Ch6 "Incrementalism". Batch nhỏ và feedback nhanh càng quan trọng khi AI sinh code nhanh hơn.
 - *Accelerate* (Forsgren, Humble, Kim, 2018): Ch2 "Measuring Performance", Ch4 "Technical Practices".
 - DORA metrics (nay là 5 chỉ số): change lead time, deployment frequency, failed deployment recovery time (throughput); change fail rate, deployment rework rate (instability). https://dora.dev/guides/dora-metrics-four-keys/ . DORA 2025: AI tương quan **dương** với throughput nhưng **âm** với độ ổn định, nên phải đo cả hai nhóm.
@@ -470,6 +479,7 @@ Khi một case fail, mở transcript (trong Claude Code: lịch sử session, ho
 5. Có sự cố thì agent soạn postmortem nháp từ timeline. Người viết phần kết luận và action item.
 
 **Kiến thức nền.**
+> Đầy đủ (link đúng mục, rule có nguồn, pattern, ví dụ xấu → tốt, **rubric chấm artifact**): `27-Engineering-Standards-Per-Phase.md` chủ đề 9 (release) và 10 (vận hành). Danh sách dưới đây chỉ là tóm tắt.
 - *Release It!* 2e (Michael Nygard, Pragmatic Bookshelf 2018): "Stability Antipatterns" (Integration Points, Cascading Failures, Unbounded Result Sets), "Stability Patterns" (Timeouts, Circuit Breaker, Bulkheads, Fail Fast). Thành checklist review cho code mạng ở pha 7: mọi lời gọi ra ngoài có timeout, không fetch danh sách không giới hạn.
 - Google *SRE* book Ch15 "Postmortem Culture: Learning from Failure": https://sre.google/sre-book/postmortem-culture/ . Khi nào phải viết postmortem, viết không đổ lỗi ("You can't 'fix' people, but you can fix systems and processes"). Thành template cho skill postmortem.
 - Play Console, *Release app updates with staged rollouts*: https://support.google.com/googleplay/android-developer/answer/6346149 . % rollout không tự tăng. "Halt rollout" chặn người dùng mới nhận bản, còn người đã cài thì giữ nguyên.
@@ -509,6 +519,7 @@ Khi một case fail, mở transcript (trong Claude Code: lịch sử session, ho
 5. Ghi số đo: số vòng sửa trung bình mỗi feature, lỗi bắt ở lớp nào (hook / reviewer / người / production), tỷ lệ PR qua CI ngay lần đầu, chi phí.
 
 **Kiến thức nền.**
+> Đầy đủ (link đúng mục, rule có nguồn, pattern, ví dụ xấu → tốt, **rubric chấm artifact**): `27-Engineering-Standards-Per-Phase.md` chủ đề 10. Danh sách dưới đây chỉ là tóm tắt.
 - Claude Code memory docs: https://code.claude.com/docs/en/memory . Thêm một dòng khi Claude mắc cùng lỗi lần 2, khi review bắt thứ Claude lẽ ra phải biết, khi bạn gõ lại một chỉnh sửa đã nói. Dưới 200 dòng mỗi file. Luật theo đường dẫn ở `.claude/rules/` chỉ nạp khi chạm file khớp.
 - Thoughtworks Vol. 35: *feedback flywheel* (Trial); *coding throughput as a productivity measure* (Caution), nên đo DORA và outcome, không đo số dòng hay số PR.
 - DORA AI Capabilities Model, 7 năng lực (AI stance rõ, dữ liệu tốt, dữ liệu nội bộ AI truy cập được, version control mạnh, batch nhỏ, tập trung người dùng, platform nội bộ tốt): https://cloud.google.com/blog/products/ai-machine-learning/introducing-doras-inaugural-ai-capabilities-model . Chi tiết ở 24 §8.4.

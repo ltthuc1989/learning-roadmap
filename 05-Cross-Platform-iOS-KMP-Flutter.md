@@ -153,7 +153,18 @@ internal actual val dataSourcePlatformModule: Module = module {
 }
 ```
 
-`expect class` với constructor cũng hợp lệ nhưng khó test hơn và từ Kotlin 2.x compiler cảnh báo khi `expect`/`actual` class có member mismatch; cần `@OptIn(ExperimentalMultiplatform::class)` cho một số dạng (cần kiểm tra tại https://kotlinlang.org/docs/multiplatform-expect-actual.html).
+`expect class` với constructor cũng hợp lệ nhưng khó test hơn. Docs chính chủ ghi: "Expected and actual classes are in Beta", compiler sẽ cảnh báo về trạng thái Beta mỗi khi bạn dùng; muốn tắt cảnh báo thì thêm compiler option `-Xexpect-actual-classes` (không phải `@OptIn`):
+
+```kotlin
+// build.gradle.kts của module shared
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+}
+```
+
+JetBrains cũng khuyến nghị: "using classes in simple cases where interfaces would be sufficient is not recommended", tức ưu tiên interface + `expect fun`/DI như ví dụ trên (https://kotlinlang.org/docs/multiplatform/multiplatform-expect-actual.html#expected-and-actual-classes, kiểm tra 18/11/2026).
 
 **Lỗi hay gặp / trade-off**
 - `expect class` lan tràn: mỗi lần thêm hàm phải sửa N file. Giữ `expect` cho "factory của platform thing", phần còn lại là interface.
@@ -170,7 +181,7 @@ internal actual val dataSourcePlatformModule: Module = module {
 Từ Kotlin 1.7.20 Kotlin/Native dùng **new memory manager** mặc định. Những điều phải nói được:
 
 - **Không còn freezing.** Object chia sẻ giữa thread tự do như JVM. `InvalidMutabilityException` và `freeze()` là lịch sử. Nếu bạn thấy thư viện cũ còn `ensureNeverFrozen()`, đó là code trước 1.7.20.
-- **GC riêng của Kotlin/Native**: tracing GC, stop-the-world mark rồi sweep; các bản gần đây có concurrent marking để giảm pause (bật mặc định ở version nào cần kiểm tra tại https://kotlinlang.org/docs/native-memory-manager.html). GC chạy theo heuristics, có thể gọi `kotlin.native.internal.GC.collect()` khi debug nhưng không nên trong production.
+- **GC riêng của Kotlin/Native**: tracing GC; binary option `gc` có `cms` (concurrent mark and sweep, **mặc định từ Kotlin 2.4.0**), `pmcs` (parallel mark concurrent sweep), `stwms` (stop-the-world mark and sweep) và `noop`; `gcMarkSingleThreaded=true` tắt mark song song (https://kotlinlang.org/docs/native-binary-options.html#binary-options, kiểm tra 18/11/2026; chi tiết GC ở https://kotlinlang.org/docs/native-memory-manager.html). GC chạy theo heuristics, có thể gọi `kotlin.native.internal.GC.collect()` khi debug nhưng không nên trong production.
 - **Kotlin GC và ARC của ObjC/Swift là hai hệ thống khác nhau.** Object Kotlin khi sang Swift được bọc trong một ObjC wrapper; Swift giữ wrapper bằng ARC; Kotlin GC coi wrapper còn sống là root. Object Swift/ObjC được Kotlin giữ bằng `retain`, release khi object Kotlin bị GC. Hệ quả: **cycle đi qua biên giới** (Kotlin giữ Swift closure, closure giữ Kotlin object) không được thu, gây leak. Phải phá cycle bằng tay (`[weak self]` phía Swift, hoặc dispose rõ ràng phía Kotlin).
 - Deinit của object Kotlin được gọi khi GC thu, không xác định thời điểm; đừng dựa vào nó để giải phóng tài nguyên; dùng `close()` tường minh.
 - Thread: `Dispatchers.Main` trên iOS map vào main run loop; `Dispatchers.IO` và `Dispatchers.Default` có trên Native từ kotlinx.coroutines 1.7+. Repo của bạn inject `ioDispatcher` qua Koin, đúng hướng.
@@ -185,7 +196,13 @@ class LevelRepository(
 }
 ```
 
-Interviewer đào sâu: "Vậy memory leak trên iOS tìm bằng gì?" Trả lời: Xcode Instruments (Leaks, Allocations) chỉ thấy ObjC wrapper; heap Kotlin xem qua `kotlin.native.internal.GC` stats hoặc log GC (`-Xruntime-logs=gc=info`, cần kiểm tra flag ở docs). Thực tế team thường log số instance ViewModel/Repository và test leak bằng cách pop screen rồi đếm.
+Interviewer đào sâu: "Vậy memory leak trên iOS tìm bằng gì?" Trả lời: Xcode Instruments (Leaks, Allocations) chỉ thấy ObjC wrapper; phía Kotlin heap, docs Kotlin/Native memory manager cho 4 công cụ (https://kotlinlang.org/docs/native-memory-manager.html#monitor-memory-consumption, kiểm tra 18/11/2026):
+- **Log GC**: compiler option `-Xruntime-logs=gc=info` trong Gradle build script; log chỉ in ra `stderr`.
+- **GC pause trong Instruments**: đặt `kotlin.native.binary.enableSafepointSignposts=true` trong `gradle.properties`, Product > Profile (Cmd+I), template **os_signpost**, subsystem `org.kotlinlang.native.runtime`, category `safepoint`; mỗi signpost là một GC pause (#monitor-gc-performance).
+- **Kotlin memory trong VM Tracker**: allocator mặc định gắn mmap tag (mặc định 246) nên VM Tracker của Instruments tách được vùng nhớ Kotlin; tính năng mất nếu đặt `mmapTag=0`, `disableMmap=true` hoặc `pagedAllocator=false` (#track-memory-consumption-on-apple-platforms).
+- **Test leak trong code**: `kotlin.native.internal.GC.collect()` rồi `GC.lastGCInfo!!.memoryUsageAfter["heap"]!!.totalObjectsSizeBytes`, so sánh trước/sau một thao tác (#check-for-memory-leaks).
+
+Thực tế team thường log số instance ViewModel/Repository và test leak bằng cách pop screen rồi đếm.
 
 **Lỗi hay gặp / trade-off**
 - Giữ `UIViewController` hoặc Swift closure trong singleton Kotlin: leak toàn bộ cây view.
@@ -210,7 +227,7 @@ Kotlin/Native xuất framework ở dạng **Objective-C header**; Swift dùng qu
 | `object Foo` | `Foo.shared` |
 | Top-level `fun bar()` trong `Baz.kt` | `BazKt.bar()` |
 | Top-level `fun initKoin()` | `InitHelperKt.doInitKoin()` vì tên bắt đầu bằng `init` bị ObjC hiểu là initializer, Kotlin tự thêm `do` |
-| `suspend fun` | hàm có completion handler, Swift thấy `async throws` (chỉ gọi được từ main thread trừ khi cấu hình khác) |
+| `suspend fun` | hàm có completion handler, Swift 5.5+ thấy thêm bản `async throws` (docs ghi "highly experimental", KT-47610); mặc định chỉ được *gọi* từ main thread, completion handler có thể chạy trên thread khác |
 | `Flow<T>` | class `Kotlinx_coroutines_coreFlow`, Swift không collect trực tiếp được |
 | `Int`, `Long` | `Int32`, `Int64` (chú ý: Kotlin `Int` là `Int32` trong Swift) |
 | `List<String>` | `[String]` nhưng `List<Int>` thành `[KotlinInt]` |
@@ -250,15 +267,15 @@ Không có `@Throws`, lỗi Kotlin sẽ terminate app, Swift không catch đư�
 2. Dùng **SKIE** (Touchlab): plugin Gradle sinh Swift code để `Flow` thành `AsyncSequence`, `suspend` thành `async` thật, `sealed class` thành Swift `enum` với exhaustive switch, default argument giữ được. Đổi lại build chậm hơn và thêm dependency.
 3. Giữ UI trong Compose (cách của repo bạn): Swift không cần đụng Flow vì toàn bộ UI là Compose. Đây là lý do thực tế bạn không cần SKIE.
 
-**Swift Export** là hướng chính thức của JetBrains để xuất Kotlin trực tiếp sang Swift (không qua ObjC), có từ Kotlin 2.2.20 ở trạng thái experimental; trạng thái hiện tại trong Kotlin 2.4.x cần kiểm tra tại https://kotlinlang.org/docs/native-swift-export.html. Khi nói trong phỏng vấn: "ObjC interop là stable path; Swift Export đang tiến tới, tôi theo dõi nhưng chưa dùng production".
+**Swift Export** là hướng chính thức của JetBrains để xuất Kotlin trực tiếp sang Swift (không qua ObjC), xuất hiện từ Kotlin 2.2.20; trang docs hiện ghi trạng thái **Alpha** ("still incomplete, so breaking changes are expected"), đã có multi-module, giữ package, nullable primitive không cần box `KotlinInt`, và mục Concurrency cho phép gọi `suspend` và export `Flow` thành `AsyncSequence` (https://kotlinlang.org/docs/native-swift-export.html#current-limitations, kiểm tra 18/11/2026). Khi nói trong phỏng vấn: "ObjC interop là stable path; Swift Export đang tiến tới, tôi theo dõi nhưng chưa dùng production".
 
 **Lỗi hay gặp / trade-off**
 - Quên `@Throws` ở suspend function: iOS crash khi mạng lỗi mà Android chỉ hiện error state.
-- Gọi suspend function từ background thread Swift: Kotlin yêu cầu caller trên main thread hoặc phải bật `kotlin.native.binary.objcExportSuspendFunctionLaunchThreadRestriction=none` (cần kiểm tra tên option). Mặc định an toàn là gọi từ `@MainActor`.
+- Gọi suspend function từ background thread Swift: mặc định Kotlin/Native vẫn ném lỗi nếu caller không ở main thread. Restriction này có từ legacy memory manager; Kotlin 1.7.20 giữ nó trong memory manager mới nhưng cho tắt bằng `kotlin.native.binary.objcExportSuspendFunctionLaunchThreadRestriction=none` trong `gradle.properties` (không dùng nếu còn `kotlinx.coroutines` native-mt hoặc thư viện "dispatch về thread gốc"). Nguồn: https://kotlinlang.org/docs/whatsnew1720.html#calling-kotlin-suspending-functions-from-swift-objective-c. Ngược lại, completion handler có thể được gọi trên thread khác main (https://kotlinlang.org/docs/native-arc-integration.html#completion-handlers), nên cập nhật UI phải hop về `@MainActor`. Mặc định an toàn: gọi từ `@MainActor`.
 - Export quá nhiều class: header ObjC phình, compile Swift chậm. Chỉ `export()` module nào Swift cần.
 
 **Đọc thêm:**
-- https://kotlinlang.org/docs/native-objc-interop.html
+- https://kotlinlang.org/docs/native-objc-interop.html#suspending-functions và #errors-and-exceptions ("`suspend` functions without `@Throws` propagate only `CancellationException`")
 - https://skie.touchlab.co/
 - https://kotlinlang.org/docs/native-swift-export.html
 
@@ -282,9 +299,9 @@ Giải thích từng quyết định:
 
 **Cách iOS app tiêu thụ framework** (3 đường):
 
-1. **Direct integration qua Gradle task**: Xcode có Run Script phase gọi `./gradlew :composeApp:embedAndSignAppleFrameworkForXcode`. Task đọc `CONFIGURATION`, `SDK_NAME`, `ARCHS` từ env Xcode để chọn target. Đây là cách project wizard của JetBrains sinh ra và gần như chắc chắn là cách repo bạn dùng (thư mục `iosApp/` không nằm trong repo root hiện tại, cần kiểm tra bạn để ở đâu).
+1. **Direct integration qua Gradle task**: Xcode có Run Script phase gọi `./gradlew :composeApp:embedAndSignAppleFrameworkForXcode`. Task đọc `CONFIGURATION`, `PLATFORM_NAME`, `ARCHS` (cùng `TARGET_BUILD_DIR`, `FRAMEWORKS_FOLDER_PATH`, `EXPANDED_CODE_SIGN_IDENTITY`) từ env Xcode để chọn target và nơi copy/sign framework (nguồn: `XcodeEnvironment.kt` trong Kotlin Gradle plugin, https://github.com/JetBrains/kotlin/blob/master/libraries/tools/kotlin-gradle-plugin/src/common/kotlin/org/jetbrains/kotlin/gradle/plugin/mpp/apple/XcodeEnvironment.kt). Theo docs direct integration: tắt "Based on dependency analysis" của Run Script phase (để Xcode chạy script mỗi lần build), và tắt **User Script Sandboxing** trong Build Settings (nếu đã build khi còn bật sandbox thì chạy `./gradlew --stop`) (https://kotlinlang.org/docs/multiplatform/multiplatform-direct-integration.html#connect-the-framework-to-your-project, kiểm tra 18/11/2026). Đây là cách project wizard của JetBrains sinh ra. Repo của bạn: thư mục `iosApp/` không nằm ở repo root hiện tại, nên mở project Xcode thật để xác nhận Run Script phase trước khi kể trong phỏng vấn.
 2. **CocoaPods**: plugin `kotlin("native.cocoapods")`, sinh `podspec`, Xcode dùng `pod install`. Hợp khi app iOS đã dùng Pods.
-3. **SPM với XCFramework**: build `XCFramework` chứa cả device và simulator slice, publish kèm `Package.swift`. Hợp khi team iOS riêng, nhận framework như thư viện. Kotlin 2.4.20 thêm tự động sinh `Package.swift` cho XCFramework (theo brief; cấu hình chi tiết cần kiểm tra tại https://kotlinlang.org/docs/whatsnew2420.html).
+3. **SPM với XCFramework**: build `XCFramework` chứa cả device và simulator slice, publish kèm `Package.swift`. Hợp khi team iOS riêng, nhận framework như thư viện. Kotlin 2.4.20 (7/9/2026): khi XCFramework phụ thuộc SwiftPM package, task `assembleSharedXCFramework` tự sinh `Package.swift` để phát hành cùng XCFramework (https://kotlinlang.org/docs/whatsnew2420.html#generated-package-swift-for-swiftpm-dependencies, kiểm tra 18/11/2026).
 
 ```kotlin
 // Ví dụ khai báo XCFramework (khi đi đường 3)
@@ -332,7 +349,7 @@ struct ContentView: UIViewControllerRepresentable {
 **Lỗi hay gặp / trade-off**
 - Build "arm64 simulator" trên Intel Mac hoặc ngược lại: lỗi "building for iOS Simulator, but linking in object file built for iOS". Kiểm tra `ARCHS` và `EXCLUDED_ARCHS`.
 - Quên `export(project(":core:model"))` trong `framework {}`: Swift không thấy class của module đó dù Kotlin dùng được. `transitiveExport = true` tiện nhưng làm header phình, không khuyến nghị.
-- Apple yêu cầu Xcode 26 / iOS 26 SDK để upload từ 28/4/2026 (brief). Kotlin version phải hỗ trợ Xcode đó; kiểm tra bảng tương thích trước khi nâng.
+- Apple: từ 28/4/2026 app upload lên App Store Connect phải build bằng Xcode 26+ với SDK iOS 26; từ 9/9/2026 app iOS phải target iOS 13+ (https://developer.apple.com/news/upcoming-requirements/, kiểm tra 18/11/2026). Kotlin version phải hỗ trợ Xcode đó: xem bảng Xcode trong https://kotlinlang.org/docs/multiplatform/multiplatform-compatibility-guide.html trước khi nâng.
 
 **Đọc thêm:**
 - https://kotlinlang.org/docs/multiplatform-build-native-binaries.html
@@ -476,7 +493,7 @@ Repo hiện dùng `fallbackToDestructiveMigration(dropAllTables = true)`. Phải
 
 **Tại sao pin `androidx.sqlite = 2.6.1`**: comment trong `libs.versions.toml` nói rõ: "2.7.0 dropped iosX64 (Intel simulator); 2.6.1 is the newest that still ships it". Vì `KmpIosPlugin` vẫn khai báo `iosX64()`, Gradle phải resolve artifact `sqlite-bundled-iosx64`; từ 2.7.0 artifact này không tồn tại nên build fail. Hai cách thoát: bỏ `iosX64` (khuyến nghị nếu không còn Intel Mac) hoặc giữ pin và chấp nhận không nhận bug fix mới. Comment tương tự nói Ktor 3.5.0 bỏ iosX64 nhưng catalog đang để `ktor = 3.5.2`; bạn cần tự build `linkDebugFrameworkIosX64` để xác nhận trạng thái thật, vì interviewer có thể hỏi "vậy iosX64 của bạn có build được không".
 
-**Room 3.0** (`androidx.room3`, stable 3.0.1 ngày 29/7/2026, theo brief): Kotlin-only codegen, KSP bắt buộc, breaking package. Repo ở 2.8.4 vẫn được hỗ trợ; kế hoạch nâng: đổi package, chạy lại schema export, so sánh schema JSON, chạy migration test trên cả Android và iOS simulator.
+**Room 3.0** (`androidx.room3`, stable 3.0.0 ngày 1/7/2026; bản mới nhất 3.0.3 ngày 9/9/2026, alpha 3.1.0-alpha03; nguồn https://developer.android.com/jetpack/androidx/releases/room3, kiểm tra 18/11/2026): Kotlin-only codegen, KSP bắt buộc, package mới `androidx.room3`, bỏ SupportSQLite (trừ khi dùng `room3-sqlite-wrapper`), mọi DAO phải `suspend` hoặc trả `Flow`, `InvalidationTracker` dựa trên `Flow`, `@TypeConverter` đổi tên thành `@ColumnTypeConverter`, thêm JS/WasmJS và `@Fts5`. Repo ở 2.8.4 vẫn được hỗ trợ; kế hoạch nâng: đổi package, chạy lại schema export, so sánh schema JSON, chạy migration test trên cả Android và iOS simulator.
 
 **Room KMP vs SQLDelight** (câu hay bị hỏi):
 
@@ -489,12 +506,12 @@ Repo hiện dùng `fallbackToDestructiveMigration(dropAllTables = true)`. Phải
 | Team Android quen | rất quen | học thêm |
 | Hỗ trợ | Google, cùng nhịp AndroidX | Cash App, cộng đồng |
 
-Lý do chọn Room cho template: team Android đã quen Room, code review dễ, Paging/Flow tích hợp sẵn, và Google đang đẩy KMP cho Room/DataStore/Lifecycle. Chọn SQLDelight khi team thích SQL-first hoặc target JS/Wasm (Room chưa có).
+Lý do chọn Room cho template: team Android đã quen Room, code review dễ, Paging/Flow tích hợp sẵn, và Google đang đẩy KMP cho Room/DataStore/Lifecycle. Chọn SQLDelight khi team thích SQL-first, hoặc khi cần target JS/Wasm mà vẫn ở Room 2.x: Room 2.x không có web target, còn **Room 3.0** (`androidx.room3`, stable 3.0.0 ngày 1/7/2026) đã thêm JS và WasmJS qua `WebWorkerSQLiteDriver` (artifact `androidx.sqlite:sqlite-web`, lưu DB trong OPFS, phải tự cung cấp worker) (https://developer.android.com/jetpack/androidx/releases/room3#3.0.0, kiểm tra 18/11/2026).
 
 **Lỗi hay gặp / trade-off**
 - Quên `setQueryCoroutineContext`: trên iOS query chạy trên thread gọi, có thể là main.
 - `Flow` từ DAO không emit trên iOS nếu quên invalidation tracker; Room KMP xử lý nhưng cần `BundledSQLiteDriver` hoặc driver hỗ trợ.
-- Schema export: thêm `room { schemaDirectory("$projectDir/schemas") }` để có JSON cho auto-migration và test; cần kiểm tra plugin `androidx.room` dùng chung với KMP.
+- Schema export: thêm `room { schemaDirectory("$projectDir/schemas") }` để có JSON cho auto-migration và test; plugin `androidx.room` (Room 3: `androidx.room3`, block `room3 { }`) áp dụng được trong module KMP cùng plugin KSP, và KSP compiler phải add cho từng target (`kspAndroid`, `kspIosArm64`, `kspIosSimulatorArm64`...) theo https://developer.android.com/kotlin/multiplatform/room#set-up-dependencies.
 
 **Đọc thêm:**
 - https://developer.android.com/kotlin/multiplatform/room
@@ -589,7 +606,7 @@ fun audioUri(path: String): String = Res.getUri("files/audio/$path")
 
 Resource đa ngôn ngữ: `values-vi/strings.xml`. Đa density: `drawable-xxhdpi`. Trên iOS resource được copy vào bundle của framework; `Res.getUri` trả `file://` URI, dùng được cho `AVPlayer`.
 
-**Navigation 3 CMP** (`org.jetbrains.androidx.navigation3:navigation3-ui`, repo dùng 1.0.0-alpha06; Nav3 Android stable 19/11/2025 theo brief, bản CMP đi sau):
+**Navigation 3 CMP** (`org.jetbrains.androidx.navigation3:navigation3-ui`, repo dùng 1.0.0-alpha06). Mốc chính chủ: AndroidX Navigation 3 `1.0.0` stable ngày 19/11/2025, hiện stable `1.2.1` (04/11/2026) và alpha `1.3.0-alpha04` (https://developer.android.com/jetpack/androidx/releases/navigation3#1.0.0). Bản CMP: docs JetBrains dùng `org.jetbrains.androidx.navigation3:navigation3-ui:1.1.1` với Compose Multiplatform 1.10+, chạy Android, iOS, desktop, web; chỉ `navigation3-ui` có implementation CMP riêng, `navigation3-common` kéo transitively (https://kotlinlang.org/docs/multiplatform/compose-navigation-3.html, kiểm tra 18/11/2026). Repo còn ở alpha06 nên khi nâng phải xử lý các đổi tên API ở alpha11 (xem dưới).
 
 ```kotlin
 @Serializable
@@ -606,8 +623,8 @@ fun AppNavHost() {
             backStack = backStack,
             onBack = { backStack.removeLastOrNull() },
             entryDecorators = listOf(
-                rememberSavedStateNavEntryDecorator(),
-                rememberViewModelStoreNavEntryDecorator(),
+                rememberSaveableStateHolderNavEntryDecorator(), // tên từ 1.0.0-alpha11; alpha06 là rememberSavedStateNavEntryDecorator()
+                rememberViewModelStoreNavEntryDecorator(),      // từ lifecycle-viewmodel-navigation3
             ),
             entryProvider = entryProvider {
                 entry<Destination.Home> { HomeScreen() }
@@ -618,7 +635,7 @@ fun AppNavHost() {
 }
 ```
 
-Repo: `Destination` sealed interface nằm ở `core:ui`, `LocalNavBackStack` là CompositionLocal, feature đăng ký bằng extension `EntryProviderScope.homeEntries()` gọi trong `AppNavHost`. Lý do: feature không biết nhau, chỉ biết `Destination`. Tên decorator có thể khác giữa alpha; cần kiểm tra tại https://developer.android.com/guide/navigation/navigation-3.
+Repo: `Destination` sealed interface nằm ở `core:ui`, `LocalNavBackStack` là CompositionLocal, feature đăng ký bằng extension `EntryProviderScope.homeEntries()` gọi trong `AppNavHost`. Lý do: feature không biết nhau, chỉ biết `Destination`. Đổi tên ở `1.0.0-alpha11` (08/10/2025): `SavedStateNavEntryDecorator` thành `SaveableStateHolderNavEntryDecorator` (và chuyển từ function sang class), `EntryProviderBuilder` thành `EntryProviderScope`, `SceneSetupNavEntryDecorator`/`rememberSceneSetupNavEntryDecorator()` bị bỏ khỏi public API vì đã mặc định có (https://developer.android.com/jetpack/androidx/releases/navigation3#1.0.0-alpha11). Bản stable dùng `rememberSaveableStateHolderNavEntryDecorator()` + `rememberViewModelStoreNavEntryDecorator()` như snippet trên (https://developer.android.com/guide/navigation/navigation-3/save-state#scoping-viewmodels, kiểm tra 18/11/2026).
 
 Khác Nav2: back stack là `List<NavKey>` bạn sở hữu, không còn route string, không `NavController`. Predictive back và transition qua Scenes API. Trên iOS, swipe-back không tự có; cần tự xử lý (mục 2.2).
 
@@ -646,7 +663,7 @@ class HomeViewModel(private val repo: LevelRepository) : ViewModel() {
 ### 1.10 Testing: commonTest và test trên iOS
 
 - `commonTest` với `kotlin("test")` chạy trên mọi target: `./gradlew :core:datasource:testDebugUnitTest` (Android/JVM) và `./gradlew :core:datasource:iosSimulatorArm64Test` (chạy trên simulator qua `xcrun simctl`).
-- **MockK không hỗ trợ Kotlin/Native**. Trong commonTest dùng fake viết tay hoặc Mokkery (KSP, hỗ trợ Native; cần kiểm tra tại https://mokkery.dev). MockK giữ cho `androidUnitTest`.
+- **MockK không hỗ trợ Kotlin/Native**. Trong commonTest dùng fake viết tay hoặc Mokkery (compiler plugin, không phải KSP: "compiler plugin driven"; hỗ trợ JVM/Android, mọi target Kotlin/Native, JS, Wasm; plugin `id("dev.mokkery") version "3.6.0"` cho Kotlin 2.4.21, bản 3.6.0 phát hành 29/10/2026; từ 3.4.0 yêu cầu tối thiểu Kotlin 2.4.0. Nguồn https://mokkery.dev/ và https://github.com/lupuuss/Mokkery/releases, kiểm tra 18/11/2026). MockK giữ cho `androidUnitTest`.
 - Turbine chạy trên Native; `kotlinx-coroutines-test` với `runTest` chạy mọi nơi.
 - Room trên test iOS: dùng `BundledSQLiteDriver` với `inMemoryDatabaseBuilder` nếu có cho KMP, hoặc file tạm trong `NSTemporaryDirectory()`.
 - Ktor: `MockEngine` (repo đã có `ktor-client-mock` trong commonTest).
@@ -682,26 +699,33 @@ UI test CMP trên iOS: `compose-ui-test` chạy được trên iOS từ 1.6+ (`r
 
 ### 1.11 Build time, binary size, debugging iOS, CI cho iOS
 
-**Build time**: compile Kotlin/Native chậm hơn JVM vì LLVM backend. Giảm bằng: bật Gradle cache và configuration cache; `kotlin.native.cacheKind=static` (mặc định cho debug trên một số target) để cache thư viện phụ thuộc; chỉ link target đang cần (`linkDebugFrameworkIosSimulatorArm64` thay vì tất cả); bỏ `iosX64` nếu không cần; tách module để incremental. `kotlin.incremental.native=true` là experimental, cần kiểm tra trạng thái.
+**Build time**: compile Kotlin/Native chậm hơn JVM vì LLVM backend; release chậm hơn debug khoảng "an order of magnitude". Danh sách chính chủ ở https://kotlinlang.org/docs/native-improving-compilation-time.html (kiểm tra 18/11/2026, trang ghi Kotlin mới nhất 2.4.21):
+- Giữ `~/.konan` giữa các build (CI/Docker); đổi chỗ bằng Gradle property `konan.data.dir`.
+- `org.gradle.jvmargs=-Xmx3g`, `org.gradle.caching=true`, `org.gradle.configuration-cache=true` (bật ngầm `org.gradle.parallel`; link song song có thể quá tải máy nhiều core, KT-70915).
+- Chỉ build binary cần: `linkDebugFramework*` hoặc `embedAndSignAppleFrameworkForXcode` khi dev, `assembleSharedDebugXCFramework` thay `assembleXCFramework`; bỏ `iosX64` nếu không chạy simulator Intel.
+- Không dùng `transitiveExport = true` (tắt dead code elimination), không export thừa module.
+- `kotlin.incremental.native=true`: incremental compile klib, trạng thái **Beta** (Kotlin 2.4.20 cải thiện thêm, https://kotlinlang.org/docs/whatsnew2420.html#improved-incremental-compilation-of-klib-artifacts).
+- Cache cho release: `kotlin.native.binary.enableReleaseBinaryCache=true` + `kotlin.internal.native.enableReleaseBinaryCache=true` (Experimental từ 2.4.20, build nhanh hơn nhưng runtime chưa tối ưu hết). `smallBinary=true` (Experimental) giảm size release bằng `-Oz`.
+- Gỡ workaround cũ nếu còn: `kotlin.native.disableCompilerDaemon=true`, `disableNativeCache`.
 
 **Binary size**: static framework + dead code elimination của linker giúp; Compose runtime + Skiko là phần lớn size. Release build dùng `-opt`; kiểm tra size qua `xcrun size` hoặc App Store Connect "App size report". Không nêu số cụ thể nếu bạn chưa đo; đo trên chính app của bạn và ghi vào `16-Side-Project-Portfolio.md`.
 
-**Debugging**: Xcode debug được Kotlin frame với symbol nếu dùng debug framework; plugin `xcode-kotlin` của Touchlab cho breakpoint vào `.kt` và xem biến. Crash production: stack trace Kotlin cần symbolicate; Crashlytics cần `CrashKiOS` (Touchlab) để report Kotlin exception với frame Kotlin. Kotlin 2.4.20 thêm coroutine stack-trace recovery (brief) giúp stack trace suspend dễ đọc hơn.
+**Debugging**: Xcode debug được Kotlin frame với symbol nếu dùng debug framework; plugin `xcode-kotlin` của Touchlab cho breakpoint vào `.kt` và xem biến. Crash production: stack trace Kotlin cần symbolicate; Crashlytics cần `CrashKiOS` (Touchlab) để report Kotlin exception với frame Kotlin. Lưu ý: Kotlin 2.4.20 thêm interface `StackTraceRecoverable` (Experimental, `@OptIn(ExperimentalStdlibCoroutineSupportApi::class)`) cho coroutine stack trace recovery, nhưng docs nói rõ "the kotlinx.coroutines library uses it for stack trace recovery only on the JVM", nên **không** giúp gì cho crash Kotlin trên iOS (https://kotlinlang.org/docs/whatsnew2420.html#support-for-coroutine-stack-trace-recovery).
 
 **CI iOS** (chi tiết GitHub Actions trong `20-Git-CICD.md`):
 
 ```yaml
-# .github/workflows/ios.yml (rút gọn)
+# .github/workflows/ios.yml (rút gọn; version action theo tag mới nhất 18/11/2026, runner image xem `20` mục 13)
 jobs:
   ios:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: 17 }
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Cache konan
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.konan
           key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
@@ -733,7 +757,7 @@ Signing cho TestFlight: Fastlane `match` lưu cert trong repo riêng mã hóa, h
 | Scroll không "mượt như native" | Overscroll bounce và fling physics được CMP mô phỏng; chạy ở 120Hz cần Metal | Bật `CADisableMinimumFrameDurationOnPhone` trong Info.plist để 120Hz; tránh recomposition nặng trong item; dùng `key` cho LazyColumn |
 | Font khác iOS | CMP không dùng San Francisco mặc định | Nạp font qua resources hoặc dùng `FontFamily.Default` (CMP map tới system font); kiểm tra |
 | Swipe back không có | Nav3 không biết UIKit gesture | Tự thêm gesture ở edge; hoặc dùng UIKit navigation host + `ComposeUIViewController` mỗi screen |
-| Accessibility / VoiceOver | Semantics tree phải map sang `UIAccessibility` | CMP tự map, bật mặc định từ 1.6.x (cần kiểm tra); test thật bằng VoiceOver |
+| Accessibility / VoiceOver | Semantics tree phải map sang `UIAccessibility` | CMP tự map; từ 1.8.0 bỏ `AccessibilitySyncOptions`, cây accessibility được dựng theo nhu cầu, hỗ trợ Bold Text và Reduce Motion; 1.12.0 thêm `LiveRegion` (release notes trên https://github.com/JetBrains/compose-multiplatform/releases). Vẫn phải test thật bằng VoiceOver |
 | Share sheet, file picker, camera | Không có API chung | `UIKitViewController`, `expect/actual`, hoặc thư viện (repo dùng FileKit, Calf) |
 | Crash do exception chưa `@Throws` | Interop | `@Throws` ở biên; `setUnhandledExceptionHook` để log |
 | Hình ảnh nặng | Coil 3 trên iOS decode qua Skia | Giới hạn size request, `memoryCachePolicy` |
@@ -767,8 +791,11 @@ flowchart TD
 // iosMain
 fun MainViewController(): UIViewController = ComposeUIViewController(
     configure = {
-        // các option như onFocusBehavior, opaque, enforceStrictPlainTextInput,
-        // parallelRendering; tên và mặc định cần kiểm tra theo version CMP bạn dùng
+        // ComposeContainerConfiguration (source jb-main, kiểm tra 18/11/2026):
+        onFocusBehavior = OnFocusBehavior.FocusableAboveKeyboard // mặc định
+        enforceStrictPlistSanityCheck = true // mặc định; báo lỗi nếu Info.plist thiếu key cần
+        // @ExperimentalComposeUiApi: opaque = true, parallelRendering = true (mặc định từ CMP 1.11.0),
+        // endEdgePanGestureBehavior = EndEdgePanGestureBehavior.Disabled
     },
 ) {
     App()
@@ -794,7 +821,7 @@ fun NativeMap(modifier: Modifier = Modifier) {
 `UIKitViewController(factory = { SomeViewController() })` cho cả controller (ví dụ `SFSafariViewController`, `AVPlayerViewController`). Hai chiều: Swift có thể nhúng `ComposeUIViewController` vào `NavigationStack` của SwiftUI; Compose có thể nhúng UIKit vào trong. Pattern "UIKit host + Compose screen" dùng khi muốn navigation gesture native.
 
 **Lỗi hay gặp / trade-off**
-- `UIKitView` là view thật nằm trên layer Compose: không clip theo `Modifier.clip`, không alpha, z-order bị giới hạn; cần `UIKitInteropProperties` cho interaction mode (cần kiểm tra tên).
+- `UIKitView` là view thật nằm trên layer Compose: không clip theo `Modifier.clip`, không alpha, z-order bị giới hạn. Truyền `properties = UIKitInteropProperties(interactionMode = UIKitInteropInteractionMode.Cooperative(), isNativeAccessibilityEnabled = false)` (giá trị mặc định; `NonCooperative` khi view native cần nhận touch ngay, ví dụ map). Tên lấy từ `UIKitInteropProperties.ios.kt` trong JetBrains/compose-multiplatform-core nhánh jb-main.
 - Mỗi `ComposeUIViewController` tạo một Compose runtime; nhiều controller cùng lúc tốn memory.
 - `opaque = false` để nền trong suốt tốn thêm blending.
 
@@ -811,7 +838,7 @@ fun NativeMap(modifier: Modifier = Modifier) {
 
 **Navigation gesture**: iOS user mong edge swipe back. Lựa chọn: (1) `UINavigationController` host, mỗi screen một `ComposeUIViewController` (native gesture, mất shared transition của Nav3); (2) Nav3 + tự `Modifier.pointerInput` ở mép trái để pop; (3) chấp nhận chỉ có nút back (app trẻ em chấp nhận được). Repo của bạn hiện là (3); cần nói rõ đây là quyết định có ý thức.
 
-**Performance**: bật 120Hz qua `CADisableMinimumFrameDurationOnPhone = YES` trong Info.plist; tránh `Modifier.blur` lớn; giảm `drawWithCache` phức tạp; `LazyColumn` với `key` và `contentType`; đo bằng Xcode Instruments (Core Animation FPS, Time Profiler sẽ thấy frame Kotlin). Hot Reload (stable từ CMP 1.10) chỉ cho desktop target; trên iOS vẫn phải rebuild, nên quy trình "làm UI trên desktop/Android, verify trên iOS" là chuẩn.
+**Performance**: bật 120Hz qua `CADisableMinimumFrameDurationOnPhone = YES` trong Info.plist; tránh `Modifier.blur` lớn; giảm `drawWithCache` phức tạp; `LazyColumn` với `key` và `contentType`; đo bằng Xcode Instruments (Core Animation FPS, Time Profiler sẽ thấy frame Kotlin). Compose Hot Reload (bundled vào Compose Gradle plugin từ CMP 1.10.0) chỉ cho desktop JVM target; trên iOS vẫn phải rebuild, nên quy trình "làm UI trên desktop/Android, verify trên iOS" là chuẩn.
 
 **Lỗi hay gặp / trade-off**
 - Dùng `LocalConfiguration` Android trong common code: không compile; dùng `LocalWindowInfo` hoặc adaptive `currentWindowAdaptiveInfo()`.
@@ -825,14 +852,17 @@ fun NativeMap(modifier: Modifier = Modifier) {
 
 ### 2.3 Dòng thời gian version: ổn định từ 1.8, thay đổi ở 1.10 đến 1.12
 
-Theo brief (đã verify 19/10/2026):
+Nguồn: release notes https://github.com/JetBrains/compose-multiplatform/releases và bảng mapping ở https://kotlinlang.org/docs/multiplatform/compose-compatibility-and-versioning.html#supported-platforms (kiểm tra 18/11/2026):
 
-| Version | Điểm chính |
-|---|---|
-| 1.8.0 (5/2025) | iOS **stable**. Text input viết lại, accessibility, hiệu năng scroll. |
-| 1.9.x | Theo Jetpack Compose 1.9; Material 3 adaptive, `@Preview` tiến tới chung. |
-| 1.10 (1/2026) | Unified `@Preview` (một annotation dùng chung commonMain), Navigation 3 cho CMP, Hot Reload stable (desktop). Repo của bạn ở 1.10.2. |
-| 1.12.2 (hiện tại) | Đi với Jetpack Compose 1.12.1; min iOS 14. Compose 1.12 cần compileSdk 37 và AGP 9.1.1+ (brief), nên nâng CMP 1.12 kéo theo nâng AGP; repo đang AGP 8.13.2 và compileSdk 36, tức là bước nâng này có chi phí. |
+| Version (ngày phát hành) | Jetpack Compose | Điểm chính |
+|---|---|---|
+| 1.8.0 (6/5/2025) | 1.8.x | iOS **stable**. Codebase chuyển hẳn K2: klib native/web chỉ dùng được với Kotlin 2.1.0+. Accessibility iOS viết lại (cây on-demand, Bold Text, Reduce Motion). `defaultUIKitMain()` deprecated. |
+| 1.9.0 (16/9/2025) | 1.9.4 (ở 1.9.3) | Theo Jetpack Compose 1.9. |
+| 1.10.0 (13/1/2026) | 1.10.5 (ở 1.10.3) | `androidx.compose.ui.tooling.preview.Preview` dùng được từ `commonMain` (annotation `org.jetbrains.compose...Preview` deprecated); Compose Hot Reload plugin bundled sẵn trong Compose Gradle plugin (desktop, Kotlin 2.1.20+); thêm `NavigationEventDispatcherOwner` cho Navigation 3; **Kotlin 2.2 bắt buộc cho native/web**; alias `compose.ui` trong Gradle plugin deprecated. Repo của bạn ở 1.10.2. |
+| 1.11.0 (13/5/2026) | 1.11.2 (ở 1.11.1) | **Kotlin 2.3 bắt buộc cho native/web**; iOS: `parallelRendering` bật mặc định, `Dialog`/`Popup` nằm trên transition view của hệ thống; **bỏ hỗ trợ Apple x86_64 (`iosX64`)** theo KT-81596. |
+| 1.12.0 (25/8/2026), 1.12.2 (15/10/2026, hiện tại) | 1.12.1 | Hot Reload có MCP server cho AI agent (desktop); iOS: `LiveRegion` accessibility, selection handle giống iOS, `NSLocale.toComposeLocale()`. Min iOS 14. |
+
+Hệ quả cho repo: nâng lên CMP 1.11+ buộc **bỏ `iosX64`** (khớp luôn với lý do pin `androidx.sqlite 2.6.1`, xem 1.7) và lên Kotlin 2.3+. Phía Android, Jetpack Compose 1.12.0-alpha01 (22/4/2026) đã "Updated Compose compileSdk to API 37. This means that a minimum AGP version of 9.2.0 is required" (https://developer.android.com/jetpack/androidx/releases/compose-ui), nên nâng CMP 1.12 kéo theo compileSdk 37 và AGP 9.2.0+; repo đang AGP 8.13.2 và compileSdk 36, tức là bước nâng này có chi phí.
 
 Material3 cho CMP: repo dùng `org.jetbrains.compose.material3:material3 1.10.0-alpha05` (bản Expressive). Jetpack Material3 stable là 1.4.0. Bạn phải nói được: "tôi dùng alpha vì cần Expressive component X; rủi ro API đổi; tôi pin version và có test screenshot".
 
@@ -842,8 +872,9 @@ Material3 cho CMP: repo dùng `org.jetbrains.compose.material3:material3 1.10.0-
 
 **Đọc thêm:**
 - https://github.com/JetBrains/compose-multiplatform/releases
-- https://blog.jetbrains.com/kotlin/
-- https://developer.android.com/jetpack/androidx/releases/compose
+- https://kotlinlang.org/docs/multiplatform/compose-compatibility-and-versioning.html#kotlin-compatibility
+- https://kotlinlang.org/docs/multiplatform/whats-new-compose-110.html
+- https://developer.android.com/jetpack/androidx/releases/compose-ui
 
 ## 3. iOS/Swift ở mức đọc và review
 
@@ -951,7 +982,48 @@ Mở rộng từ `docs/swift-compose-mapping.md` trong `compose-template` của 
 | `PreviewProvider` / `#Preview` | `@Preview` | |
 | `UIViewRepresentable` | `AndroidView` / `UIKitView` | interop |
 
+**Cùng một màn hình ở hai bên** (SwiftUI iOS 17+ với Observation; Compose với `StateFlow`):
+
+```swift
+import SwiftUI
+import Observation
+
+@Observable final class CounterModel { var count = 0 }   // macro, không cần @Published
+
+struct CounterView: View {
+    @State private var model = CounterModel()   // view sở hữu model (thay @StateObject)
+    var body: some View {
+        VStack(spacing: 8) {
+            Text("Count: \(model.count)")       // chỉ property được đọc mới bị track
+            Button("Add") { model.count += 1 }
+        }
+        .padding()
+    }
+}
+```
+
+```kotlin
+class CounterViewModel : ViewModel() {
+    private val _count = MutableStateFlow(0)
+    val count: StateFlow<Int> = _count.asStateFlow()
+    fun add() = _count.update { it + 1 }
+}
+
+@Composable
+fun CounterScreen(vm: CounterViewModel = viewModel()) {
+    val count by vm.count.collectAsStateWithLifecycle()
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Count: $count")
+        Button(onClick = vm::add) { Text("Add") }
+    }
+}
+```
+
+**`ObservableObject` sang `@Observable`** (Apple, "Migrating from the Observable Object protocol to the Observable macro"): bỏ conformance `ObservableObject` và `@Published`, gắn `@Observable`; `@StateObject` thành `@State`; `@ObservedObject` thành property thường (hoặc `@Bindable` khi cần `$binding`); `@EnvironmentObject` thành `@Environment(Type.self)` và `.environment(model)`. Lợi ích: SwiftUI chỉ re-render view đọc đúng property thay vì mọi view nghe `objectWillChange`, giống cách Compose snapshot chỉ invalidate scope đọc state. Review PR iOS 17+: thấy code mới vẫn dùng `ObservableObject` thì hỏi lý do (thường là còn support iOS 16).
+
 **Đọc thêm:**
+- https://developer.apple.com/documentation/swiftui/migrating-from-the-observable-object-protocol-to-the-observable-macro
+- https://developer.apple.com/documentation/observation
 - https://developer.apple.com/documentation/swiftui
 - https://developer.android.com/develop/ui/compose/mental-model
 - `/Volumes/Entertainment/ComposeProject/compose-template/docs/swift-compose-mapping.md`
@@ -960,9 +1032,59 @@ Mở rộng từ `docs/swift-compose-mapping.md` trong `compose-template` của 
 
 **UIKit tối thiểu**: `UIApplication`, `AppDelegate` (`application(_:didFinishLaunchingWithOptions:)`, push token, URL scheme), `SceneDelegate`, `UIViewController` lifecycle (`viewDidLoad`, `viewWillAppear`, `viewDidAppear`, `viewWillDisappear`), `UINavigationController` (push/pop, gesture), `UIWindow`, `UIView` layer, Auto Layout khái niệm (constraint, intrinsic size). Lý do còn cần: CMP host là `UIViewController`; SDK (Firebase, AdMob, RevenueCat) hook vào AppDelegate; crash log nói bằng ngôn ngữ UIKit.
 
-**ARC**: reference counting lúc compile chèn retain/release. Không có GC, không có pause, nhưng cycle không tự thu. Cycle điển hình: `self.handler = { self.doX() }`; closure giữ self, self giữ closure. Phá bằng `[weak self]` (optional) hoặc `[unowned self]` (crash nếu nil). Delegate pattern: `weak var delegate: FooDelegate?`. Dùng Xcode Memory Graph Debugger để nhìn cycle.
+**ARC**: reference counting lúc compile chèn retain/release. Không có GC, không có pause, nhưng cycle không tự thu. Cycle điển hình: `self.handler = { self.doX() }`; closure giữ self, self giữ closure. Phá bằng `[weak self]` (optional) hoặc `[unowned self]` (crash nếu nil). Delegate pattern: `weak var delegate: FooDelegate?`. Dùng Xcode Memory Graph Debugger để nhìn cycle. Định nghĩa và quy tắc capture list: Swift book, chương "Automatic Reference Counting", mục "Strong Reference Cycles for Closures" và "Resolving Strong Reference Cycles for Closures".
+
+```swift
+final class PlayerViewModel {
+    private var timer: Timer?
+    var onTick: (() -> Void)?
+
+    func start() {
+        // SAI: RunLoop giữ timer, timer giữ closure, closure giữ self mạnh -> deinit không bao giờ chạy
+        // timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in self.tick() }
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.tick()                     // self là Optional, nil sau khi VM bị giải phóng
+        }
+    }
+    private func tick() { onTick?() }
+    deinit { timer?.invalidate() }           // chạy được nhờ [weak self]
+}
+```
+
+Với Kotlin dev: giống leak `Activity` bị lambda/listener giữ, nhưng ARC không có GC để "cứu" cycle; Kotlin/Native GC thu được cycle thuần Kotlin, nhưng docs nói rõ: "if at least one Objective-C object is present, the retain cycle of a whole graph of objects cannot be reclaimed, and it's impossible to break the cycle from the Kotlin side" (https://kotlinlang.org/docs/native-arc-integration.html#retain-cycles).
 
 **Keychain**: lưu secret (token, key) có mã hóa bởi Secure Enclave/Data Protection. API C-style: `SecItemAdd`, `SecItemCopyMatching`, `SecItemUpdate`, `SecItemDelete` với dictionary `kSecClass`, `kSecAttrService`, `kSecAttrAccount`, `kSecValueData`, `kSecAttrAccessible`. Mức bảo vệ nên dùng: `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` (không backup sang máy khác). Biometric gate: `SecAccessControlCreateWithFlags(... .biometryCurrentSet ...)`. Tương đương Android Keystore + EncryptedSharedPreferences/`BiometricPrompt` (xem `08-Security.md`). Từ Kotlin có thể gọi `platform.Security.*` trực tiếp trong iosMain, nhưng thư viện như `multiplatform-settings` hoặc KVault gọn hơn.
+
+```swift
+import Security
+
+private let service = "com.example.app.auth"
+
+func saveToken(_ token: String, account: String) -> Bool {
+    let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                               kSecAttrService as String: service,
+                               kSecAttrAccount as String: account]
+    SecItemDelete(base as CFDictionary)                 // upsert đơn giản: xóa rồi thêm
+    var add = base
+    add[kSecValueData as String] = Data(token.utf8)
+    add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+    return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+}
+
+func readToken(account: String) -> String? {
+    let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                kSecAttrService as String: service,
+                                kSecAttrAccount as String: account,
+                                kSecReturnData as String: true,
+                                kSecMatchLimit as String: kSecMatchLimitOne]
+    var item: CFTypeRef?
+    guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+          let data = item as? Data else { return nil }  // errSecItemNotFound khi chưa có
+    return String(decoding: data, as: UTF8.self)
+}
+```
+
+Production nên dùng `SecItemUpdate` khi item đã tồn tại (`errSecDuplicateItem` từ `SecItemAdd`) thay vì delete rồi add, để không mất item nếu add fail.
 
 **URLSession**: `URLSession.shared.data(from:)` async; `URLSessionConfiguration` (`default`, `ephemeral`, `background`), `URLCache`, `waitsForConnectivity`; `URLSessionDelegate` cho pinning (`urlSession(_:didReceive:completionHandler:)`); ATS yêu cầu HTTPS. Ktor Darwin engine ngồi trên chính `NSURLSession`, nên những gì bạn biết về URLSession áp dụng cho Ktor iOS.
 
@@ -974,6 +1096,8 @@ Mở rộng từ `docs/swift-compose-mapping.md` trong `compose-template` của 
 **Đọc thêm:**
 - https://developer.apple.com/documentation/uikit
 - https://developer.apple.com/documentation/security/keychain-services
+- https://developer.apple.com/documentation/security/adding-a-password-to-the-keychain
+- https://developer.apple.com/documentation/security/searching-for-keychain-items
 - https://developer.apple.com/documentation/foundation/urlsession
 - https://docs.swift.org/swift-book/documentation/the-swift-programming-language/automaticreferencecounting/
 
@@ -981,11 +1105,66 @@ Mở rộng từ `docs/swift-compose-mapping.md` trong `compose-template` của 
 
 **SPM**: `Package.swift` khai báo `products`, `targets`, `dependencies`. Xcode > Add Package Dependency. Lock file `Package.resolved` commit vào repo. Binary target: `.binaryTarget(name:, path: "Shared.xcframework")` là cách consume Kotlin XCFramework. CocoaPods vẫn tồn tại nhưng đang lùi.
 
+```swift
+// swift-tools-version:5.9
+// Package.swift trong repo phát hành của team KMP (Apple: "Distributing binary frameworks as Swift packages")
+import PackageDescription
+
+let package = Package(
+    name: "Shared",
+    platforms: [.iOS(.v14)],                       // khớp min iOS của CMP 1.12
+    products: [.library(name: "Shared", targets: ["Shared"])],
+    targets: [
+        .binaryTarget(
+            name: "Shared",
+            url: "https://example.com/shared/1.4.0/Shared.xcframework.zip",
+            checksum: "<swift package compute-checksum Shared.xcframework.zip>"
+        )
+        // local khi dev: .binaryTarget(name: "Shared", path: "Shared.xcframework")
+    ]
+)
+```
+
+Phía Kotlin, `assembleSharedReleaseXCFramework` (hoặc tên XCFramework bạn khai báo) sinh `.xcframework`; zip lại, tính checksum, publish. Kotlin 2.4.20 tự sinh `Package.swift` khi XCFramework phụ thuộc SwiftPM package (https://kotlinlang.org/docs/multiplatform/multiplatform-spm-export.html).
+
 **Xcode build settings cần biết**: Bundle Identifier, Team, Signing (Automatic vs Manual, Provisioning Profile, Certificate: Development/Distribution), Build Configuration (Debug/Release, thêm Staging qua `.xcconfig`), Scheme (chọn configuration + test plan), `Info.plist` (permission string `NSCameraUsageDescription`, `CADisableMinimumFrameDurationOnPhone`, URL scheme), Capabilities (Push, Sign in with Apple, In-App Purchase, App Groups), `IPHONEOS_DEPLOYMENT_TARGET` (CMP 1.12 min iOS 14), `ENABLE_BITCODE` đã bỏ, `Other Linker Flags`. Run Script phase cho Gradle: dùng `$CONFIGURATION`, `$SDK_NAME`.
 
-**TestFlight**: Archive (Product > Archive hoặc `xcodebuild archive` + `-exportArchive`) rồi upload qua Xcode Organizer, Transporter, hoặc Fastlane `pilot`. Internal tester (team App Store Connect, tối đa 100, không review) và external tester (tối đa 10.000, cần Beta App Review lần đầu). Build hết hạn sau 90 ngày. Tương đương Internal testing track của Play.
+**TestFlight**: Archive (Product > Archive hoặc `xcodebuild archive` + `-exportArchive`) rồi upload qua Xcode Organizer, Transporter, hoặc Fastlane `pilot`. Internal tester (team App Store Connect, tối đa 100, không review) và external tester (tối đa 10.000, cần Beta App Review lần đầu). Build hết hạn sau 90 ngày. Tương đương Internal testing track của Play (https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview).
 
-**App Store review**: Guidelines 2.1 (app phải hoàn chỉnh, demo account), 3.1.1 (IAP bắt buộc cho digital goods; RevenueCat của bạn phải cấu hình đúng), 4.8 (Sign in with Apple khi có login bên thứ ba), 5.1.1 (privacy: Privacy Nutrition Label, `PrivacyInfo.xcprivacy` với required reason API và tracking domain), 1.3 Kids Category (app trẻ em: không third-party analytics/ads không được phép, parental gate; liên quan trực tiếp Grabee và COPPA). Review mất 1-2 ngày; reject thường gặp: thiếu demo account, crash trên iPad, metadata sai, permission string chung chung. Apple yêu cầu Xcode 26 / iOS 26 SDK để upload từ 28/4/2026 (brief).
+```bash
+# Archive + export trên CI (signing qua App Store Connect API key hoặc fastlane match)
+xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Release \
+  -destination 'generic/platform=iOS' -archivePath build/iosApp.xcarchive archive
+xcodebuild -exportArchive -archivePath build/iosApp.xcarchive \
+  -exportOptionsPlist ExportOptions.plist -exportPath build/export
+# ExportOptions.plist tối thiểu: method (app-store-connect từ Xcode 15.3, trước đó app-store),
+# teamID, signingStyle; xem các key bằng `xcodebuild -help`
+```
+
+**App Store review**: Guidelines 2.1 (app phải hoàn chỉnh, demo account), 3.1.1 (IAP bắt buộc cho digital goods; RevenueCat của bạn phải cấu hình đúng), 4.8 Login Services (nếu dùng login bên thứ ba như Google/Facebook cho tài khoản chính, phải có thêm **một** lựa chọn login tương đương chỉ thu tên + email, cho phép ẩn email, không thu tương tác để quảng cáo khi chưa có consent; Sign in with Apple là một lựa chọn thỏa điều kiện nhưng không còn là bắt buộc theo tên; miễn trừ khi app chỉ dùng tài khoản riêng của công ty, app education/enterprise, eID chính phủ, client của dịch vụ bên thứ ba), 5.1.1 (privacy: Privacy Nutrition Label, `PrivacyInfo.xcprivacy` với required reason API và tracking domain), 1.3 Kids Category và 5.1.4 Kids ("Apps intended primarily for kids should not include third-party analytics or third-party advertising", ngoại lệ hẹp theo 1.3; parental gate; liên quan trực tiếp Grabee và COPPA). Review mất 1-2 ngày; reject thường gặp: thiếu demo account, crash trên iPad, metadata sai, permission string chung chung. Từ 28/4/2026 upload phải build bằng Xcode 26+ với SDK iOS 26 (https://developer.apple.com/news/upcoming-requirements/). Nguồn guideline: https://developer.apple.com/app-store/review/guidelines/#login-services, #kids, #in-app-purchase (kiểm tra 18/11/2026).
+
+**`PrivacyInfo.xcprivacy` tối thiểu** cho app chỉ dùng `UserDefaults` của chính nó (reason `CA92.1`), không tracking:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSPrivacyTracking</key><false/>
+  <key>NSPrivacyTrackingDomains</key><array/>
+  <key>NSPrivacyCollectedDataTypes</key><array/>
+  <key>NSPrivacyAccessedAPITypes</key>
+  <array>
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key><string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key><array><string>CA92.1</string></array>
+    </dict>
+  </array>
+</dict>
+</plist>
+```
+
+Kotlin framework dùng `NSUserDefaults` (ví dụ `multiplatform-settings`, DataStore) cũng tính là app gọi required reason API, nên khai báo ở manifest của app.
 
 **Lỗi hay gặp / trade-off**
 - Thiếu `PrivacyInfo.xcprivacy` cho SDK dùng `UserDefaults`/file timestamp API: bị reject với lý do "required reason API".
@@ -994,9 +1173,11 @@ Mở rộng từ `docs/swift-compose-mapping.md` trong `compose-template` của 
 
 **Đọc thêm:**
 - https://developer.apple.com/documentation/xcode/swift-packages
-- https://developer.apple.com/testflight/
-- https://developer.apple.com/app-store/review/guidelines/
+- https://developer.apple.com/documentation/xcode/distributing-binary-frameworks-as-swift-packages
+- https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview
+- https://developer.apple.com/app-store/review/guidelines/#login-services
 - https://developer.apple.com/documentation/bundleresources/privacy-manifest-files
+- https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api
 
 ### 3.5 Checklist review Swift PR với tư cách Android lead
 
@@ -1022,7 +1203,7 @@ Khi không chắc một API Swift: hỏi "what happens if this closure outlives 
 
 ## 4. Flutter: nền tảng vững để so sánh và dẫn team
 
-Flutter 3.47 (8/2026, brief), Impeller là renderer mặc định. Mục tiêu: hiểu đủ để làm mini app, review PR Flutter cơ bản, và so sánh chính xác với KMP.
+Flutter stable mới nhất: 3.50.0 (11/11/2026, theo release manifest chính thức storage.googleapis.com/flutter_infra_release/releases/releases_macos.json, kiểm tra 18/11/2026); Impeller là renderer mặc định trên iOS và Android API 29+ từ 3.27. Mục tiêu: hiểu đủ để làm mini app, review PR Flutter cơ bản, và so sánh chính xác với KMP.
 
 ### 4.1 Dart essentials
 
@@ -1105,13 +1286,24 @@ class _CounterState extends State<Counter> {
 | Phù hợp | app nhỏ, team mới | app vừa và lớn, team muốn type-safe | team lớn, bank/fintech cần audit trail của event |
 | Tương đương Android | `ViewModel` + `LiveData` | `ViewModel` + `StateFlow` + DI | MVI |
 
+**Riverpod 3** (`flutter_riverpod` 3.0.0 ra 10/9/2025, mới nhất 3.5.0 trên pub.dev, kiểm tra 18/11/2026). Thay đổi cần biết theo https://riverpod.dev/docs/whats_new: `AutoDisposeNotifier`/family notifier gộp vào `Notifier`/`AsyncNotifier`; `StateProvider`, `StateNotifierProvider`, `ChangeNotifierProvider` bị coi là legacy và chuyển sang `import 'package:riverpod/legacy.dart';` (Flutter: `package:flutter_riverpod/legacy.dart`); `Ref` hợp nhất (không còn `XxxRef` riêng trong code gen); provider lỗi lúc khởi tạo **tự retry**; listener trong widget không hiển thị bị **pause**; có `Ref.mounted`; mutations và offline persistence là experimental. Migration: https://riverpod.dev/docs/3.0_migration.
+
 ```dart
-// Riverpod 2.x
+// flutter_riverpod 3.x
 final levelRepositoryProvider = Provider<LevelRepository>((ref) => RemoteLevelRepository(http.Client()));
 
-final levelsProvider = FutureProvider<List<Level>>((ref) async {
-  return ref.watch(levelRepositoryProvider).levels();
-});
+class LevelsNotifier extends AsyncNotifier<List<Level>> {
+  @override
+  Future<List<Level>> build() => ref.watch(levelRepositoryProvider).levels();
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => ref.read(levelRepositoryProvider).levels());
+  }
+}
+
+final levelsProvider = AsyncNotifierProvider<LevelsNotifier, List<Level>>(LevelsNotifier.new);
+// nút reload: ref.read(levelsProvider.notifier).refresh()
 
 class LevelListScreen extends ConsumerWidget {
   const LevelListScreen({super.key});
@@ -1134,12 +1326,45 @@ class LevelListScreen extends ConsumerWidget {
 }
 ```
 
+**Cubit** (`flutter_bloc` 9.x; Cubit là BLoC không có event, gọi method rồi `emit`, https://bloclibrary.dev/bloc-concepts/#cubit), state bằng `sealed class` của Dart 3 để `switch` exhaustive như `sealed interface` Kotlin:
+
+```dart
+sealed class LevelsState { const LevelsState(); }
+final class LevelsLoading extends LevelsState { const LevelsLoading(); }
+final class LevelsLoaded extends LevelsState { const LevelsLoaded(this.items); final List<Level> items; }
+final class LevelsError extends LevelsState { const LevelsError(this.message); final String message; }
+
+class LevelsCubit extends Cubit<LevelsState> {
+  LevelsCubit(this._repo) : super(const LevelsLoading());
+  final LevelRepository _repo;
+
+  Future<void> load() async {
+    emit(const LevelsLoading());
+    try {
+      emit(LevelsLoaded(await _repo.levels()));
+    } catch (e) {
+      emit(LevelsError('$e'));
+    }
+  }
+}
+
+// UI: BlocProvider(create: (_) => LevelsCubit(repo)..load(), child: BlocBuilder<LevelsCubit, LevelsState>(
+//   builder: (context, state) => switch (state) {
+//     LevelsLoading() => const CircularProgressIndicator(),
+//     LevelsLoaded(:final items) => LevelList(items),
+//     LevelsError(:final message) => Text(message),
+//   }))
+```
+
+**Kiến trúc chính chủ của Flutter**: https://docs.flutter.dev/app-architecture/guide khuyến nghị MVVM: UI layer gồm View (widget) và ViewModel, Data layer gồm Repository (source of truth) và Service (bọc API/platform), Domain layer (use-case) là tùy chọn; ví dụ chính thức dùng `ChangeNotifier` + `ListenableBuilder` và DI bằng `provider`, xem thêm https://docs.flutter.dev/app-architecture/recommendations và case study https://docs.flutter.dev/app-architecture/case-study. Ánh xạ thẳng sang guide kiến trúc Android (UI layer/ViewModel, data layer/repository), nên team Android đọc rất nhanh.
+
 Cách chọn khi bạn là lead: team mới và app nhỏ thì Provider; mặc định cho app sản phẩm thì Riverpod; bank yêu cầu truy vết hành động thì BLoC. Đừng trộn hai cái trong một app. `setState` vẫn đúng cho state cục bộ (toggle, animation).
 
 **Đọc thêm:**
 - https://docs.flutter.dev/data-and-backend/state-mgmt/options
-- https://riverpod.dev/
-- https://bloclibrary.dev/
+- https://docs.flutter.dev/app-architecture/guide
+- https://riverpod.dev/docs/whats_new
+- https://bloclibrary.dev/bloc-concepts/
 
 ### 4.4 Navigation (go_router), platform channels, FFI, và Flutter nói chuyện với Kotlin
 
@@ -1187,7 +1412,7 @@ class MainActivity : FlutterActivity() {
 }
 ```
 
-**FFI**: `dart:ffi` gọi C trực tiếp, không qua channel, sync, nhanh; `ffigen` sinh binding từ header; `jnigen` sinh binding gọi Kotlin/Java qua JNI (cần kiểm tra trạng thái). Dùng khi cần crypto/codec native. Plugin Flutter (`flutter create --template=plugin`) đóng gói channel code Kotlin + Swift + Dart.
+**FFI**: `dart:ffi` gọi C trực tiếp, không qua channel, sync, nhanh; `ffigen` sinh binding từ header; `jnigen` (cùng `package:jni`) sinh binding Dart gọi Java qua JNI; Kotlin chỉ được hỗ trợ gián tiếp (compile ra bytecode Java rồi sinh binding). Trạng thái: dart.dev ghi "This interop feature is **experimental**, and in active development" (https://dart.dev/interop/java-interop), dù package đã lên `1.0.1` trên pub.dev và cấu hình YAML đã deprecated (https://pub.dev/packages/jnigen, kiểm tra 18/11/2026). Dùng khi cần crypto/codec native. Plugin Flutter (`flutter create --template=plugin`) đóng gói channel code Kotlin + Swift + Dart.
 
 **Add-to-app**: nhúng Flutter vào app Android có sẵn bằng `FlutterActivity`/`FlutterFragment`/`FlutterEngineCache`; đây là cách migration từng màn hình.
 
@@ -1203,7 +1428,7 @@ class MainActivity : FlutterActivity() {
 
 ### 4.5 Impeller, build/release, testing, performance
 
-**Impeller**: renderer thay Skia, precompile shader lúc build nên hết "shader jank" frame đầu; Metal trên iOS, Vulkan trên Android (fallback OpenGL ES trên device cũ). Mặc định trên cả hai platform ở Flutter 3.47 (brief). Khi nói chuyện với team: Impeller vẫn có issue trên một số GPU Android cũ; kiểm tra `flutter run --no-enable-impeller` để so sánh.
+**Impeller**: renderer thay Skia, precompile shader lúc build nên hết "shader jank" frame đầu; Metal trên iOS, Vulkan trên Android (fallback OpenGL ES trên device cũ). Theo https://docs.flutter.dev/perf/impeller (kiểm tra 18/11/2026): từ 3.27 Impeller mặc định trên iOS và Android API 29+; trên iOS là renderer **duy nhất**, không tắt được; Android dưới API 29 hoặc không có Vulkan tự fallback về OpenGL; desktop (macOS, Linux, Windows) bật mặc định từ 3.47; web vẫn dùng Skia. Khi nói chuyện với team: Impeller vẫn có issue trên một số GPU Android cũ; so sánh bằng `flutter run --no-enable-impeller`, tắt khi deploy bằng `<meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false" />` trong `AndroidManifest.xml`.
 
 **Build/release**: `flutter build appbundle --release` (AAB với R8, cần `--split-debug-info` và `--obfuscate` cho Dart), `flutter build ipa` rồi upload. Flavor qua `--flavor` và `--dart-define`. Size: engine ~ vài MB thêm vào mỗi app; kiểm tra bằng `flutter build apk --analyze-size`.
 
@@ -1270,7 +1495,16 @@ Nếu còn thời gian: thêm một `MethodChannel` lấy battery level để c�
 
 ## 5. React Native ở mức khái niệm
 
-RN 0.88 (10/2026, brief), chỉ còn **New Architecture** (bắt buộc từ 0.82). Bạn cần nói đúng tên các mảnh và biết khi nào team chọn RN.
+RN hiện tại: 0.88.0 phát hành 15/10/2026, bản vá 0.88.1 (npm registry, kiểm tra 18/11/2026). Mốc New Architecture cần nhớ:
+
+| Version (ngày) | Mốc | Nguồn |
+|---|---|---|
+| 0.76 (23/10/2024) | New Architecture **bật mặc định** cho app mới và app nâng cấp; vẫn tắt được bằng `newArchEnabled=false` | https://reactnative.dev/blog/2024/10/23/release-0.76-new-architecture |
+| 0.82 (8/10/2025) | New Architecture là kiến trúc **duy nhất**: `newArchEnabled=false` (Android) hoặc `RCT_NEW_ARCH_ENABLED=0` (iOS) bị bỏ qua. API Legacy chưa bị xóa ở 0.82, việc xóa "scheduled to start from the next version". Interop layer được giữ "for the foreseeable future" để thư viện cũ chạy tiếp. Hermes V1 experimental (phải build RN từ source). React 19.1.1 | https://reactnative.dev/blog/2025/10/08/react-native-0.82#new-architecture-only |
+
+**Interop layer**: lớp cho phép native module và view viết theo API cũ (bridge) chạy trên New Architecture mà không phải viết lại ngay; nhờ nó đa số thư viện 3P "backward compatible với cả hai kiến trúc" vẫn chạy trên 0.82+. Khi review dependency: thư viện chưa có TurboModule/Fabric spec là nợ kỹ thuật, vì interop layer sẽ bị gỡ ở một version tương lai chưa công bố.
+
+Bạn cần nói đúng tên các mảnh và biết khi nào team chọn RN.
 
 ### 5.1 New Architecture: JSI, Fabric, TurboModules, bridgeless; Hermes; Expo
 
@@ -1297,7 +1531,64 @@ flowchart LR
 
 ### 5.2 Native module bằng Kotlin, và khi nào team chọn RN
 
-TurboModule: viết spec TS, chạy codegen, implement class Kotlin kế thừa spec sinh ra (tên lớp dạng `NativeXxxSpec`), đăng ký qua `ReactPackage`/`TurboReactPackage`. Với Expo Modules API, module Kotlin khai báo bằng DSL `Module` với `Function("name") { ... }` và `AsyncFunction`. Tên API cụ thể thay đổi theo version; cần kiểm tra tại https://reactnative.dev/docs/turbo-native-modules-introduction và https://docs.expo.dev/modules/overview/.
+TurboModule theo docs chính thức (https://reactnative.dev/docs/turbo-native-modules-introduction và phần Android https://reactnative.dev/docs/turbo-native-modules-android, kiểm tra 18/11/2026), 4 bước:
+
+1. **Spec TypeScript** `specs/NativeLocalStorage.ts`: đây là contract, codegen đọc file này.
+
+```ts
+import type {TurboModule} from 'react-native';
+import {TurboModuleRegistry} from 'react-native';
+
+export interface Spec extends TurboModule {
+  setItem(value: string, key: string): void;
+  getItem(key: string): string | null;
+}
+// getEnforcing ném exception nếu module không tồn tại (khác TurboModuleRegistry.get trả null)
+export default TurboModuleRegistry.getEnforcing<Spec>('NativeLocalStorage');
+```
+
+2. **`codegenConfig` trong `package.json`**: `{"name": "NativeLocalStorageSpec", "type": "modules", "jsSrcsDir": "specs", "android": {"javaPackageName": "com.nativelocalstorage"}}`. Codegen chạy tự động khi build Android, hoặc tay: `cd android && ./gradlew generateCodegenArtifactsFromSchema`; nó sinh abstract class `NativeLocalStorageSpec`.
+
+3. **Kotlin module** kế thừa spec sinh ra, và **package** kế thừa `BaseReactPackage` (docs hiện tại dùng `BaseReactPackage`, không còn `TurboReactPackage`):
+
+```kotlin
+class NativeLocalStorageModule(ctx: ReactApplicationContext) : NativeLocalStorageSpec(ctx) {
+    private val prefs get() = reactApplicationContext.getSharedPreferences("my_prefs", Context.MODE_PRIVATE)
+    override fun getName() = NAME
+    override fun setItem(value: String, key: String) { prefs.edit().putString(key, value).apply() }
+    override fun getItem(key: String): String? = prefs.getString(key, null)
+    companion object { const val NAME = "NativeLocalStorage" }
+}
+
+class NativeLocalStoragePackage : BaseReactPackage() {
+    override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? =
+        if (name == NativeLocalStorageModule.NAME) NativeLocalStorageModule(reactContext) else null
+
+    override fun getReactModuleInfoProvider() = ReactModuleInfoProvider {
+        mapOf(NativeLocalStorageModule.NAME to ReactModuleInfo(
+            name = NativeLocalStorageModule.NAME, className = NativeLocalStorageModule.NAME,
+            canOverrideExistingModule = false, needsEagerInit = false,
+            isCxxModule = false, isTurboModule = true))
+    }
+}
+```
+
+4. **Đăng ký** trong `MainApplication.getPackages()`: `PackageList(this).packages.apply { add(NativeLocalStoragePackage()) }` (module autolink được thì không cần).
+
+**Expo Modules API** (https://docs.expo.dev/modules/module-api/) là cách gọn hơn, không cần spec TS hay package class; module Kotlin khai báo bằng DSL và được autolink qua `expo-module.config.json`:
+
+```kotlin
+class MyModule : Module() {
+    override fun definition() = ModuleDefinition {
+        Name("MyFirstExpoModule")
+        Function("hello") { name: String -> "Hello $name!" }          // sync, gọi qua JSI
+        AsyncFunction("fetchToken") { userId: String -> repo.token(userId) } // trả Promise bên JS
+        Events("onClipboardChanged")                                  // phát sự kiện bằng sendEvent(...)
+    }
+}
+```
+
+Với Android lead: Expo Modules gần với cách bạn viết một lớp Kotlin bình thường, và đẩy được logic KMP có sẵn vào app RN; TurboModule thuần thì hợp khi team bare RN hoặc viết thư viện cho cộng đồng.
 
 Khi team chọn RN:
 
@@ -1307,14 +1598,15 @@ Khi team chọn RN:
 - Không chọn khi: UI nặng animation/custom drawing, cần nhiều native API phức tạp, team không có JS.
 
 **Lỗi hay gặp / trade-off**
-- Thư viện cũ chưa hỗ trợ New Architecture: phải tìm thay thế vì 0.82+ không còn bridge.
+- Thư viện cũ chưa hỗ trợ New Architecture: 0.82+ không cho tắt New Architecture nữa; thư viện cũ chỉ còn chạy nhờ interop layer, nên lên kế hoạch thay thế trước khi interop bị gỡ.
 - Debug memory JS vs native là hai thế giới; Hermes có profiler riêng.
 - Bundle size JS lớn làm TTI chậm; Hermes bytecode giúp nhưng vẫn phải code-split.
 
 **Đọc thêm:**
-- https://reactnative.dev/docs/native-platform
-- https://docs.expo.dev/modules/overview/
-- https://reactnative.dev/docs/the-new-architecture/landing-page
+- https://reactnative.dev/docs/turbo-native-modules-introduction
+- https://reactnative.dev/docs/turbo-native-modules-android
+- https://docs.expo.dev/modules/module-api/
+- https://reactnative.dev/blog/2025/10/08/react-native-0.82#interop-layers--3p-library-compatibility
 
 ## 6. Khung quyết định: KMP vs Flutter vs RN vs native x2
 
@@ -1334,6 +1626,13 @@ Khi team chọn RN:
 | Ownership dài hạn | Google + Apple | JetBrains + Google (Room, DataStore, Lifecycle, Nav KMP) | Google | Meta + Expo |
 | Test | JUnit + XCTest | commonTest + 2 platform | widget test rất nhanh | Jest + Detox/Maestro |
 | Khi nào hợp | bank lớn có 2 team, UI phải "chuẩn platform" | team Android-first muốn ship iOS; share logic cho app bank giữ UI native | outsourcing, startup, MVP nhanh, UI brand | web team mạnh, cần OTA |
+
+**So sánh do chính các bên công bố** (kiểm tra 18/11/2026; nhớ đây là tài liệu của vendor, mỗi bên có thiên vị):
+- JetBrains, "Kotlin Multiplatform and Flutter": bảng overview so sánh ngôn ngữ, mức share code (KMP "from 1% to 100%", Flutter 100% và kiểm soát từng pixel), truy cập native API (`expect/actual` vs platform channels), độ chín (KMP stable 11/2023; CMP stable trên iOS, Android, desktop, Beta trên web) và danh sách user (Forbes, Todoist, McDonald's, Google Workspace vs Xiaomi, Wolt, ByteDance, Google Pay): https://kotlinlang.org/docs/multiplatform/kotlin-multiplatform-flutter.html
+- JetBrains, KMP vs React Native: https://kotlinlang.org/docs/multiplatform/kotlin-multiplatform-react-native.html
+- JetBrains, native vs cross-platform: https://kotlinlang.org/docs/multiplatform/native-and-cross-platform.html
+- Google, KMP được hỗ trợ chính thức cho Android, danh sách thư viện Jetpack KMP: https://developer.android.com/kotlin/multiplatform
+- Case study: KMP https://kotlinlang.org/case-studies/?type=multiplatform, Flutter https://flutter.dev/showcase, React Native https://reactnative.dev/showcase
 
 **Đọc thêm:**
 - https://kotlinlang.org/docs/multiplatform/
@@ -1373,8 +1672,9 @@ Dẫn team mixed native + Flutter (câu hỏi lead hay gặp):
 - **Tiêu chí dừng**: nếu sau 2 quý metric không đạt, quay về native; nói trước để không ai sợ.
 
 **Đọc thêm:**
-- https://kotlinlang.org/docs/multiplatform/
+- https://kotlinlang.org/docs/multiplatform/kotlin-multiplatform-flutter.html (dùng làm "bằng chứng vendor" ở bước 2, nhưng phải đối chiếu số liệu của chính bạn ở bước 4)
 - https://docs.flutter.dev/resources/faq
+- https://docs.flutter.dev/add-to-app (Flutter vào app native có sẵn, nền của chiến lược strangler)
 - `06-Mobile-System-Design.md` mục tech stack decision
 - `11-Leadership-Management.md` mục architecture decision record
 
@@ -1398,7 +1698,7 @@ Nhóm A: KMP cơ chế (Q1-Q12). Nhóm B: về chính template của bạn (Q13-
 **Điểm interviewer muốn nghe:** Biết freezing đã chết, biết GC riêng, và nêu được rủi ro cycle qua biên giới ARC.
 
 ### Q4. How does a `suspend` function look from Swift, and how do you make it safe?
-**A:** The Objective-C export turns a `suspend` function into a method with a completion handler, which Swift surfaces as `async throws`. Two things make it safe. First, annotate with `@Throws(CancellationException::class, Exception::class)`; without it any Kotlin exception terminates the process because it cannot be converted to `NSError`. Second, call it from the main actor; by default Kotlin/Native restricts launching exported suspend functions to the main thread unless you change a binary option. For `Flow` there is no direct mapping, so I either expose a `CommonFlow` wrapper with a `watch` callback, use SKIE which generates `AsyncSequence` adapters, or, as in my template, keep the UI in Compose so Swift never has to consume a `Flow`.
+**A:** The Objective-C export turns a `suspend` function into a method with a completion handler, which Swift surfaces as `async throws`. Two things make it safe. First, annotate with `@Throws(CancellationException::class, Exception::class)`; without it any Kotlin exception terminates the process because it cannot be converted to `NSError`. Second, call it from the main actor; by default Kotlin/Native still restricts launching exported suspend functions to the main thread, and you can lift that only with `kotlin.native.binary.objcExportSuspendFunctionLaunchThreadRestriction=none` (Kotlin 1.7.20+) when no library dispatches back to the calling thread. The completion handler itself may run on a background thread, so UI updates must hop back to the main actor. For `Flow` there is no direct mapping, so I either expose a `CommonFlow` wrapper with a `watch` callback, use SKIE which generates `AsyncSequence` adapters, or, as in my template, keep the UI in Compose so Swift never has to consume a `Flow`.
 **Follow-ups:** What does SKIE do to sealed classes? What is Swift Export and what is its status? How do you cancel a Kotlin coroutine from a Swift `Task` cancellation?
 **Điểm interviewer muốn nghe:** `@Throws` + main thread + Flow strategy. Nêu được SKIE và Swift Export với trạng thái đúng.
 
@@ -1453,7 +1753,7 @@ Nhóm A: KMP cơ chế (Q1-Q12). Nhóm B: về chính template của bạn (Q13-
 **Điểm interviewer muốn nghe:** Mô tả đúng file `InitHelper.kt`, `Application.kt`, và giải thích prefix `do`.
 
 ### Q15. Why Room KMP instead of SQLDelight in the template?
-**A:** The team is Android-first and already fluent in Room: entities, DAOs, `Flow` queries and migrations read naturally in review. Room KMP is maintained by Google in step with the rest of AndroidX KMP such as DataStore, Lifecycle and Navigation, so upgrades move together. SQLDelight is excellent and SQL-first, and I would pick it when the team prefers writing SQL, when we target JS or Wasm which Room does not support, or when we want the schema to be the single source of truth in `.sq` files. For this product, type-safe Kotlin entities plus KSP fit better.
+**A:** The team is Android-first and already fluent in Room: entities, DAOs, `Flow` queries and migrations read naturally in review. Room KMP is maintained by Google in step with the rest of AndroidX KMP such as DataStore, Lifecycle and Navigation, so upgrades move together. SQLDelight is excellent and SQL-first, and I would pick it when the team prefers writing SQL, when we target JS or Wasm while still on Room 2.x (Room 2.x has no web target; Room 3.0, stable since July 2026, added JS and WasmJS through `WebWorkerSQLiteDriver`), or when we want the schema to be the single source of truth in `.sq` files. For this product, type-safe Kotlin entities plus KSP fit better.
 **Follow-ups:** What does Room 3.0 change for you? How do you share schema JSON between platforms for auto-migrations? How would you unit test a DAO on iOS?
 **Điểm interviewer muốn nghe:** So sánh có điều kiện, không nói SQLDelight kém.
 
@@ -1523,9 +1823,9 @@ Nhóm A: KMP cơ chế (Q1-Q12). Nhóm B: về chính template của bạn (Q13-
 **Điểm interviewer muốn nghe:** Quyết định theo user expectation và team, không theo công nghệ.
 
 ### Q29. What changed in Compose Multiplatform from 1.8 to 1.12 that matters for your app?
-**A:** 1.8 made iOS stable with a rewritten text input stack and accessibility work. 1.10 brought a unified `@Preview` usable from common code, Navigation 3 for multiplatform, and stable Hot Reload for desktop, which changed my workflow to iterate UI on desktop or Android and verify on iOS. 1.12 tracks Jetpack Compose 1.12.1 and keeps the iOS minimum at 14; because Compose 1.12 needs compileSdk 37 and a newer AGP, upgrading CMP from 1.10 to 1.12 is really an Android toolchain upgrade too, so I plan it as one change with a screenshot test run.
+**A:** 1.8 made iOS stable with a rewritten text input stack and accessibility work. 1.10 brought `@Preview` usable from common code, Navigation 3 support and Compose Hot Reload bundled into the Gradle plugin for desktop, which changed my workflow to iterate UI on desktop or Android and verify on iOS; it also requires Kotlin 2.2 for native. 1.11 requires Kotlin 2.3 for native, turns on parallel rendering on iOS by default and drops Apple x86_64 targets, so `iosX64` has to go from my build. 1.12 tracks Jetpack Compose 1.12.1 and keeps the iOS minimum at 14; because Jetpack Compose 1.12 moved to compileSdk 37 with a minimum AGP of 9.2.0, upgrading CMP from 1.10 to 1.12 is really an Android toolchain upgrade too, so I plan it as one change with a screenshot test run.
 **Follow-ups:** Does Hot Reload work for the iOS target? What is the risk of using a Material 3 alpha for Expressive components? How do you schedule toolchain upgrades?
-**Điểm interviewer muốn nghe:** Dùng đúng timeline trong brief; nhìn ra ràng buộc AGP/compileSdk.
+**Điểm interviewer muốn nghe:** Dùng đúng timeline theo release notes (mục 2.3); nhìn ra ràng buộc Kotlin, iosX64, AGP/compileSdk.
 
 ### Q30. How do you handle text input and the keyboard in a shared Compose UI on iOS?
 **A:** Compose Multiplatform implements text input by bridging UIKit's text input protocols, so autocorrect, dictation and selection work, but behavior depends on version and I test it on every upgrade with a checklist: paste, undo, emoji, hardware keyboard, VoiceOver. For layout I use `Modifier.imePadding()` and scaffold content insets so fields stay visible, and the `ComposeUIViewController` configuration exposes a focus behavior option for how the view reacts to the keyboard. For forms where fidelity is critical I can drop a `UITextField` through `UIKitView`, but that loses theming, so it is the exception.
@@ -1558,7 +1858,7 @@ Nhóm A: KMP cơ chế (Q1-Q12). Nhóm B: về chính template của bạn (Q13-
 **Điểm interviewer muốn nghe:** Mapping chính xác, nêu được `Sendable` là khác biệt lớn.
 
 ### Q36. What should an Android lead know about the iOS release pipeline?
-**A:** Signing: development versus distribution certificates and provisioning profiles, usually managed by Fastlane match or automatic signing with an App Store Connect API key on CI. Build: archive with `xcodebuild` then export; the Kotlin framework is produced by a run script phase. Distribution: TestFlight internal testers without review, external testers after a beta review, builds expire in 90 days. Review: guidelines on in-app purchase for digital goods, Sign in with Apple when third-party login exists, privacy nutrition labels and the privacy manifest with required-reason APIs, and the Kids Category rules for a children's app. Apple requires the current Xcode and SDK for uploads on a schedule, so the Kotlin version must be compatible with that Xcode.
+**A:** Signing: development versus distribution certificates and provisioning profiles, usually managed by Fastlane match or automatic signing with an App Store Connect API key on CI. Build: archive with `xcodebuild` then export; the Kotlin framework is produced by a run script phase. Distribution: TestFlight internal testers without review, external testers after a beta review, builds expire in 90 days. Review: guidelines on in-app purchase for digital goods; guideline 4.8, whose current text no longer names Sign in with Apple but requires an equivalent privacy-focused login option (name and email only, private email allowed, no ad tracking without consent) whenever a third-party social login sets up the primary account; privacy nutrition labels and the privacy manifest with required-reason APIs, and the Kids Category rules for a children's app. Apple requires the current Xcode and SDK for uploads on a schedule (Xcode 26 with the iOS 26 SDK since April 28, 2026), so the Kotlin version must be compatible with that Xcode.
 **Follow-ups:** How do you handle a rejection for a missing privacy manifest? What is the difference between internal and external TestFlight? How do you do a staged rollout on iOS?
 **Điểm interviewer muốn nghe:** Signing, TestFlight, review rule chính; liên hệ với Kotlin/Xcode compatibility.
 
@@ -1573,7 +1873,7 @@ Nhóm A: KMP cơ chế (Q1-Q12). Nhóm B: về chính template của bạn (Q13-
 **Điểm interviewer muốn nghe:** Ba cây và ánh xạ sang Compose; `const` và `Key`.
 
 ### Q39. Provider, Riverpod or BLoC: how would you choose for a new team?
-**A:** For a small app and a new team, Provider is enough and easy to teach. For a product with growth, Riverpod: providers are compile-safe, do not need a `BuildContext`, are trivially overridden in tests, and `FutureProvider` and `AsyncValue` cover loading and error states. BLoC when the organization wants an explicit event log, for example a bank that audits user actions, and accepts the boilerplate. I would never mix two in one app, and I keep `setState` for local UI state. The mapping for Android developers: Riverpod is `ViewModel` plus `StateFlow` plus DI, BLoC is MVI.
+**A:** For a small app and a new team, Provider is enough and easy to teach. For a product with growth, Riverpod: providers are compile-safe, do not need a `BuildContext`, are trivially overridden in tests, and `AsyncNotifier` with `AsyncValue` covers loading and error states. On Riverpod 3 I would keep new code on `Notifier`/`AsyncNotifier`, because `StateProvider`, `StateNotifierProvider` and `ChangeNotifierProvider` moved to the `legacy` import, and I would know that failing providers now retry automatically and listeners in hidden widgets are paused. BLoC when the organization wants an explicit event log, for example a bank that audits user actions, and accepts the boilerplate. I would never mix two in one app, and I keep `setState` for local UI state. The mapping for Android developers: Riverpod is `ViewModel` plus `StateFlow` plus DI, BLoC is MVI.
 **Follow-ups:** How do you test a Riverpod provider? What is the difference between `Bloc` and `Cubit`? How do you handle global app state like auth?
 **Điểm interviewer muốn nghe:** Chọn theo team và tổ chức, có mapping sang Android.
 
@@ -1583,7 +1883,7 @@ Nhóm A: KMP cơ chế (Q1-Q12). Nhóm B: về chính template của bạn (Q13-
 **Điểm interviewer muốn nghe:** Channel vs FFI, Pigeon, add-to-app.
 
 ### Q41. What is Impeller and why did Flutter move off Skia?
-**A:** Impeller is Flutter's renderer that precompiles its shaders at build time and uses Metal on iOS and Vulkan on Android, with an OpenGL ES fallback. Skia compiled shaders at runtime, which caused first-use jank in animations that users saw as stutter. Impeller removes that class of jank, gives more predictable frame times, and is the default on both platforms in Flutter 3.47. The caveat for a lead is older Android GPUs and driver bugs, so I keep a device matrix and know the flag to compare renderers when a bug report mentions artifacts.
+**A:** Impeller is Flutter's renderer that precompiles its shaders at build time and uses Metal on iOS and Vulkan on Android, with an OpenGL ES fallback. Skia compiled shaders at runtime, which caused first-use jank in animations that users saw as stutter. Impeller removes that class of jank, gives more predictable frame times, and has been the default since Flutter 3.27 on iOS, where it is the only renderer, and on Android API 29 and above, where devices without Vulkan fall back to OpenGL. The caveat for a lead is older Android GPUs and driver bugs, so I keep a device matrix and know the flag to compare renderers when a bug report mentions artifacts.
 **Follow-ups:** How do you profile a jank in Flutter? What is the difference between the UI thread and the raster thread? What would make you disable Impeller?
 **Điểm interviewer muốn nghe:** Shader precompile, Metal/Vulkan, mặc định; biết caveat.
 
@@ -1598,7 +1898,7 @@ Nhóm A: KMP cơ chế (Q1-Q12). Nhóm B: về chính template của bạn (Q13-
 **Điểm interviewer muốn nghe:** Kế hoạch gọn, có metric so sánh với KMP.
 
 ### Q44. Explain React Native's New Architecture in two minutes.
-**A:** The old bridge serialized JSON asynchronously between JavaScript and native, so every call was slow and layout could not be synchronous. The New Architecture replaces it with JSI, a C++ layer where JavaScript holds direct references to native host objects and calls them synchronously. Fabric is the renderer built on JSI with a C++ shadow tree and Yoga layout, which supports React 18 concurrent rendering. TurboModules are lazily loaded native modules declared with TypeScript specs; codegen generates the Kotlin and Objective-C interfaces at build time. Bridgeless mode removes the old bridge entirely. Hermes is the default engine, precompiling bytecode for faster start. Since 0.82 the New Architecture is the only architecture.
+**A:** The old bridge serialized JSON asynchronously between JavaScript and native, so every call was slow and layout could not be synchronous. The New Architecture replaces it with JSI, a C++ layer where JavaScript holds direct references to native host objects and calls them synchronously. Fabric is the renderer built on JSI with a C++ shadow tree and Yoga layout, which supports React 18 concurrent rendering. TurboModules are lazily loaded native modules declared with TypeScript specs; codegen generates the Kotlin and Objective-C interfaces at build time. Bridgeless mode removes the old bridge entirely. Hermes is the default engine, precompiling bytecode for faster start. It became the default in 0.76 (October 2024), and since 0.82 (October 2025) it is the only architecture: the opt-out flags are ignored, while an interop layer keeps old-style libraries working for now.
 **Follow-ups:** What is Expo's role today? How is a native module written in Kotlin? Why do teams choose React Native over Flutter?
 **Điểm interviewer muốn nghe:** Đúng tên JSI, Fabric, TurboModules, bridgeless, Hermes; biết 0.82 mốc.
 
@@ -1637,7 +1937,7 @@ Nhóm A: KMP cơ chế (Q1-Q12). Nhóm B: về chính template của bạn (Q13-
 1. Đọc `GrabeeDatabase.kt`, `DatabaseFactory.kt`, `DatabaseBuilder.android.kt`, `DatabaseBuilder.ios.kt`. Vẽ sequence từ `startKoin` tới query đầu tiên.
 2. Viết một `Migration(1, 2)` thêm cột vào `LevelEntity`, bật schema export, viết test migration chạy trên `testDebugUnitTest`. Sau đó quyết định: tách progress DB hay giữ destructive; ghi ADR 10 dòng vào `docs/`.
 3. Thay `BundledSQLiteDriver` bằng `NativeSQLiteDriver` trên iOS trong một branch thử nghiệm; build và so size framework. Ghi số.
-4. Viết test Koin: start mọi module với `koinApplication { modules(...) }.checkModules()` (API `checkModules` cần kiểm tra ở Koin 4.2) để bắt missing binding.
+4. Viết test Koin bắt missing binding bằng `Module.verify()` (Koin 4.2 docs: "`checkModules()`, `checkKoinModules()` and their DSL are deprecated", thay bằng `verify()` hoặc Koin Compiler Plugin). `verify()` kiểm tra constructor dependency mà không start Koin: `appModule.verify(extraTypes = listOf(HttpClientEngine::class))`; nhiều module rời nhau dùng `listOf(dataModule, uiModule).verifyAll()`; Android dùng `androidVerify()` (tự thêm `Context`, `SavedStateHandle`...) (https://insert-koin.io/docs/reference/koin-test/verify/, kiểm tra 18/11/2026).
 5. Đọc `AppSettingDataSource.kt` và `PreferenceHelper` hai platform; trả lời: tại sao iOS không cần `Context` và path lưu ở đâu.
 
 **Ngày 3 (3h): iOS host, test, CI**

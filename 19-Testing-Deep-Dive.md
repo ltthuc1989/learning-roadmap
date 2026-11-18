@@ -67,6 +67,8 @@ mindmap
 
 ## 1. Vì sao test và test gì
 
+> **Thế nào là một test tốt** (rule từ SWE at Google ch12-13, Android testing fundamentals, coroutines/Flow testing docs, Khorikov; pattern; ví dụ xấu → tốt; checklist; rubric chấm test do AI viết): `27-Engineering-Standards-Per-Phase.md` chủ đề 4. File này lo phần tooling và cách viết từng loại test.
+
 ### 1.1 Unit test là gì (từ zero)
 
 Unit test là một hàm nhỏ, chạy tự động, gọi một "đơn vị" code (một hàm, một class) với input cố định và kiểm tra output có đúng như mong đợi không. Nó chạy trên JVM máy bạn hoặc CI, không cần emulator, mất vài mili giây.
@@ -161,6 +163,13 @@ flowchart TB
     E2E --> UI --> INT --> UNIT
 ```
 
+Cách Google tự định nghĩa (kiểm tra 18/11/2026):
+
+- Scope ([Fundamentals #scope](https://developer.android.com/training/testing/fundamentals#scope)): test chia theo "size, hay mức độ cô lập". Unit test = small test (một method/class); medium test kiểm tra integration giữa hai unit trở lên; end-to-end = big test (cả màn hình, cả user flow).
+- Nơi chạy ([#instrumented-vs-local](https://developer.android.com/training/testing/fundamentals#instrumented-vs-local)): instrumented test chạy trên device/emulator; local test (host-side) chạy trên máy dev/CI. Hai trục này độc lập: Robolectric là "big local test", test SQLite trên device là "small instrumented test".
+- Fidelity ([Strategies #testing-pyramid](https://developer.android.com/training/testing/fundamentals/strategies#testing-pyramid)): "độ giống giữa môi trường chạy test và production". Test càng to càng fidelity cao nhưng chậm, khó bảo trì. Trang này còn đề xuất pyramid 5 tầng (unit, component, feature, application, release candidate) kèm bảng network access, build type, lúc chạy (pre-merge/post-merge/pre-release) ở [#scalable-testing](https://developer.android.com/training/testing/fundamentals/strategies#scalable-testing). Key point của Google: viết một "testing strategy document" cho team.
+- Tỉ lệ: bài [Just Say No to More End-to-End Tests](https://testing.googleblog.com/2015/04/just-say-no-to-more-end-to-end-tests.html) (Mike Wacker, Google Testing Blog, 22/4/2015) gợi ý "70/20/10 split: 70% unit, 20% integration, 10% end-to-end" như điểm khởi đầu, và gọi tên hai anti-pattern: inverted pyramid / ice cream cone (dựa chủ yếu vào E2E, rất ít unit) và hourglass (nhiều unit, nhiều E2E, thiếu integration).
+
 ### 1.3 Cost vs confidence
 
 Mỗi tầng trả lời một câu hỏi khác nhau:
@@ -174,6 +183,7 @@ Quy tắc đơn giản: viết test ở tầng thấp nhất có thể bắt đ�
 ### 1.4 Lead quyết định gì
 
 - Coverage policy: không đặt con số toàn cục kiểu "80%". Đặt theo module: `core/domain`, `core/repository` cao (70-80%), `feature/*` ViewModel bắt buộc có test state machine, UI composable không đếm vào coverage (dùng screenshot test). Coverage là chỉ báo thiếu test, không phải chỉ báo chất lượng.
+- Con số có nguồn để trích khi phỏng vấn: [Code Coverage Best Practices](https://testing.googleblog.com/2020/08/code-coverage-best-practices.html) (Adam Bender, Carlos Arguelles, Marko Ivanković, Google Testing Blog, 7/8/2020): "no ideal code coverage number", guideline của Google là 60% "acceptable", 75% "commendable", 90% "exemplary"; mục tiêu toàn project trên 90% "most likely not worth it", nhưng coverage theo commit 99% là hợp lý và 90% là ngưỡng dưới tốt. Nghĩa là: siết coverage của code mới/đổi (diff coverage), không ép số toàn repo. (kiểm tra 18/11/2026)
 - CI gating: PR bắt buộc pass unit test + lint/detekt + screenshot verify. Instrumented test chạy nightly hoặc trước release, không chặn PR (quá chậm, quá flaky). Xem `20-Git-CICD.md` mục 14.
 - Định nghĩa "done": feature có test cho happy path + ít nhất một error path.
 - Flaky test policy: test flaky bị cách ly (quarantine) trong 1 tuần, có owner; quá hạn thì xoá.
@@ -194,7 +204,7 @@ Quy tắc đơn giản: viết test ở tầng thấp nhất có thể bắt đ�
 
 ### 2.1 Vì sao cần test double
 
-ViewModel của bạn phụ thuộc Repository, Repository phụ thuộc network và database. Khi unit test ViewModel, bạn không muốn gọi network thật. "Test double" (như diễn viên đóng thế) là đối tượng thay thế dependency thật trong test. Có 5 loại theo Gerard Meszaros (xUnit Test Patterns):
+ViewModel của bạn phụ thuộc Repository, Repository phụ thuộc network và database. Khi unit test ViewModel, bạn không muốn gọi network thật. "Test double" (như diễn viên đóng thế) là đối tượng thay thế dependency thật trong test. Có 5 loại theo Gerard Meszaros (xUnit Test Patterns), cộng thêm Shadow là loại riêng của Android/Robolectric:
 
 | Loại | Là gì | Dùng khi |
 |---|---|---|
@@ -203,6 +213,9 @@ ViewModel của bạn phụ thuộc Repository, Repository phụ thuộc network
 | Fake | Implementation thật nhưng đơn giản (in-memory thay DB) | Test hành vi phức tạp, nhiều test dùng chung |
 | Mock | Object ghi lại lời gọi để verify ("hàm X được gọi với Y") | Kiểm tra side effect: analytics, logger, navigation |
 | Spy | Object thật nhưng có ghi lại lời gọi, có thể stub một phần | Cần giữ hành vi thật, chỉ thay một hàm |
+| Shadow | Fake của Robolectric thay cho class framework Android (`ShadowLooper`, `ShadowApplication`...) | Test local cần hành vi framework; xem mục 9.2 |
+
+Bảng của Android ([Test doubles #types](https://developer.android.com/training/testing/fundamentals/test-doubles#types), kiểm tra 18/11/2026) liệt kê đúng 6 loại trên và nói rõ: Fake "preferred"; Stub "fakes are preferred over stubs for simplicity"; Spy "usually avoided for adding complexity"; Shadow là "fake used in Robolectric". Trang này cũng lưu ý định nghĩa giữa các nguồn mâu thuẫn nhau và trỏ về bài của Fowler.
 
 Trong thực tế Android, "mock" hay bị dùng để chỉ cả stub lẫn mock (MockK làm được cả hai). Interviewer giỏi sẽ hỏi bạn phân biệt.
 
@@ -320,7 +333,8 @@ Trong `kmp-template-impl`, file `core/content/src/commonTest/.../TestDoubles.kt`
 ### 3.1 JUnit4 vs JUnit5 trên Android
 
 - JUnit4: `org.junit.Test`, `@Before`, `@After`, `@Rule`, `@RunWith`. Android instrumented test (`androidTest`) chính thức chỉ hỗ trợ JUnit4 qua `AndroidJUnitRunner`. Compose test rule `createComposeRule()` là JUnit4 rule.
-- JUnit5 (Jupiter): `org.junit.jupiter.api.Test`, `@BeforeEach`, `@ParameterizedTest`, `@Nested`, extension thay cho rule. Chạy tốt cho local unit test nếu bật `useJUnitPlatform()`. Cho androidTest cần plugin bên thứ ba `de.mannodermaus.android-junit5`.
+- JUnit5 (Jupiter): `org.junit.jupiter.api.Test`, `@BeforeEach`, `@ParameterizedTest`, `@Nested`, extension thay cho rule. Chạy tốt cho local unit test nếu bật `useJUnitPlatform()`. Cho Android cần plugin bên thứ ba của mannodermaus: bản 2.x đổi id thành `de.mannodermaus.android-junit` (bản 1.x là `de.mannodermaus.android-junit5`), README hiện ghi `version "2.0.2"`, yêu cầu AGP 8.2 + Gradle 8.2 ([github.com/mannodermaus/android-junit5](https://github.com/mannodermaus/android-junit5#setup)).
+- JUnit 6: đã GA (6.0.0 lên Maven Central 30/9/2025; bản ổn định mới nhất trên Maven Central lúc kiểm tra là 6.1.3). Vẫn là nền tảng Jupiter (`org.junit.jupiter.*`), nhưng [junit.org](https://junit.org/) ghi "requires Java 17 and Kotlin 2.1 or above". Hệ quả cho Android theo README plugin trên: instrumentation test chạy JUnit 5 cần device Android 8.0 (API 26)+, JUnit 6 cần Android 15 (API 35)+. Vì vậy androidTest thực tế vẫn là JUnit4. (kiểm tra 18/11/2026)
 - `kotlin.test`: lớp mỏng chung cho KMP (`kotlin.test.Test`, `assertEquals`, `assertFailsWith`), trên JVM map sang JUnit4 hoặc JUnit5 tuỳ cấu hình. `kmp-template-impl` dùng cái này trong `commonTest`.
 
 Khuyến nghị: Android app thuần dùng JUnit4 cho đồng nhất với androidTest và Compose; KMP dùng `kotlin.test`. Đừng trộn JUnit4 và 5 trong một module.
@@ -331,28 +345,52 @@ Khuyến nghị: Android app thuần dùng JUnit4 cho đồng nhất với andro
 |---|---|---|---|
 | `src/test` | JVM local | `testDebugUnitTest`, `testReleaseUnitTest` | Unit test, Robolectric, Paparazzi/Roborazzi |
 | `src/androidTest` | Device/emulator | `connectedDebugAndroidTest` | Compose UI test, Espresso, Room thật |
-| `src/screenshotTest` | JVM (AGP plugin) | `validateDebugScreenshotTest` | Compose Preview Screenshot Testing |
+| `src/screenshotTest` | JVM (AGP test suite) | `testScreenshotTestDefaultDebugTestSuite` (plugin cũ: `validateDebugScreenshotTest`) | Compose Preview Screenshot Testing, xem 10.2 |
 | KMP `commonTest` | Mọi target | `allTests` | Test logic chung với `kotlin.test` |
-| KMP `androidUnitTest` | JVM | `testDebugUnitTest` | Test cần MockK, Robolectric |
-| KMP `androidInstrumentedTest` | Device | `connectedDebugAndroidTest` | UI test trên Android |
+| KMP `androidUnitTest` (plugin cũ `com.android.library` + `androidTarget()`) | JVM | `testDebugUnitTest` | Test cần MockK, Robolectric |
+| KMP `androidInstrumentedTest` (plugin cũ) | Device | `connectedDebugAndroidTest` | UI test trên Android |
+| KMP `androidHostTest` (plugin mới `com.android.kotlin.multiplatform.library`) | JVM | xem `./gradlew :module:tasks --group verification` (thường là `testAndroidHostTest`) | Thay `androidUnitTest`, phải bật `withHostTest {}` |
+| KMP `androidDeviceTest` (plugin mới) | Device | `connectedAndroidTest` | Thay `androidInstrumentedTest`, phải bật `withDeviceTest {}` |
 | KMP `iosTest` / `iosSimulatorArm64Test` | iOS simulator | `iosSimulatorArm64Test` | Test code iOS-specific |
 | KMP `jvmTest`, `desktopTest` | JVM | `jvmTest`, `desktopTest` | Target desktop |
 
+Hai tên source set cho Android trong KMP (kiểm tra 18/11/2026 tại [developer.android.com/kotlin/multiplatform/plugin #configure-tests](https://developer.android.com/kotlin/multiplatform/plugin#configure-tests)):
+
+- Plugin `com.android.kotlin.multiplatform.library` là cách "officially supported" để thêm Android target vào KMP library. Dùng `com.android.library` cho KMP dựa vào API đã deprecated, cần opt-in từ AGP 9.0 và dự kiến bị xoá ở AGP 10.0 (nửa sau 2026).
+- Với plugin mới, test host và device bị tắt mặc định. `androidUnitTest` đổi thành `androidHostTest` (thư mục `src/androidHostTest`), `androidInstrumentedTest` đổi thành `androidDeviceTest` (`src/androidDeviceTest`). Compilation tương ứng tên `hostTest`, `deviceTest`.
+- `kmp-template-impl` hiện vẫn dùng `com.android.library` + `androidTarget` (xem `build-logic/.../KmpAndroidPlugin.kt`), nên các ví dụ bên dưới dùng `androidUnitTest`. Khi migrate sang AGP 9+ plugin mới thì đổi tên như trên.
+
+```kotlin
+// Plugin mới (AGP 8.12+ dùng block android {}; bản cũ hơn là androidLibrary {})
+kotlin {
+    android {
+        namespace = "me.ltthuc.kmp.core.repository"
+        compileSdk = 36
+        minSdk = 24
+        withHostTest { isIncludeAndroidResources = true }          // tạo androidHostTest
+        withDeviceTest { instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    }
+    sourceSets {
+        getByName("androidHostTest").dependencies { implementation(libs.mockk) }
+    }
+}
+```
+
 ### 3.3 Khai báo dependency trong `libs.versions.toml`
 
-Version dưới đây đúng theo trí nhớ tại thời điểm viết; luôn kiểm tra trang release trước khi copy.
+Version của mockk, turbine, coroutines-test, robolectric, kover dưới đây là bản `release` trên Maven Central / Gradle Plugin Portal ngày 18/11/2026; androidx.test giữ theo project, xem [androidx.test releases](https://developer.android.com/jetpack/androidx/releases/test) khi nâng.
 
 ```toml
 [versions]
 junit4 = "4.13.2"
-mockk = "1.14.2"            # kiểm tra: github.com/mockk/mockk/releases
-turbine = "1.2.1"           # kiểm tra: github.com/cashapp/turbine/releases
+mockk = "1.14.12"           # repo1.maven.org/maven2/io/mockk/mockk/
+turbine = "1.2.1"           # app.cash.turbine:turbine
 kotlinxCoroutines = "1.11.0"
 androidxTestExt = "1.2.1"
 androidxTestRunner = "1.6.2"
 espresso = "3.6.1"
-robolectric = "4.14.1"      # kiểm tra: robolectric.org
-kover = "0.9.1"             # kiểm tra: github.com/Kotlin/kotlinx-kover/releases
+robolectric = "4.18.1"      # org.robolectric:robolectric
+kover = "0.9.11"            # plugin org.jetbrains.kotlinx.kover
 
 [libraries]
 junit4 = { module = "junit:junit", version.ref = "junit4" }
@@ -398,14 +436,14 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)   // multiplatform
             implementation(libs.turbine)                    // multiplatform
         }
-        androidUnitTest.dependencies {
+        androidUnitTest.dependencies {                      // plugin mới: getByName("androidHostTest")
             implementation(libs.mockk)                      // MockK chỉ chạy JVM
         }
     }
 }
 ```
 
-Điểm quan trọng cho `kmp-template-impl`: catalog hiện có `kotlinx-coroutines-test` nhưng chưa có `turbine` và `mockk`. Turbine thêm được vào `commonTest`. MockK không chạy trên iOS, nên test trong `commonTest` phải dùng fake (đúng hướng mục 2.3). Nếu thật sự cần mock đa nền tảng, có thư viện Mokkery (KSP) nhưng cần kiểm tra tính tương thích với Kotlin 2.3 trước khi thêm.
+Điểm quan trọng cho `kmp-template-impl`: catalog hiện có `kotlinx-coroutines-test` nhưng chưa có `turbine` và `mockk`. Turbine thêm được vào `commonTest`. MockK không chạy trên iOS, nên test trong `commonTest` phải dùng fake (đúng hướng mục 2.3). Nếu thật sự cần mock đa nền tảng, có Mokkery: đây là Kotlin compiler plugin (không phải KSP), plugin id `dev.mokkery`, bản mới nhất 3.6.0; bảng tương thích tại [mokkery.dev/docs/Setup](https://mokkery.dev/docs/Setup) ghi Kotlin 2.3.0-2.3.10 được hỗ trợ từ Mokkery 3.1.0, nên Kotlin 2.3.10 của repo dùng được. Compiler plugin gắn chặt với version Kotlin: mỗi lần nâng Kotlin phải tra lại bảng đó. (kiểm tra 18/11/2026)
 
 Với `compose-template`: catalog nằm bên YammyDelivery (`settings.gradle.kts` import catalog từ đó), nên muốn thêm alias test phải sửa ở YammyDelivery rồi publish lại.
 
@@ -461,7 +499,7 @@ Trong Android Studio: click chuột phải vào class test, Run. Cửa sổ Run 
 **Đọc thêm:**
 - https://developer.android.com/studio/test/command-line (chạy test từ CLI, task names)
 - https://docs.gradle.org/current/userguide/java_testing.html (Gradle test task, filter, report)
-- https://kotlinlang.org/docs/multiplatform-run-tests.html (chạy test KMP theo target)
+- https://kotlinlang.org/docs/multiplatform/multiplatform-run-tests.html (chạy test KMP theo target)
 
 ## 4. MockK từ zero
 
@@ -669,7 +707,7 @@ Luôn có `unmockkAll()` trong `@After` khi dùng object/static. Nếu không, t
 | `no answer found for: UserRepository(#1).getUser(2)` | Chưa stub hoặc matcher không khớp (truyền "2" nhưng stub "1") | Stub đúng tham số hoặc `any()`; kiểm tra `equals` của data class |
 | Lỗi compile khi `every { repo.getUser() }` | Hàm suspend | `coEvery` |
 | Test chạy lần đầu chậm 1-3s | MockK khởi động agent (ByteBuddy) | Chấp nhận, hoặc dùng fake cho test nhiều |
-| Mock trả `null` cho `String` | Dùng `relaxed` | Stub tường minh |
+| Relaxed mock trả `""` cho `String`, `0`/`false` cho primitive, mock lồng nhau cho reference type | Dùng `relaxed = true`, code under test nhận giá trị rỗng "hợp lệ" nên bug bị che | Stub tường minh (`AnyValueGenerator` của MockK map `String::class -> ""`) |
 | Verify pass dù logic sai | `verify { x.foo(any()) }` quá lỏng | Verify tham số cụ thể hoặc dùng slot |
 | Flow từ relaxed mock không emit | Mock Flow không phải Flow thật | Trả `flowOf(...)` hoặc `MutableStateFlow` |
 | Test lệ thuộc thứ tự | `mockkStatic` không gỡ | `unmockkAll()` trong `@After` |
@@ -707,7 +745,11 @@ class VirtualTimeTest {
 }
 ```
 
-`runTest { }` tạo một `TestScope`, chạy block như một coroutine, tự động bỏ qua `delay` bằng cách tua đồng hồ ảo tới mốc kế tiếp. Nó có timeout thật (tham số `timeout`, mặc định xem docs kotlinx-coroutines-test, có thể truyền `runTest(timeout = 10.seconds)`), để test treo vẫn kết thúc. Khi block xong, `runTest` kiểm tra không còn coroutine con nào đang chạy trong `TestScope`; nếu còn, fail với `UncompletedCoroutinesError`. Coroutine cần chạy nền suốt test thì launch trong `backgroundScope` (bị huỷ tự động khi test xong).
+`runTest { }` tạo một `TestScope`, chạy block như một coroutine, tự động bỏ qua `delay` bằng cách tua đồng hồ ảo tới mốc kế tiếp. Theo KDoc của [`runTest`](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-test/kotlinx.coroutines.test/run-test.html) (kotlinx-coroutines-test 1.11.0, kiểm tra 18/11/2026):
+
+- Timeout thật mặc định 60 giây ("built-in timeout of 60 seconds for the test body"). Đổi cho một test bằng `runTest(timeout = 10.seconds)`, hoặc đổi cho mọi test trên JVM bằng system property `kotlinx.coroutines.test.default_timeout` (giá trị parse bằng `Duration.parse`, ví dụ `30s`, `1m`). Hết timeout thì test body bị cancel và test fail với `AssertionError`.
+- Coroutine con chưa xong: sau khi test body return, `runTest` vẫn tiếp tục chạy các task trong scheduler (tua đồng hồ ảo) và chờ mọi coroutine con của `TestScope` hoàn tất ("the test will hang until all the coroutines launched inside testBody complete"). Nếu chúng không bao giờ xong (ví dụ `while (true) { delay(1_000) }`), test treo đến hết timeout thật rồi fail với `UncompletedCoroutinesError` (lớp con của `AssertionError`), message dạng "After waiting for 60s, there were active child jobs: [...]. Use `TestScope.backgroundScope` to launch the coroutines that need to be cancelled when the test body finishes".
+- Coroutine cần chạy nền suốt test thì launch trong `backgroundScope`: bị huỷ tự động khi test xong, không làm test treo.
 
 ### 5.3 `StandardTestDispatcher` vs `UnconfinedTestDispatcher`
 
@@ -760,7 +802,8 @@ fun `polling ticks every second`() = runTest {
     runCurrent()              // chạy tick tại 3000
     assertEquals(listOf(1, 2, 3), ticks)
 
-    job.cancel()              // nếu không cancel, runTest fail vì còn coroutine sống
+    job.cancel()              // nếu không cancel: runTest chờ job mãi, hết 60s thật thì fail UncompletedCoroutinesError
+                              // cách gọn hơn: backgroundScope.launch { ... } thay cho launch { ... }
 }
 ```
 
@@ -996,7 +1039,7 @@ class RetryTest {
 - Quên `advanceUntilIdle()` với Standard dispatcher: assert ngay sau `vm.load()` thấy state cũ.
 - Dùng `Dispatchers.IO` cứng trong repo: test "chạy xong" nhưng assert trước khi IO xong, hoặc delay thật làm test chậm.
 - `runBlocking` thay `runTest`: delay thật, không có scheduler ảo.
-- Lỗi `UncompletedCoroutinesError`: còn `while(true)` hoặc `collect` chưa huỷ. Cancel job hoặc dùng `backgroundScope`.
+- Lỗi `UncompletedCoroutinesError` sau khoảng 60 giây (timeout mặc định của `runTest`): còn `while(true)` hoặc `collect` chưa huỷ. Cancel job hoặc dùng `backgroundScope`.
 - Test pass trên máy nhưng fail trên CI vì `GlobalScope` hoặc `CoroutineScope(Dispatchers.Default)` tự tạo trong class, không inject được.
 
 **Đọc thêm:**
@@ -1388,7 +1431,7 @@ expect fun inMemoryTestDatabaseBuilder(): RoomDatabase.Builder<AppDatabase>
 actual fun inMemoryTestDatabaseBuilder(): RoomDatabase.Builder<AppDatabase> =
     Room.inMemoryDatabaseBuilder<AppDatabase>()
 
-// androidUnitTest (Robolectric) hoặc androidInstrumentedTest
+// androidUnitTest (Robolectric) hoặc androidInstrumentedTest (plugin KMP mới: androidHostTest / androidDeviceTest)
 actual fun inMemoryTestDatabaseBuilder(): RoomDatabase.Builder<AppDatabase> =
     Room.inMemoryDatabaseBuilder<AppDatabase>(ApplicationProvider.getApplicationContext())
 
@@ -1399,7 +1442,48 @@ val db = inMemoryTestDatabaseBuilder()
     .build()
 ```
 
-Chữ ký chính xác cần kiểm tra lại tại https://developer.android.com/kotlin/multiplatform/room vì Room 3.0 (`androidx.room3`) đổi package và breaking (xem brief ecosystem). Migration test dùng `MigrationTestHelper` (androidTest).
+Builder không cần `Context` cho JVM/Native và `setDriver`, `setQueryCoroutineContext` là API Room KMP theo [developer.android.com/kotlin/multiplatform/room](https://developer.android.com/kotlin/multiplatform/room). Lưu ý Room 3.0 ([release notes](https://developer.android.com/jetpack/androidx/releases/room3), stable 3.0.0 ngày 1/7/2026, bản mới nhất 3.0.3): package mới `androidx.room3`, maven group `androidx.room3:room3-*`, bắt buộc `SQLiteDriver`, mọi thao tác DB là coroutine, chỉ KSP, Gradle plugin `androidx.room3` với extension `room3 { }`; Room 3.0 còn thêm `Room.inMemoryDatabaseBuilder` không cần Context ở common code. Repo đang ở Room 2.8.4 (`androidx.room`), code bên dưới viết cho 2.x; khi lên 3.x chủ yếu đổi import và tên artifact. (kiểm tra 18/11/2026)
+
+Migration test (Room 2.7+ API theo driver; nguồn: [Migrating Room databases #test](https://developer.android.com/training/data-storage/room/migrating-db-versions#test)). Bước 1, export schema JSON và commit vào git:
+
+```kotlin
+// module build.gradle.kts, Room 2.x
+plugins { id("androidx.room") }
+room { schemaDirectory("$projectDir/schemas") }   // bắt buộc khi dùng Room Gradle plugin
+dependencies { androidTestImplementation("androidx.room:room-testing:2.8.4") }
+```
+
+Bước 2, test từng migration trong `androidTest` với `MigrationTestHelper` (là JUnit4 `TestRule`, đọc schema đã export):
+
+```kotlin
+@RunWith(AndroidJUnit4::class)
+class MigrationTest {
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+
+    @get:Rule
+    val helper = MigrationTestHelper(
+        instrumentation = instrumentation,
+        file = instrumentation.targetContext.getDatabasePath("migration-test"),
+        driver = AndroidSQLiteDriver(),
+        databaseClass = AppDatabase::class,
+    )
+
+    @Test
+    fun migrate1To2_keepsData() {
+        helper.createDatabase(1).apply {                 // schema v1 từ schemas/1.json
+            execSQL("INSERT INTO User (id, name) VALUES ('1', 'An')")   // DAO không dùng được: DAO theo schema mới
+            close()
+        }
+        val conn = helper.runMigrationsAndValidate(2, listOf(MIGRATION_1_2))  // validate schema tự động
+        val count = conn.prepare("SELECT COUNT(*) FROM User").use { it.step(); it.getLong(0) }
+        assertEquals(1L, count)                          // dữ liệu thì phải tự assert
+        conn.close()
+    }
+}
+```
+
+- `@AutoMigration(from = 1, to = 2)`: vẫn test bằng `runMigrationsAndValidate(2)` không truyền migration, helper tự lấy auto migration từ `databaseClass`. Auto migration cần `exportSchema = true` và đã compile cả version cũ lẫn mới; đổi/xoá bảng hay cột phải khai `AutoMigrationSpec` (`@RenameColumn`, `@DeleteTable`...), xem [#automated](https://developer.android.com/training/data-storage/room/migrating-db-versions#automated).
+- Test toàn bộ đường migrate ([#all-migrations-test](https://developer.android.com/training/data-storage/room/migrating-db-versions#all-migrations-test)): `helper.createDatabase(1)` rồi mở DB thật bằng `Room.databaseBuilder(...).addMigrations(*ALL_MIGRATIONS).build()`; Room validate schema khi mở.
 
 ### 7.5 Paging
 
@@ -1422,10 +1506,37 @@ fun `first page loads 20 items`() = runTest {
 @Test
 fun `viewmodel exposes paged users`() = runTest {
     val vm = UsersViewModel(FakeUserRepository(total = 50))
-    val snapshot: List<User> = vm.pagedUsers.asSnapshot()   // tải trang đầu theo config
-    assertTrue(snapshot.isNotEmpty())
+    val snapshot: List<User> = vm.pagedUsers.asSnapshot {    // tải trang đầu theo config
+        scrollTo(index = 45)                                  // giả lập cuộn, suspend tới khi load xong
+    }
+    assertTrue(snapshot.size >= 46)                           // số item thực tế còn phụ thuộc prefetchDistance
 }
 ```
+
+API chính thức của `androidx.paging:paging-testing` (nguồn: [Test your Paging implementation](https://developer.android.com/topic/libraries/architecture/paging/test), kiểm tra 18/11/2026):
+
+```kotlin
+// PagingSource: dùng TestPager thay vì tự dựng LoadParams (#pagingsource-tests); các hàm là suspend, gọi trong runTest
+val config = PagingConfig(pageSize = 20, initialLoadSize = 20)   // mặc định initialLoadSize = 3 * pageSize
+val pager = TestPager(config, UserPagingSource(FakeUserApi(total = 50)))
+assertEquals(20, (pager.refresh() as LoadResult.Page).data.size)
+val last = with(pager) { append(); append() } as LoadResult.Page   // load liên tiếp: 20 + 20 + 10
+assertEquals(10, last.data.size); assertNull(last.nextKey)
+// lỗi: fake ném IOException -> pager.refresh() is LoadResult.Error, pager.getLastLoadedPage() == null
+
+// Transformation (map, insertSeparators) trong ViewModel (#transformation-tests)
+class FakeUserRepository : UserRepository {
+    private val factory = (1..100).map { User("$it", "U$it") }.asPagingSourceFactory()
+    override fun pagingSource() = factory()   // mỗi lần Pager gọi là một PagingSource mới
+}
+// Flow<List<User>>.asPagingSourceFactory(): mỗi emission là một generation mới, test được invalidate
+
+// UI load state (#compose-state-tests): đẩy PagingData tĩnh qua MutableStateFlow
+pagingFlow.value = PagingData.from(listOf(User("1", "An")),
+    sourceLoadStates = LoadStates(LoadState.NotLoading(false), LoadState.NotLoading(false), LoadState.NotLoading(false)))
+```
+
+`RemoteMediator` ([#remotemediator-tests](https://developer.android.com/topic/libraries/architecture/paging/test#remotemediator-tests)): đặt trong `androidTest` vì cần Room in-memory có Context, gọi trực tiếp `mediator.load(LoadType.REFRESH, PagingState(listOf(), null, PagingConfig(10), 10))` và assert ba case: `MediatorResult.Success` với `endOfPaginationReached == false` (có data), `== true` (API trả rỗng), `MediatorResult.Error` (API ném lỗi). `@After` gọi `db.clearAllTables()` để không rò state.
 
 ### 7.6 DI trong test
 
@@ -1645,6 +1756,28 @@ rule.onNodeWithTag("sheet").assertIsDisplayed()
 
 Mặc định `autoAdvance = true`: test tự tua animation tới khi idle, nên animation không làm test chậm nhưng bạn không thấy frame giữa.
 
+Bộ API đồng bộ chính thức (nguồn: [Synchronize your tests](https://developer.android.com/develop/ui/compose/testing/synchronization), kiểm tra 18/11/2026):
+
+```kotlin
+// 1. Idling resource (#idling-resources): báo cho Compose biết có việc nền ngoài tầm nhìn của nó
+val idling = object : IdlingResource {                     // androidx.compose.ui.test.IdlingResource
+    override val isIdleNow: Boolean get() = fakeRepo.pendingCalls == 0
+}
+rule.registerIdlingResource(idling)
+// ... test ...
+rule.unregisterIdlingResource(idling)
+
+// 2. Chờ điều kiện (#manual-sync-waituntil): timeout mặc định của các helper là 1_000 ms
+rule.waitUntilAtLeastOneExists(hasText("An"), timeoutMillis = 5_000)
+rule.waitUntilExactlyOneExists(hasTestTag("profile"))
+rule.waitUntilDoesNotExist(hasTestTag("loading"))
+rule.waitUntilNodeCount(hasTestTag("row"), count = 20)
+```
+
+- `waitForIdle()` (#manual-sync): khi `autoAdvance = true` thì tua clock tới khi Compose idle; khi `autoAdvance = false` thì chỉ chờ idling resource. Cả hai trường hợp đều chờ pass layout/draw đang treo. `awaitIdle()` là bản `suspend` của nó, dùng được trong coroutine (ví dụ trong `runComposeUiTest`). `mainClock.advanceTimeUntil(timeoutMs) { condition }` chỉ dùng cho điều kiện phụ thuộc Compose state.
+- Google cảnh báo: dùng `CountDownLatch` tự chế thay `waitUntil` có thể "behave unexpectedly, since the test clock won't be advanced". Key point ở [trang stability #solutions](https://developer.android.com/training/testing/instrumented-tests/stability#solutions): idling resource cho UI test nhỏ, wait-until API cho UI test lớn.
+- Compose testing v2 ([Migrate to v2 testing APIs](https://developer.android.com/develop/ui/compose/testing/migrate-v2), từ `ui-test-junit4:1.11.0-alpha03`): `androidx.compose.ui.test.junit4.v2.createComposeRule` và `androidx.compose.ui.test.v2.runComposeUiTest` thay bản v1 (đã deprecated). Khác biệt: v2 chạy composition bằng `StandardTestDispatcher` (v1 dùng `UnconfinedTestDispatcher`), nên coroutine launch xong chưa chạy ngay; test assert ngay sau `viewModel.loadData()` sẽ thấy state cũ, sửa bằng `waitForIdle()` hoặc `runOnIdle { }`. Khi trộn Compose test với `runTest`, Google khuyên chuyển hẳn sang `runComposeUiTest` để chỉ có một clock.
+
 ### 8.4 Test với ViewModel giả
 
 Cách ưu tiên: screen stateless như trên, test không cần ViewModel. Nếu screen gọi `koinViewModel()` bên trong, bạn có hai lựa chọn:
@@ -1709,7 +1842,29 @@ class LoginScreenCommonTest {
 }
 ```
 
-Dependency: `commonTest.dependencies { implementation(compose.uiTest) }`; Android cần thêm `ui-test-junit4` ở instrumented và `ui-test-manifest` ở debug, và cấu hình để `androidInstrumentedTest` kế thừa `commonTest`. Chi tiết DSL (`instrumentedTestVariant.sourceSetTree`) kiểm tra tại tài liệu "Test your Compose Multiplatform UI" của JetBrains vì nó thay đổi theo phiên bản plugin.
+Setup theo [Testing Compose Multiplatform UI](https://kotlinlang.org/docs/multiplatform/compose-test.html) (kiểm tra 18/11/2026):
+
+```kotlin
+// shared/build.gradle.kts
+kotlin {
+    android {                                          // plugin KMP mới; tài liệu viết androidLibrary {} cho AGP < 8.12
+        withDeviceTestBuilder { sourceSetTreeName = "test" }   // androidDeviceTest kế thừa cây test (commonTest)
+    }
+    sourceSets {
+        commonTest.dependencies { implementation("org.jetbrains.compose.ui:ui-test:1.12.2") }  // theo version CMP của bạn
+        jvmTest.dependencies { implementation(compose.desktop.currentOs) }
+    }
+}
+// androidApp/build.gradle.kts: testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+// dependencies { androidTestImplementation("androidx.compose.ui:ui-test-junit4-android:1.12.1")
+//                debugImplementation("androidx.compose.ui:ui-test-manifest:1.12.1") }
+```
+
+- Alias `compose.uiTest` (và mọi alias `compose.*` của Gradle plugin CMP) đã deprecated từ CMP 1.10.0-beta01, JetBrains khuyên dùng tọa độ trực tiếp trong version catalog ([What's new 1.10 #deprecated-dependency-aliases](https://kotlinlang.org/docs/multiplatform/whats-new-compose-110.html#deprecated-dependency-aliases)). Repo của bạn dùng CMP 1.10.2, nên khai `org.jetbrains.compose.ui:ui-test` cùng version CMP.
+- Plugin cũ (`androidTarget`, như repo bạn): cùng ý tưởng nhưng DSL là `androidTarget { instrumentedTestVariant.sourceSetTree.set(KotlinSourceSetTree.test) }`.
+- Cần tạo `src/androidDeviceTest/AndroidManifest.xml` khai `androidx.activity.ComponentActivity` (exported) dù test nằm hết ở `commonTest`.
+- Lệnh: iOS `./gradlew :shared:iosSimulatorArm64Test`, Android `./gradlew :shared:connectedAndroidTest`, desktop `./gradlew :shared:jvmTest`, web `./gradlew :shared:wasmJsTest`. Tài liệu ghi chú test common CMP hiện không chạy qua cấu hình "android (local)" nên gutter icon Android trong IDE không giúp được.
+- Từ Compose 1.11 (AndroidX), `runComposeUiTest` v1 deprecated, dùng `androidx.compose.ui.test.v2.runComposeUiTest` (mục 8.3).
 
 **Lỗi hay gặp / trade-off**
 - `Expected exactly 1 node but found 2`: text trùng (title và button cùng chữ). Dùng testTag hoặc matcher kết hợp.
@@ -1722,13 +1877,15 @@ Dependency: `commonTest.dependencies { implementation(compose.uiTest) }`; Androi
 - https://developer.android.com/develop/ui/compose/testing (Testing your Compose layout: semantics, finders, actions, sync)
 - https://developer.android.com/develop/ui/compose/testing/apis (bảng cheat sheet API test)
 - https://developer.android.com/guide/navigation/testing (test navigation)
-- https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-test.html (UI test cho Compose Multiplatform)
+- https://kotlinlang.org/docs/multiplatform/compose-test.html (UI test cho Compose Multiplatform, URL mới của trang JetBrains cũ)
+- https://developer.android.com/develop/ui/compose/testing/synchronization (idling, waitUntil, mainClock)
+- https://developer.android.com/develop/ui/compose/testing/migrate-v2 (Compose testing v2, StandardTestDispatcher)
 
 ## 9. Espresso, Robolectric, Gradle Managed Devices, Firebase Test Lab
 
 ### 9.1 Espresso: khi nào còn cần
 
-Espresso test View-based UI trên device. "Compose First" (5/2026) đưa Views vào maintenance, nhưng project cũ (`YammyDelivery` phần legacy, app bank) còn nhiều Fragment/RecyclerView. Espresso còn cần khi: màn hình View, WebView (`espresso-web`), system dialog/permission (kết hợp UI Automator), interop màn hình lai Compose + View.
+Espresso test View-based UI trên device. Bài [Android UI Development is Compose First](https://android-developers.googleblog.com/2026/05/android-ui-development-is-compose-first.html) (Android Developers Blog, 19/5/2026) đưa các component View mà Compose thay thế (`android.widget`) vào maintenance mode: không deprecate, không xoá, chỉ sửa bug nghiêm trọng; Fragments/RecyclerView/ViewPager được coi là "complete". Nhưng project cũ (`YammyDelivery` phần legacy, app bank) còn nhiều Fragment/RecyclerView. Espresso còn cần khi: màn hình View, WebView (`espresso-web`), system dialog/permission (kết hợp UI Automator), interop màn hình lai Compose + View.
 
 ```kotlin
 @RunWith(AndroidJUnit4::class)
@@ -1745,7 +1902,25 @@ class LegacyLoginTest {
 }
 ```
 
-Espresso đồng bộ với main looper và `AsyncTask`, không biết coroutine. Dùng `IdlingResource` (`CountingIdlingResource` tăng khi bắt đầu công việc, giảm khi xong) hoặc inject fake. Trong cùng test có thể trộn `onView` (View) và `composeTestRule.onNodeWithText` (Compose).
+Espresso đồng bộ với main looper và `AsyncTask`, không biết coroutine. Dùng `IdlingResource` hoặc inject fake. Ví dụ `CountingIdlingResource` (artifact `androidx.test.espresso:espresso-idling-resource`, nguồn: [Espresso idling resources #register-idling-resources](https://developer.android.com/training/testing/espresso/idling-resource#register-idling-resources)):
+
+```kotlin
+// main source set: một counter dùng chung (chi phí gần bằng 0 khi không test)
+object EspressoIdling { val counter = CountingIdlingResource("network") }
+
+class UserRepositoryImpl(private val api: UserApi) {
+    suspend fun load(id: String): User {
+        EspressoIdling.counter.increment()                    // bắt đầu việc nền
+        try { return api.get(id) } finally { EspressoIdling.counter.decrement() }   // luôn giảm, kể cả lỗi
+    }
+}
+
+// androidTest
+@Before fun register() { IdlingRegistry.getInstance().register(EspressoIdling.counter) }
+@After fun unregister() { IdlingRegistry.getInstance().unregister(EspressoIdling.counter) }
+```
+
+Nhược điểm Google nêu: idling resource "can be hard to install without polluting the code under test", nên ưu tiên inject fake trả ngay; chỉ dùng counter khi buộc phải chạy IO thật. Trong cùng test có thể trộn `onView` (View) và `composeTestRule.onNodeWithText` (Compose). Khi cần chạm system UI, app khác, notification, permission dialog thì dùng [UI Automator](https://developer.android.com/training/testing/other-components/ui-automator); trang stability lưu ý UI Automator "might require more manual synchronization so they tend to be less reliable".
 
 ### 9.2 Robolectric: chạy Android trên JVM
 
@@ -1778,7 +1953,27 @@ class SettingsScreenRobolectricTest {
 }
 ```
 
-Hạn chế: không có GPU thật (render qua native graphics mode), hành vi khác device ở animation, font, một số API hệ thống; không thay thế được test trên device cho release.
+Hạn chế: không có GPU thật (render qua native graphics mode), hành vi khác device ở animation, font, một số API hệ thống; không thay thế được test trên device cho release. Trang [Robolectric strategies](https://developer.android.com/training/testing/local-tests/robolectric) của Google: Robolectric hỗ trợ từ API 21, "most Google apps rely heavily on Robolectric"; với unit test chỉ dùng nó "as a last resort" (legacy, API phụ thuộc class Android), còn UI behavior test thì fidelity đủ; vẫn cần device cho system UI (edge-to-edge, picture-in-picture) hoặc `WebView`.
+
+Looper PAUSED: từ Robolectric 4.4, `LooperMode.PAUSED` là mặc định ([release 4.4](https://github.com/robolectric/robolectric/releases/tag/robolectric-4.4): "the new PAUSED looper mode is now the default"). Task post lên main `Looper` không tự chạy inline nữa, giống device thật hơn; test phải tự xả hàng đợi ([bài giới thiệu PAUSED](https://robolectric.org/blog/2019/06/04/paused-looper/)):
+
+```kotlin
+@RunWith(AndroidJUnit4::class)
+class HandlerTest {
+    @Test
+    fun postedTaskRunsAfterIdle() {
+        val events = mutableListOf<String>()
+        Handler(Looper.getMainLooper()).post { events += "posted" }
+        assertTrue(events.isEmpty())                 // PAUSED: chưa chạy
+        shadowOf(Looper.getMainLooper()).idle()      // org.robolectric.Shadows.shadowOf: chạy mọi task đang chờ
+        assertEquals(listOf("posted"), events)
+    }
+}
+```
+
+`ShadowLooper.idleFor(duration)` để chạy task có delay. Compose test rule và Espresso tự idle main looper, nên chỉ cần gọi tay khi test code dùng `Handler` trực tiếp.
+
+Cấu hình chung ([robolectric.org/configuring](https://robolectric.org/configuring/)): `@Config` trên class/method (method thắng class, kế thừa từ base class), hoặc file `src/test/resources/robolectric.properties` (đặt trong thư mục package để áp cho package đó), ví dụ `sdk=34`. Mọi giá trị của `@Config` đều đặt được trong file này. (kiểm tra 18/11/2026; bản mới nhất 4.18.1)
 
 ### 9.3 Gradle Managed Devices (GMD)
 
@@ -1801,7 +1996,14 @@ android {
 }
 ```
 
-Chạy: `./gradlew pixel6Api34DebugAndroidTest`. Trên CI Linux không GPU: thêm `-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect`. DSL (`localDevices` vs `devices`) đổi theo AGP, kiểm tra tại https://developer.android.com/studio/test/gradle-managed-devices. Cấu hình CI runner (KVM) xem `20-Git-CICD.md` mục 12.
+Chạy: `./gradlew pixel6Api34DebugAndroidTest` (cú pháp `<device-name><BuildVariant>AndroidTest`); nhóm device: `./gradlew <group-name>Group<BuildVariant>AndroidTest`. Trên CI Linux không hỗ trợ hardware rendering (ví dụ GitHub Actions): thêm `-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect`. Cấu hình CI runner (KVM) xem `20-Git-CICD.md` mục 12.
+
+Chi tiết đã đối chiếu với [Gradle Managed Devices](https://developer.android.com/studio/test/gradle-managed-devices) (kiểm tra 18/11/2026):
+
+- DSL hiện tại là `managedDevices { localDevices { create(...) } }` như trên (block `devices { }` kiểu cũ vẫn xuất hiện trong ví dụ Baseline Profile); GMD dùng cho API 27+.
+- Group ([#define-groups](https://developer.android.com/studio/test/gradle-managed-devices#define-groups)): `groups { create("phoneAndTablet") { targetDevices.add(devices["pixel2api29"]) } }`, chạy song song mọi device trong group.
+- Sharding ([#test-sharding](https://developer.android.com/studio/test/gradle-managed-devices#test-sharding)): `android.experimental.androidTest.numManagedDeviceShards=<n>` trong `gradle.properties`; group 3 device với 2 shard là 6 emulator, mỗi shard xuất một file `.proto`.
+- ATD ([#gmd-atd](https://developer.android.com/studio/test/gradle-managed-devices#gmd-atd)): `systemImageSource = "aosp-atd"` hoặc `"google-atd"`; bỏ app Google, SystemUI, tắt hardware rendering, nên screenshot test phụ thuộc hardware rendering không chạy trên ATD. Comment trong ví dụ của docs vẫn ghi "ATDs currently support only API level 30" nhưng đã cũ: repository system image của Google (`dl.google.com/android/repository/sys-img/aosp_atd/sys-img2-3.xml`) hiện có `aosp_atd` cho API 30 tới 37, nên `apiLevel = 34` ở trên hợp lệ.
 
 ### 9.4 Firebase Test Lab (FTL)
 
@@ -1819,7 +2021,33 @@ gcloud firebase test android run \
   --timeout 20m
 ```
 
-`gcloud firebase test android models list` để chọn model. `--type robo` cho Robo test (crawler tự bấm, không cần viết test, tốt cho smoke). GMD cũng hỗ trợ FTL device qua `firebase-test-lab` plugin (`managedDevices { allDevices { create<ManagedVirtualDevice> ... } }` phần FTL cần kiểm tra docs).
+`gcloud firebase test android models list` để chọn model. `--type robo` cho Robo test (crawler tự bấm, không cần viết test, tốt cho smoke).
+
+GMD chạy trên FTL (nguồn: [GMD #gmd-ftl](https://developer.android.com/studio/test/gradle-managed-devices#gmd-ftl) và [#ftl-gmd-dsl](https://developer.android.com/studio/test/gradle-managed-devices#ftl-gmd-dsl), kiểm tra 18/11/2026). Cần bật Cloud Testing API + Cloud Tool Results API, `gradle.properties` có `android.experimental.testOptions.managedDevices.customDevice=true`, plugin root `id("com.google.firebase.testlab") version "0.0.1-alpha05" apply false`, rồi ở module:
+
+```kotlin
+plugins { id("com.google.firebase.testlab") }
+
+firebaseTestLab {
+    serviceAccountCredentials.set(file("ftl-service-account.json"))   // khuyến nghị cho CI
+    managedDevices {
+        create("ftlDevice") { device = "Pixel3"; apiLevel = 30 }
+    }
+    testOptions {
+        fixture { grantedPermissions = "all" }          // mặc định "all"
+        execution {
+            timeoutMinutes = 30                          // mặc định 15; tối đa 45 (device thật) / 60 (ảo)
+            maxTestReruns = 1                            // mặc định 0, tối đa 10
+            numUniformShards = 4                         // hoặc targetedShardDurationMinutes, không đặt cả hai
+        }
+        results { recordVideo = false; performanceMetrics = true }
+    }
+}
+// chạy giống GMD: ./gradlew ftlDeviceDebugAndroidTest
+```
+
+- Smart sharding: `testOptions { targetedShardDurationMinutes = 2 }` chia theo lịch sử thời gian chạy; tối đa 50 shard trên device thật, 100 trên ảo; nên đặt nhỏ hơn `timeoutMinutes` ít nhất 5 phút. Gradle không chạy song song các FTL device.
+- Quota và giá: xem [Usage levels, quotas, and pricing for Test Lab](https://firebase.google.com/docs/test-lab/usage-quotas-pricing); vượt quota miễn phí thì project phải ở gói Blaze.
 
 **Lỗi hay gặp / trade-off**
 - Emulator trên CI không KVM: chậm 10 lần hoặc không boot. Dùng runner có KVM, hoặc FTL, hoặc đẩy test xuống Robolectric.
@@ -1829,9 +2057,12 @@ gcloud firebase test android run \
 
 **Đọc thêm:**
 - https://developer.android.com/training/testing/espresso (Espresso basics, idling resources)
-- https://robolectric.org (Robolectric, bảng SDK hỗ trợ)
-- https://developer.android.com/studio/test/gradle-managed-devices (GMD)
-- https://firebase.google.com/docs/test-lab (Firebase Test Lab)
+- https://developer.android.com/training/testing/espresso/idling-resource (IdlingResource, CountingIdlingResource)
+- https://developer.android.com/training/testing/other-components/ui-automator (UI Automator)
+- https://developer.android.com/training/testing/local-tests/robolectric (Robolectric: khi nào dùng, theo Google)
+- https://robolectric.org/configuring/ (`@Config`, `robolectric.properties`)
+- https://developer.android.com/studio/test/gradle-managed-devices (GMD, sharding, ATD, FTL devices)
+- https://firebase.google.com/docs/test-lab/usage-quotas-pricing (FTL quota)
 
 ## 10. Screenshot testing
 
@@ -1843,54 +2074,65 @@ Ba lựa chọn hiện tại:
 
 | Tool | Chạy ở đâu | Cách viết | Hỗ trợ | Ghi chú |
 |---|---|---|---|---|
-| Compose Preview Screenshot Testing (Google) | JVM, plugin AGP | Dùng luôn `@Preview` trong `src/screenshotTest` | Android | Chính thức, còn alpha, ít cấu hình nhất |
+| Compose Preview Screenshot Testing (Google) | JVM (layoutlib), AGP test suites từ AGP 9.5 | `@PreviewTest` + `@Preview` trong source set riêng (`src/screenshotTest`) | Android (không hỗ trợ target non-Android của KMP) | Chính thức, engine `0.0.1-alpha16`, experimental |
 | Roborazzi | JVM qua Robolectric | Test thường + `captureRoboImage()` | Android, CMP (desktop, iOS) | Quay được cả interaction (click rồi chụp), hỗ trợ CMP |
 | Paparazzi (Cash App) | JVM qua layoutlib | Rule + `snapshot { }` | Android library module | Nhanh, không Robolectric, không chạy chung với Robolectric trong một module |
 
 ### 10.2 Compose Preview Screenshot Testing
 
+Trạng thái (kiểm tra 18/11/2026): trang [Compose Preview Screenshot Testing](https://developer.android.com/studio/preview/compose-screenshot-testing) ghi plugin độc lập `com.android.compose.screenshot` "is no longer maintained"; Google khuyên chuyển sang [AGP test suites](https://developer.android.com/studio/preview/compose-screenshot-testing-with-testsuites) (AGP 9.5.0-alpha03+, engine `0.0.1-alpha16`, JDK 17+, đánh dấu Experimental). Cả hai cách đều cần `@PreviewTest` và `screenshot-validation-api`.
+
+Cách mới, AGP test suites ([#setup](https://developer.android.com/studio/preview/compose-screenshot-testing-with-testsuites#setup)):
+
 ```properties
-# gradle.properties
+# gradle.properties (root)
 android.experimental.enableScreenshotTest=true
+android.experimental.testSuiteSupport=true
 ```
 
 ```kotlin
-// composeApp/build.gradle.kts hoặc module feature
-plugins {
-    id("com.android.compose.screenshot")   // pin bản alpha mới nhất theo docs
-}
+// module build.gradle.kts
 android {
-    experimentalProperties["android.experimental.enableScreenshotTest"] = true
-}
-dependencies {
-    screenshotTestImplementation(libs.compose.ui.tooling)
+    testOptions {
+        screenshotTests.create("screenshotTest") {      // tên suite = tên source set src/screenshotTest
+            engineVersion = "0.0.1-alpha16"
+            targetVariants.add("debug")
+            dependencies {
+                implementation(libs.androidx.compose.ui.tooling)
+                implementation("com.android.tools.screenshot:screenshot-validation-api:0.0.1-alpha16")
+            }
+        }
+    }
 }
 ```
 
 ```kotlin
 // src/screenshotTest/kotlin/.../SettingsScreenshots.kt
-class SettingsScreenshots {
-    @Preview(showBackground = true)
-    @Composable
-    fun SettingsLight() {
-        AppTheme { SettingsScreen(SettingsState.sample(), onAction = {}) }
-    }
+import com.android.tools.screenshot.PreviewTest
 
-    @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-    @Composable
-    fun SettingsDark() {
-        AppTheme(darkTheme = true) { SettingsScreen(SettingsState.sample(), onAction = {}) }
-    }
-
-    @Preview(fontScale = 1.5f)
-    @Composable
-    fun SettingsLargeFont() {
-        AppTheme { SettingsScreen(SettingsState.sample(), onAction = {}) }
-    }
+@PreviewTest
+@Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(fontScale = 1.5f)
+@Composable
+fun SettingsScreenPreview() {                            // hàm top-level; mỗi @Preview là một ảnh
+    AppTheme { SettingsScreen(SettingsState.sample(), onAction = {}) }
 }
 ```
 
-Lệnh: `./gradlew updateDebugScreenshotTest` ghi ảnh chuẩn vào `src/debug/screenshotTest/reference/`; `./gradlew validateDebugScreenshotTest` so sánh, báo cáo HTML trong `build/reports/screenshotTest/preview/debug/`. Vì còn alpha, tên task và đường dẫn có thể đổi; kiểm tra docs trước khi viết vào CI.
+Lệnh và đường dẫn ([#tasks-and-paths](https://developer.android.com/studio/preview/compose-screenshot-testing-with-testsuites#tasks-and-paths)):
+
+| | Plugin cũ (deprecated) | AGP test suites |
+|---|---|---|
+| Ghi ảnh chuẩn | `./gradlew updateDebugScreenshotTest` | `./gradlew update{SuiteName}{Target}{Variant}TestSuite`, ví dụ `updateScreenshotTestDefaultDebugTestSuite` |
+| So sánh | `./gradlew validateDebugScreenshotTest` | `./gradlew test{SuiteName}{Target}{Variant}TestSuite` |
+| Ảnh chuẩn | `src/screenshotTestDebug/reference` | `src/{suiteName}{Target}{Variant}/reference` |
+| Report | `build/reports/screenshotTest/preview/debug/index.html` | `build/reports/tests/{taskName}/index.html` |
+
+- Plugin cũ setup: `plugins { alias(libs.plugins.screenshot) }` (`com.android.compose.screenshot:0.0.1-alpha16`), `experimentalProperties["android.experimental.enableScreenshotTest"] = true` trong `android {}`, và `screenshotTestImplementation(...)` cho `ui-tooling` và `screenshot-validation-api`.
+- Tên ảnh = tên đầy đủ hàm + hash tham số preview; đổi tên hàm `@PreviewTest` là mất liên kết với ảnh cũ, phải record lại.
+- JVM hết heap khi chụp nhiều: `android.compose.screenshot.maxHeapSize=4g` trong `gradle.properties`.
+- Ngưỡng sai khác (plugin cũ, từ `0.0.1-alpha06`, theo [release notes](https://developer.android.com/studio/preview/compose-screenshot-testing-release-notes)): `android { testOptions { screenshotTests { imageDifferenceThreshold = 0.0001f } } }` (0.01%, áp cho mọi test trong module). Trang AGP test suites chưa mô tả tham số ngưỡng cho DSL `screenshotTests.create(...)`; khi chuyển sang cách mới, tra lại DSL reference trước khi đưa vào CI.
 
 ### 10.3 Roborazzi
 
@@ -1974,7 +2216,8 @@ Golden trong CI:
 - Dùng screenshot test thay unit test logic: chậm, khó đọc vì sao fail.
 
 **Đọc thêm:**
-- https://developer.android.com/studio/preview/compose-screenshot-testing (Compose Preview Screenshot Testing)
+- https://developer.android.com/studio/preview/compose-screenshot-testing-with-testsuites (Compose Preview Screenshot Testing với AGP test suites, cách được khuyến nghị)
+- https://developer.android.com/studio/preview/compose-screenshot-testing (plugin độc lập cũ, không còn được maintain)
 - https://github.com/takahirom/roborazzi (Roborazzi)
 - https://github.com/cashapp/paparazzi (Paparazzi)
 
@@ -1984,13 +2227,49 @@ Golden trong CI:
 
 Chi tiết nằm ở `04-Android-Kotlin-Deep-Dive.md` mục Performance. Ở góc nhìn testing:
 
-- Macrobenchmark là test chạy trên device thật, đo startup, scroll jank, với `CompilationMode` khác nhau. Nó nằm trong module riêng (`:benchmark`), task `connectedBenchmarkReleaseAndroidTest`.
+- Macrobenchmark là test chạy trên device thật, đo startup, scroll jank, với `CompilationMode` khác nhau. Nó nằm trong module `com.android.test` riêng (ví dụ `:macrobenchmark`), app đích phải `profileable`, non-debuggable, gần release nhất (build type `benchmark` `initWith(release)` ký debug). Chạy: `./gradlew :macrobenchmark:connectedCheck`, hoặc một test: `-P android.testInstrumentationRunnerArguments.class=<FQCN>#startup`. Google không khuyến khích chạy trên emulator vì số không đại diện.
 - Không chạy mỗi PR (chậm, cần device ổn định). Chạy nightly hoặc trước release, so sánh với baseline; cảnh báo khi startup chậm hơn X%.
 - Baseline Profile generator cũng là một test (`BaselineProfileRule`), chạy để sinh file profile commit vào repo.
 
+Code (nguồn: [Macrobenchmark overview #create-macrobenchmark](https://developer.android.com/topic/performance/benchmarking/macrobenchmark-overview#create-macrobenchmark) và [Create Baseline Profiles](https://developer.android.com/topic/performance/baselineprofiles/create-baselineprofile), kiểm tra 18/11/2026):
+
+```kotlin
+@LargeTest
+@RunWith(AndroidJUnit4::class)
+class StartupBenchmark {
+    @get:Rule val rule = MacrobenchmarkRule()
+
+    @Test
+    fun coldStartup() = rule.measureRepeated(
+        packageName = "me.ltthuc.kmp",
+        metrics = listOf(StartupTimingMetric()),          // timeToInitialDisplayMs, timeToFullDisplayMs
+        compilationMode = CompilationMode.Partial(),      // mặc định DEFAULT: cài Baseline Profile nếu có
+        startupMode = StartupMode.COLD,                    // COLD kill process giữa setupBlock và measureBlock
+        iterations = 10,
+        setupBlock = { pressHome() },
+    ) { startActivityAndWait() }
+}
+
+class BaselineProfileGenerator {
+    @get:Rule val rule = BaselineProfileRule()
+
+    @Test
+    fun generate() = rule.collect(packageName = "me.ltthuc.kmp", includeInStartupProfile = true) {
+        startActivityAndWait()                             // thêm các critical user journey ở đây
+    }
+}
+```
+
+Plugin `androidx.baselineprofile` apply ở cả module producer (`com.android.test`, `targetProjectPath = ":app"`) lẫn `:app` (`dependencies { baselineProfile(project(":baselineprofile")) }`). Sinh profile: `./gradlew :app:generateBaselineProfile` (hoặc `generate<Variant>BaselineProfile`), file được copy vào `app/src/<variant>/generated/baselineProfiles/`. Cần device root, hoặc API 33+ với Macrobenchmark 1.2.0-alpha06+; GMD thì dùng `systemImageSource = "aosp"`.
+
 ### 11.2 Journeys (Android Studio)
 
-Journeys là tính năng E2E test trong Android Studio (Gemini Agent Mode, bản Rabbit theo brief ecosystem): bạn mô tả hành trình bằng ngôn ngữ tự nhiên ("mở Settings, bật dark mode, kiểm tra màn hình chuyển sang nền tối"), agent điều khiển app trên device/emulator và tự đánh giá kết quả.
+Journeys là tính năng E2E test trong Android Studio: bạn mô tả hành trình bằng ngôn ngữ tự nhiên ("mở Settings, bật dark mode, kiểm tra màn hình chuyển sang nền tối"), AI agent điều khiển app trên device/emulator và tự đánh giá assertion dựa trên những gì nó thấy trên màn hình. Fact đã đối chiếu tại [Journeys for Android Studio](https://developer.android.com/studio/gemini/journeys) (kiểm tra 18/11/2026):
+
+- Từ Android Studio Rabbit 3: chạy journey bằng AI agent trong cửa sổ Agent (agent bạn chọn, không bắt buộc Gemini; cấu hình ở Settings > Tools > AI > Agents). Rabbit 2 trở về trước: là tính năng Studio Labs, chạy journey như AGP test suite, cần AGP 9.0.0+.
+- File journey là XML đuôi `.journey.xml`, đặt trong `src/journeysTest/` của app module; Studio có Design view để soạn từng bước. Không cần sửa build file.
+- Hỗ trợ: tap, long-press, type, swipe/scroll. Không hỗ trợ: cử chỉ nhiều ngón (pinch zoom). Có thể không ổn định: đếm số lượng.
+- Chạy từ command line với bất kỳ agent nào qua [Android CLI](https://developer.android.com/tools/agents/android-cli/journeys). Kết quả là report từng bước, kèm lệnh agent đã chạy và screenshot.
 
 Vị trí trong chiến lược test:
 
@@ -1998,11 +2277,12 @@ Vị trí trong chiến lược test:
 - Không thay thế: test deterministic. Kết quả phụ thuộc model, có thể không lặp lại được; chậm; cần device.
 - Trả lời interviewer: "Journeys dùng cho exploratory và regression ở mức hành trình; gate PR vẫn là unit + screenshot test."
 
-Cách chạy trong CI và giới hạn hiện tại cần kiểm tra lại tại https://developer.android.com/studio/gemini/features vì tính năng đổi nhanh.
+Trong CI: trang Journeys chỉ mô tả chạy trong IDE và qua Android CLI, không có hướng dẫn gate PR. Vì kết quả do model đánh giá, coi nó là job nightly/exploratory, không phải gate.
 
 **Đọc thêm:**
 - https://developer.android.com/topic/performance/benchmarking/macrobenchmark-overview
-- https://developer.android.com/studio/gemini/features (Gemini in Android Studio, bao gồm Journeys)
+- https://developer.android.com/topic/performance/baselineprofiles/create-baselineprofile (BaselineProfileRule, plugin `androidx.baselineprofile`)
+- https://developer.android.com/studio/gemini/journeys (Journeys for Android Studio)
 
 ## 12. Testing trong KMP
 
@@ -2058,21 +2338,58 @@ Trên CI cần runner macOS với Xcode (xem `20-Git-CICD.md` mục 13). Test iO
 
 ### 12.3 Test platform-specific
 
-- `androidUnitTest`: Robolectric, MockK, Room Android.
+- `androidUnitTest` (plugin KMP mới: `androidHostTest`): Robolectric, MockK, Room Android.
 - `iosTest`: test `actual` iOS (NSUserDefaults wrapper, file path). Dùng `kotlin.test` + API Foundation qua cinterop.
-- Pattern: định nghĩa contract test trong `commonTest` dưới dạng `abstract class SettingsStoreContract { abstract fun create(): SettingsStore; @Test fun roundTrip() ... }`, rồi mỗi platform có class con `actual` khởi tạo implementation thật. Một bộ test, nhiều implementation.
+- Pattern: contract test trong `commonTest` là abstract class, mỗi platform có class con khởi tạo implementation thật. Một bộ test, nhiều implementation. Không cần `expect/actual`: class con trong `iosTest`/`androidUnitTest` thấy được class abstract của `commonTest` vì cây source set test kế thừa nhau ([Run tests in KMP](https://kotlinlang.org/docs/multiplatform/multiplatform-run-tests.html)).
+
+```kotlin
+// commonTest
+abstract class SettingsStoreContract {
+    protected abstract fun createStore(): SettingsStore     // mỗi test một instance mới
+
+    @Test fun missingKeyReturnsDefault() =
+        assertEquals("light", createStore().getString("theme", default = "light"))
+
+    @Test fun putThenGetRoundTrips() {
+        val store = createStore()
+        store.putString("theme", "dark")
+        assertEquals("dark", store.getString("theme", default = "light"))
+    }
+}
+
+// commonTest: fake cũng phải pass cùng contract, nên fake không lệch production
+class FakeSettingsStoreTest : SettingsStoreContract() {
+    override fun createStore(): SettingsStore = FakeSettingsStore()
+}
+
+// iosTest
+class NsUserDefaultsSettingsStoreTest : SettingsStoreContract() {
+    override fun createStore(): SettingsStore =
+        NsUserDefaultsSettingsStore(NSUserDefaults(suiteName = "test-${Random.nextInt()}"))
+}
+
+// androidUnitTest (Robolectric cho SharedPreferences)
+@RunWith(AndroidJUnit4::class)
+class SharedPrefsSettingsStoreTest : SettingsStoreContract() {
+    override fun createStore(): SettingsStore = SharedPrefsSettingsStore(
+        ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("t-${Random.nextInt()}", 0))
+}
+```
+
+`@Test` của `kotlin.test` trên abstract class được kế thừa bởi class con, JUnit và runner Kotlin/Native đều chạy các test đó trên class con.
 
 ### 12.4 Coroutines + Turbine trong common
 
 `kotlinx-coroutines-test` và Turbine đều multiplatform. `Dispatchers.setMain` dùng được trong `commonTest`. Nên toàn bộ mục 5 và 6 áp dụng nguyên cho `commonTest` với `@BeforeTest` thay rule. Chỉ MockK là JVM-only.
 
 **Lỗi hay gặp / trade-off**
-- Test trong `commonTest` dùng `java.*` hoặc MockK: compile iOS fail. Chuyển sang `androidUnitTest`/`jvmTest`.
+- Test trong `commonTest` dùng `java.*` hoặc MockK: compile iOS fail. Chuyển sang `androidUnitTest` (plugin mới: `androidHostTest`) hoặc `jvmTest`.
 - iOS test fail vì simulator chưa có hoặc Xcode license chưa accept trên CI.
 - Dùng `runBlocking` trong `commonTest`: có trên JVM/Native nhưng không có trên JS/Wasm; `runTest` an toàn hơn.
 
 **Đọc thêm:**
-- https://kotlinlang.org/docs/multiplatform-run-tests.html (chạy test theo target, chọn simulator)
+- https://kotlinlang.org/docs/multiplatform/multiplatform-run-tests.html (chạy test theo target, chọn simulator)
+- https://developer.android.com/kotlin/multiplatform/plugin#configure-tests (androidHostTest / androidDeviceTest)
 - https://kotlinlang.org/api/latest/kotlin.test/ (API kotlin.test)
 - https://github.com/cashapp/turbine (hỗ trợ multiplatform)
 
@@ -2115,7 +2432,7 @@ dependencies {
 }
 ```
 
-Lệnh: `./gradlew koverHtmlReport` (mở `build/reports/kover/html/index.html`), `koverXmlReport` (cho CI/SonarQube), `koverVerify`. DSL theo Kover 0.9; kiểm tra tại repo trước khi copy.
+Lệnh: `./gradlew koverHtmlReport` (mở `build/reports/kover/html/index.html`), `koverXmlReport` (cho CI/SonarQube), `koverVerify`. DSL theo Kover 0.9.x (bản mới nhất trên Gradle Plugin Portal ngày 18/11/2026 là 0.9.11); tài liệu DSL: [kotlin.github.io/kotlinx-kover/gradle-plugin](https://kotlin.github.io/kotlinx-kover/gradle-plugin/).
 
 JaCoCo cho Android thuần: `buildTypes { debug { enableUnitTestCoverage = true } }` rồi `./gradlew createDebugUnitTestCoverageReport`. Kover đơn giản hơn với Kotlin và inline function.
 
@@ -2138,9 +2455,24 @@ Flaky = chạy lúc pass lúc fail mà code không đổi. Một test flaky làm
 
 Quy trình xử lý ở mức Lead: (1) tự động phát hiện (CI retry 1 lần và gắn nhãn flaky nếu lần 2 pass); (2) quarantine: đổi sang tag `@Flaky`, không chặn PR; (3) owner sửa trong 1 tuần; (4) nếu không ai sửa, xoá test. Không bật "retry 3 lần" mặc định cho toàn bộ bộ test; đó là cách giấu bug.
 
+Nguồn để trích (kiểm tra 18/11/2026):
+
+- [Flaky Tests at Google and How We Mitigate Them](https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html) (John Micco, Google Testing Blog, 5/2016): định nghĩa flaky là "both a passing and a failing result with the same code"; khoảng 1.5% lượt chạy test cho kết quả flaky; gần 16% test có mức flaky nào đó; khoảng 84% lần chuyển pass sang fail mà CI ghi nhận có dính test flaky.
+- Android, [Big test stability](https://developer.android.com/training/testing/instrumented-tests/stability): ba biện pháp chính là cấu hình device đúng (GMD), tránh lỗi đồng bộ (idling resource cho test nhỏ, wait-until cho test lớn, không `sleep`), và retry ([#retry-mechanisms](https://developer.android.com/training/testing/instrumented-tests/stability#retry-mechanisms): JUnit rule retry, bước retry trong CI, restart emulator). Key point của Google: "Add retrying mechanisms to big tests, but always fix flaky tests", tức retry chỉ cho big test và luôn kèm việc sửa.
+
 ### 13.3 TDD trong thực tế
 
 Test-Driven Development: viết test trước (đỏ), viết code tối thiểu cho pass (xanh), dọn code (refactor). Lặp.
+
+Định nghĩa gốc của Kent Beck, bài [Canon TDD](https://newsletter.kentbeck.com/p/canon-tdd) (newsletter "Software Design: Tidy First?", 11/12/2023; link cũ tidyfirst.substack.com redirect về đây), gồm 5 bước:
+
+1. Viết danh sách các test scenario muốn cover (test list).
+2. Biến đúng một mục trong list thành một test cụ thể, chạy được.
+3. Sửa code để test đó (và mọi test trước) pass, thêm mục mới vào list khi phát hiện.
+4. Tuỳ chọn: refactor để cải thiện thiết kế implementation.
+5. Còn mục trong list thì quay lại bước 2.
+
+Điểm hay bị hiểu sai mà Beck nhấn mạnh: bước 1 là test list chứ không phải viết hết test một lượt; bước 2 chỉ một test.
 
 Ví dụ ngắn, hàm `slugify` cho tên bài học:
 
@@ -2171,7 +2503,11 @@ Với Claude Code: đưa test cho agent trước, yêu cầu code pass test. B�
 
 ### 13.4 Mutation testing (khái niệm)
 
-Coverage trả lời "dòng này có chạy không", mutation testing trả lời "test có phát hiện khi dòng này sai không". Tool sửa code tự động (đổi `>` thành `>=`, xoá một dòng, đảo điều kiện), chạy lại test; nếu test vẫn xanh thì "mutant sống sót", tức test yếu. Tool JVM phổ biến: Pitest (`info.solidsoft.pitest` Gradle plugin), hoạt động với Kotlin JVM module, hạn chế với Android. Trong phỏng vấn chỉ cần nói được khái niệm và khi nào dùng (module domain quan trọng, chạy hàng tuần, không chạy mỗi PR vì chậm).
+Coverage trả lời "dòng này có chạy không", mutation testing trả lời "test có phát hiện khi dòng này sai không". Tool sửa code tự động (đổi `>` thành `>=`, xoá một dòng, đảo điều kiện), chạy lại test; nếu test vẫn xanh thì "mutant sống sót", tức test yếu. Tool JVM phổ biến: Pitest (PIT). Trong phỏng vấn chỉ cần nói được khái niệm và khi nào dùng (module domain quan trọng, chạy hàng tuần, không chạy mỗi PR vì chậm). Chi tiết tool (kiểm tra 18/11/2026):
+
+- Gradle plugin cho module JVM: `info.solidsoft.pitest` (bản mới nhất 1.19.0 trên Gradle Plugin Portal, docs [gradle-pitest-plugin.solidsoft.info](https://gradle-pitest-plugin.solidsoft.info/)). Cho Android module: fork `pl.droidsonroids.pitest` ([github.com/koral--/gradle-pitest-plugin](https://github.com/koral--/gradle-pitest-plugin), bản 0.3.0).
+- Kotlin: [pitest.org/faq](https://pitest.org/faq/) ghi ngôn ngữ được hỗ trợ là Java và "Kotlin (via the Arcmutate kotlin plugin)". Không có plugin đó, PIT sinh nhiều "junk mutation" từ bytecode do compiler Kotlin sinh ra (null check, coroutine state machine, accessor), không ứng với lỗi lập trình viên có thể gõ. Plugin `com.arcmutate:pitest-kotlin-plugin` là sản phẩm thương mại, licence theo subscription trả phí ([docs.arcmutate.com/docs/kotlin.html](https://docs.arcmutate.com/docs/kotlin.html), yêu cầu pitest 1.22.0+).
+- Hệ quả thực tế cho repo Kotlin: chạy PIT không có Arcmutate vẫn được, nhưng phải lọc nhiễu tay và chỉ đọc mutant ở code logic thuần; đó là lý do mutation testing ít gặp trong team Android.
 
 ### 13.5 Đặt tên và cấu trúc test
 
@@ -2217,6 +2553,12 @@ Checklist review một PR có test:
 - https://github.com/Kotlin/kotlinx-kover (Kover docs và DSL)
 - https://developer.android.com/training/testing/instrumented-tests/androidx-test-libraries/runner (Orchestrator, clearPackageData chống flaky)
 - https://martinfowler.com/articles/nonDeterminism.html (Eradicating Non-Determinism in Tests)
+- https://developer.android.com/training/testing/instrumented-tests/stability (Big test stability: sync, retry)
+- https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html (số liệu flaky ở Google)
+- https://testing.googleblog.com/2020/08/code-coverage-best-practices.html (60/75/90, per-commit 99%)
+- https://newsletter.kentbeck.com/p/canon-tdd (Canon TDD, Kent Beck)
+- https://pitest.org/faq/ (PIT, hỗ trợ Kotlin qua Arcmutate)
+- `27-Engineering-Standards-Per-Phase.md` chủ đề 4 (thế nào là test tốt, rubric review test)
 - https://github.com/android/nowinandroid (xem `core/testing`, cách tổ chức fake và test rule)
 
 ## Interview Q&A (English)
@@ -2247,7 +2589,7 @@ Checklist review một PR có test:
 **Điểm interviewer muốn nghe:** Hiểu hàng đợi vs eager, biết hệ quả lên state trung gian.
 
 ### Q6. How does runTest handle delay, and what is the role of the scheduler?
-**A:** runTest creates a TestScope backed by a TestCoroutineScheduler. delay does not sleep; it registers a task at a future virtual time and the scheduler jumps the clock to the next task when the test body is idle. advanceTimeBy moves the clock explicitly, advanceUntilIdle runs everything. This makes a retry with exponential backoff of one plus two seconds test in milliseconds while asserting currentTime equals 3000. runTest also has a real wall-clock timeout to stop hung tests, and it fails if child coroutines of the TestScope are still active at the end, which catches leaked collectors.
+**A:** runTest creates a TestScope backed by a TestCoroutineScheduler. delay does not sleep; it registers a task at a future virtual time and the scheduler jumps the clock to the next task when the test body is idle. advanceTimeBy moves the clock explicitly, advanceUntilIdle runs everything. This makes a retry with exponential backoff of one plus two seconds test in milliseconds while asserting currentTime equals 3000. runTest also has a real wall-clock timeout, 60 seconds by default, configurable per test with the timeout parameter or globally on the JVM with the kotlinx.coroutines.test.default_timeout system property. After the body returns, runTest keeps running scheduled tasks and waits for every child coroutine of the TestScope; if one never finishes, such as an infinite polling loop, the test hangs until the timeout and then fails with UncompletedCoroutinesError listing the active jobs, which catches leaked collectors. Work that should outlive the body goes into backgroundScope, which is cancelled automatically.
 **Follow-ups:** How do you test code that uses System.currentTimeMillis? How do you run a background collector during the test? Why would a test hang even with virtual time?
 **Điểm interviewer muốn nghe:** Thời gian ảo, backgroundScope, lý do treo (dispatcher thật).
 
@@ -2312,7 +2654,7 @@ Checklist review một PR có test:
 **Điểm interviewer muốn nghe:** Khai báo trong build, ATD, KVM.
 
 ### Q19. Compare Compose Preview Screenshot Testing, Roborazzi and Paparazzi.
-**A:** Preview Screenshot Testing is Google's official plugin: existing Preview functions in a screenshotTest source set become tests, record and validate tasks, minimal setup, still alpha. Roborazzi runs on Robolectric so it can capture after interactions and supports Compose Multiplatform targets including desktop and iOS, which matters for a KMP project. Paparazzi uses layoutlib without Robolectric, is fast and stable, but cannot drive interactions and has module-type constraints. For an Android-only app I start with the official plugin; for KMP with shared UI I choose Roborazzi; for a pure design-system library Paparazzi is the leanest.
+**A:** Compose Preview Screenshot Testing is Google's official tool: Preview functions annotated with @PreviewTest in a screenshotTest source set become tests, with the screenshot-validation-api dependency, update and test tasks, and an HTML diff report. It is still experimental with engine 0.0.1-alpha16, and Google now recommends running it through AGP test suites on AGP 9.5 or higher because the standalone com.android.compose.screenshot plugin is no longer maintained. It is Android-only and does not support non-Android KMP targets. Roborazzi runs on Robolectric so it can capture after interactions and supports Compose Multiplatform targets including desktop and iOS, which matters for a KMP project. Paparazzi uses layoutlib without Robolectric, is fast and stable, but cannot drive interactions and has module-type constraints. For an Android-only app I start with the official plugin; for KMP with shared UI I choose Roborazzi; for a pure design-system library Paparazzi is the leanest.
 **Follow-ups:** Where do you store golden images? How do you update them safely? How do you avoid font rendering differences between machines?
 **Điểm interviewer muốn nghe:** Biết 3 tool và chọn theo bối cảnh KMP vs Android-only.
 
@@ -2322,7 +2664,7 @@ Checklist review một PR có test:
 **Điểm interviewer muốn nghe:** Quy trình record/verify rõ ràng, chống lệch môi trường.
 
 ### Q21. How do you test a Room database?
-**A:** For DAOs I use an in-memory database so each test starts empty and nothing touches disk; on Android that is Room.inMemoryDatabaseBuilder with a Context in an instrumented test or under Robolectric, and in Room KMP the JVM and Native builders take no context with the bundled SQLite driver. I test queries, conflict strategies and Flow emissions with Turbine. For migrations I use MigrationTestHelper with the exported schema JSON to validate each step. Repository tests above the DAO use fakes, because DAO behavior is already covered.
+**A:** For DAOs I use an in-memory database so each test starts empty and nothing touches disk; on Android that is Room.inMemoryDatabaseBuilder with a Context in an instrumented test or under Robolectric, and in Room KMP the JVM and Native builders take no context with the bundled SQLite driver. I test queries, conflict strategies and Flow emissions with Turbine. For migrations I export schemas with the Room Gradle plugin's schemaDirectory and commit the JSON, then use MigrationTestHelper, a JUnit4 rule: createDatabase at the old version, insert rows with raw SQL because DAOs expect the new schema, then runMigrationsAndValidate to the new version, which checks the schema automatically, and I assert the data myself. Auto migrations are validated the same way without passing a Migration, and I keep one test that walks every migration from version one. Repository tests above the DAO use fakes, because DAO behavior is already covered. I also know Room 3.0 moved to the androidx.room3 package with a mandatory SQLiteDriver and coroutine-only APIs, so the same tests mainly change imports.
 **Follow-ups:** Why export schemas? How do you test a destructive migration policy? How do you run Room tests in commonTest?
 **Điểm interviewer muốn nghe:** In-memory, migration test, phân tầng DAO vs repository.
 
@@ -2332,7 +2674,7 @@ Checklist review một PR có test:
 **Điểm interviewer muốn nghe:** Graph verification tách khỏi logic test.
 
 ### Q23. What does your test setup look like in a KMP module?
-**A:** Shared logic lives in commonTest with kotlin.test, kotlinx-coroutines-test and Turbine, which are all multiplatform; those tests compile and run for Android unit, JVM and iOS simulator targets, so one test proves expect/actual behaves the same everywhere. Platform-specific tests go in androidUnitTest, where MockK and Robolectric are available, or iosTest for Foundation-backed actuals. I use fakes rather than mocks in common code because MockK is JVM only. CI runs the JVM tests on every PR and iOS tests on macOS runners for affected modules or nightly.
+**A:** Shared logic lives in commonTest with kotlin.test, kotlinx-coroutines-test and Turbine, which are all multiplatform; those tests compile and run for Android unit, JVM and iOS simulator targets, so one test proves expect/actual behaves the same everywhere. Platform-specific tests go in androidUnitTest, where MockK and Robolectric are available, or iosTest for Foundation-backed actuals. With the newer com.android.kotlin.multiplatform.library plugin, which AGP 9 pushes KMP libraries toward, those Android source sets are named androidHostTest and androidDeviceTest and must be enabled explicitly with withHostTest and withDeviceTest. For a shared interface I write an abstract contract test in commonTest and subclass it per platform, including for the fake. I use fakes rather than mocks in common code because MockK is JVM only. CI runs the JVM tests on every PR and iOS tests on macOS runners for affected modules or nightly.
 **Follow-ups:** How do you choose the iOS simulator for a test run? What is a contract test across platforms? How do you test Compose Multiplatform UI in common code?
 **Điểm interviewer muốn nghe:** Biết giới hạn tool theo target, tổ chức source set.
 
@@ -2347,12 +2689,12 @@ Checklist review một PR có test:
 **Điểm interviewer muốn nghe:** Nguyên nhân cụ thể + quy trình có owner và deadline.
 
 ### Q26. What coverage target do you set and how do you enforce it?
-**A:** I set targets per module rather than per repo: domain and repository layers around 70 to 80 percent lines, ViewModels require a state-machine test rather than a percentage, and composables are excluded from coverage because screenshot tests cover them. Kover enforces a minimum per module and reports in CI; the number only moves up, never down, and a drop blocks the PR. I treat coverage as a map of untested code, not a quality score, and I review assertions during code review to prevent empty tests written to satisfy the number.
+**A:** I set targets per module rather than per repo: domain and repository layers around 70 to 80 percent lines, ViewModels require a state-machine test rather than a percentage, and composables are excluded from coverage because screenshot tests cover them. Kover enforces a minimum per module and reports in CI; the number only moves up, never down, and a drop blocks the PR. I treat coverage as a map of untested code, not a quality score, and I review assertions during code review to prevent empty tests written to satisfy the number. If asked for a reference, Google's Testing Blog post Code Coverage Best Practices from 2020 gives 60 percent as acceptable, 75 as commendable and 90 as exemplary, says project-wide goals above 90 are most likely not worth it, and suggests per-commit coverage of 99 percent with 90 as a lower threshold, which is why I gate on changed code.
 **Follow-ups:** Why exclude composables? What about branch coverage? How do you handle generated code in the report?
 **Điểm interviewer muốn nghe:** Theo module, ratchet, coverage là chỉ báo thiếu chứ không phải điểm chất lượng.
 
 ### Q27. What is mutation testing and would you use it?
-**A:** Mutation testing changes the code automatically, flipping conditions, removing statements, altering constants, and reruns the tests; a mutant that survives means no test noticed the change, so the suite is weak there even if coverage is high. Tools like Pitest work on JVM Kotlin modules. I would run it weekly on the domain module of a payments or pricing feature, not on every PR, because it is slow. It is most useful for finding tests that execute code without asserting anything meaningful.
+**A:** Mutation testing changes the code automatically, flipping conditions, removing statements, altering constants, and reruns the tests; a mutant that survives means no test noticed the change, so the suite is weak there even if coverage is high. Pitest is the standard JVM tool, with the info.solidsoft.pitest Gradle plugin and the pl.droidsonroids.pitest fork for Android modules. The PIT FAQ lists Kotlin as supported only through the commercial Arcmutate Kotlin plugin; without it, compiler-generated bytecode produces junk mutants that need manual filtering. I would run it weekly on the domain module of a payments or pricing feature, not on every PR, because it is slow. It is most useful for finding tests that execute code without asserting anything meaningful.
 **Follow-ups:** How does it relate to coverage? What is a typical mutation score to aim for? Any constraints with Android modules?
 **Điểm interviewer muốn nghe:** Hiểu khái niệm, biết giới hạn chi phí.
 
@@ -2372,7 +2714,7 @@ Checklist review một PR có test:
 **Điểm interviewer muốn nghe:** Biết mainClock, animationsDisabled, không dùng sleep.
 
 ### Q31. How do you test a Paging 3 implementation?
-**A:** I test the PagingSource directly by calling load with a Refresh LoadParams and asserting the page data and next key, plus error mapping when the data source fails. For the ViewModel I use paging-testing's asSnapshot on the PagingData flow to get a list and assert content and ordering. UI tests check that the list renders and loads the next page on scroll with a fake source, but I keep those few. RemoteMediator gets its own test with an in-memory Room database and a fake API.
+**A:** I test the PagingSource with paging-testing's TestPager: refresh, then append, and assert the returned LoadResult.Page data and keys, plus LoadResult.Error and a null getLastLoadedPage when the fake API fails. For the ViewModel I use asSnapshot on the PagingData flow, optionally with scrollTo or appendScrollWhile inside its lambda, to get a list and assert content and ordering. Transformations like insertSeparators are tested by backing a fake repository with List.asPagingSourceFactory, and Compose load states by pushing PagingData.from or PagingData.empty with explicit LoadStates through a MutableStateFlow. UI tests check that the list renders and loads the next page on scroll with a fake source, but I keep those few. RemoteMediator gets its own instrumented test with an in-memory Room database and a fake API, calling load with LoadType.REFRESH and a PagingState and asserting MediatorResult.Success with the right endOfPaginationReached, or MediatorResult.Error.
 **Follow-ups:** How do you simulate a network error on page two? What does prefetchDistance change in a test? How do you test RemoteMediator initialize?
 **Điểm interviewer muốn nghe:** Hai mức test và tool chính thức paging-testing.
 
@@ -2422,7 +2764,7 @@ Checklist review một PR có test:
 **Điểm interviewer muốn nghe:** Giữ quyền sở hữu test, biết nhận diện test rỗng.
 
 ### Q41. What is the difference between unit, integration and end-to-end tests in your mobile pyramid?
-**A:** Unit tests isolate one class with fakes and run in milliseconds on the JVM. Integration tests combine real components such as repository plus in-memory Room or client plus MockWebServer, still on the JVM, to catch wiring and mapping errors. End-to-end tests run the app on a device against a fake or staging backend through real UI. Numbers follow the pyramid: many unit, fewer integration, a handful of E2E. Mobile adds screenshot tests as a wide layer because so much of the risk is visual. Each layer gates a different stage of CI.
+**A:** Unit tests isolate one class with fakes and run in milliseconds on the JVM. Integration tests combine real components such as repository plus in-memory Room or client plus MockWebServer, still on the JVM, to catch wiring and mapping errors. End-to-end tests run the app on a device against a fake or staging backend through real UI. Numbers follow the pyramid: many unit, fewer integration, a handful of E2E; Google's Testing Blog suggests 70/20/10 as a first guess, and Android's testing strategies page defines fidelity as how close the test environment is to production, which is what bigger tests buy. Mobile adds screenshot tests as a wide layer because so much of the risk is visual. Each layer gates a different stage of CI.
 **Follow-ups:** Where do Robolectric tests fit? What is a contract test? How do you prevent the ice-cream-cone anti-pattern?
 **Điểm interviewer muốn nghe:** Định nghĩa rõ, số lượng theo tầng, screenshot là tầng riêng của mobile.
 

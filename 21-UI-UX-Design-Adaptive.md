@@ -125,9 +125,10 @@ fun AppTheme(
 - Dynamic color cho app ngân hàng: logo và brand bị đổi màu theo wallpaper. Tắt hoặc chỉ áp cho một phần.
 
 **Đọc thêm:**
-- https://m3.material.io/styles/color/roles
-- https://developer.android.com/develop/ui/compose/designsystems/material3
-- https://m3.material.io/styles/color/overview
+- https://m3.material.io/styles/color/roles (danh sách role và cặp "on")
+- https://m3.material.io/styles/color/dynamic/user-generated-source (dynamic color từ wallpaper)
+- https://developer.android.com/develop/ui/compose/designsystems/material3#color-scheme (`lightColorScheme`/`darkColorScheme`) và https://developer.android.com/develop/ui/compose/designsystems/material3#dynamic_color_schemes (`dynamicLightColorScheme`, Android 12+)
+- https://developer.android.com/jetpack/androidx/releases/compose-material3#1.2.0-alpha03 (bản thêm `surfaceBright`, `surfaceDim`, `surfaceContainerLowest..Highest` vào `ColorScheme`; có trong stable 1.2.0, kiểm tra 18/11/2026)
 
 ### 1.2 Typography scale, shape, elevation
 
@@ -154,7 +155,7 @@ Luôn `sp` cho `fontSize` và `lineHeight` để font scale hoạt động (mụ
 
 **Shape scale**: `Shapes(extraSmall = 4.dp, small = 8.dp, medium = 12.dp, large = 16.dp, extraLarge = 28.dp)` và `CircleShape` (full). Component M3 đã gắn sẵn với shape token (button = full, card = medium, bottom sheet = extraLarge trên). Đổi `Shapes` một lần đổi cả app, không override từng component.
 
-**Elevation**: M3 có hai cơ chế: **tonal elevation** (surface càng cao càng được pha `surfaceTint`, thấy rõ ở dark theme) và **shadow elevation**. Level 0, 1, 3, 6, 8, 12 dp. Từ M3 1.1 phần lớn component chuyển sang dùng `surfaceContainer*` role thay cho tonal elevation để designer kiểm soát rõ hơn; `Surface(tonalElevation = ...)` vẫn hoạt động. Trong Compose: `Surface(shadowElevation = 2.dp)`, `Card(elevation = CardDefaults.elevatedCardElevation())`.
+**Elevation**: M3 có hai cơ chế: **tonal elevation** (surface càng cao càng được pha `surfaceTint`, thấy rõ ở dark theme) và **shadow elevation**. Level 0, 1, 3, 6, 8, 12 dp. Từ Compose Material3 1.2.0 (role `surfaceContainer*`, `surfaceBright`, `surfaceDim` được thêm ở 1.2.0-alpha03) phần lớn component chuyển sang dùng `surfaceContainer*` role thay cho tonal elevation để designer kiểm soát rõ hơn; `Surface(tonalElevation = ...)` vẫn hoạt động. Trong Compose: `Surface(shadowElevation = 2.dp)`, `Card(elevation = CardDefaults.elevatedCardElevation())`.
 
 **Lỗi hay gặp / trade-off**
 - `fontSize` bằng `dp` hoặc `TextUnit.Unspecified` bị override sai: font scale không ăn, bị a11y audit fail.
@@ -168,7 +169,26 @@ Luôn `sp` cho `fontSize` và `lineHeight` để font scale hoạt động (mụ
 
 ### 1.3 M3 Expressive, mapping Compose Material3, và khi nào lệch khỏi Material
 
-**M3 Expressive** (Google công bố 2025) mở rộng M3: motion scheme dựa trên spring (spatial và effects), shape morphing, bộ component mới (button group, split button, floating toolbar, loading indicator mới, flexible app bar), và typography có biến thể emphasized. Trong Compose, Material3 1.4.0 là bản stable hiện tại (brief), và `kmp-template-impl` dùng `org.jetbrains.compose.material3:material3 1.10.0-alpha05` để lấy Expressive trên CMP. Entry point là `MaterialExpressiveTheme` với `MotionScheme`; tên chính xác của từng component và annotation experimental cần kiểm tra tại https://developer.android.com/jetpack/androidx/releases/compose-material3.
+**M3 Expressive** (Google công bố 2025) mở rộng M3: motion scheme dựa trên spring (spatial và effects), shape morphing, bộ component mới (button group, split button, floating toolbar, loading indicator mới, flexible app bar), và typography có biến thể emphasized. Trạng thái trong Compose (https://developer.android.com/jetpack/androidx/releases/compose-material3, kiểm tra 18/11/2026): bản stable là `androidx.compose.material3:material3:1.4.0` (24/9/2025) nhưng **không có** Expressive: 1.4.0-beta01 đã gỡ "all public APIs tagged with ExperimentalMaterial3ExpressiveApi" và bảo chuyển sang 1.5.0-alpha. Dòng 1.5.0 (đang 1.5.0-rc01, 4/11/2026) promote phần lớn Expressive lên API thường: `MaterialExpressiveTheme` (alpha18), các button mới (alpha19), floating toolbar (alpha22), motion scheme ("Graduate motion scheme from experimental", alpha15); `LoadingIndicator` và `MaterialShapes` vẫn `@ExperimentalMaterial3ExpressiveApi`. `kmp-template-impl` dùng `org.jetbrains.compose.material3:material3 1.10.0-alpha05` để lấy Expressive trên CMP.
+
+Tên API chính (reference: https://developer.android.com/reference/kotlin/androidx/compose/material3/MaterialExpressiveTheme.composable):
+
+```kotlin
+// androidx.compose.material3 1.5.0 (rc): MaterialExpressiveTheme không còn cần OptIn
+@Composable
+fun AppExpressiveTheme(content: @Composable () -> Unit) {
+    MaterialExpressiveTheme(
+        colorScheme = LightColors,
+        motionScheme = MotionScheme.expressive(),   // hoặc MotionScheme.standard()
+        typography = AppTypography,
+        content = content,
+    )
+}
+// Component mới: ButtonGroup, SplitButtonLayout, HorizontalFloatingToolbar / VerticalFloatingToolbar,
+// LoadingIndicator (vẫn @ExperimentalMaterial3ExpressiveApi ở 1.5.0)
+```
+
+Không có trang Compose riêng cho Expressive; tổng quan ở https://developer.android.com/develop/ui/compose/designsystems/material3 và motion physics ở https://m3.material.io/blog/m3-expressive-motion-theming.
 
 Mapping Compose Material3:
 
@@ -177,7 +197,7 @@ Mapping Compose Material3:
 | Color roles | `MaterialTheme.colorScheme.primary` ... (`ColorScheme`) |
 | Type scale | `MaterialTheme.typography.titleMedium` (`Typography`) |
 | Shape scale | `MaterialTheme.shapes.medium` (`Shapes`) |
-| Motion scheme | `MaterialTheme.motionScheme` (Expressive; cần kiểm tra) |
+| Motion scheme | `MaterialTheme.motionScheme` (`MotionScheme.standard()` / `.expressive()`; có từ 1.4.0-alpha nhưng bị gỡ khỏi stable 1.4.0, ra stable ở 1.5.0) |
 | Component tokens | `ButtonDefaults.buttonColors()`, `CardDefaults.cardElevation()`, `TopAppBarDefaults.topAppBarColors()` |
 | Dynamic color | `dynamicLightColorScheme(context)` |
 | Ripple / state layer | `LocalRippleConfiguration` (M3 1.3+), `Indication` |
@@ -361,7 +381,7 @@ Quy tắc API component (viết thành `CONTRIBUTING.md` của design system):
 
 ### 2.3 Versioning, catalog app, docs, governance, adoption metrics, migration
 
-**Versioning**: semver cho module design system khi publish nội bộ (Maven, bạn đã publish library nên quen). Breaking change = đổi chữ ký composable, đổi tên token, đổi hành vi visual mặc định. Quy trình deprecate: `@Deprecated(level = WARNING, replaceWith = ReplaceWith(...))` một release, `ERROR` release sau, xóa release kế tiếp. Dùng `kotlinx binary-compatibility-validator` để diff API public mỗi PR. Changelog theo Keep a Changelog, có ảnh before/after cho thay đổi visual.
+**Versioning**: semver cho module design system khi publish nội bộ (Maven, bạn đã publish library nên quen). Breaking change = đổi chữ ký composable, đổi tên token, đổi hành vi visual mặc định. Quy trình deprecate (cùng policy với `06-Mobile-System-Design.md` bài 4.10): `@Deprecated(level = WARNING, replaceWith = ReplaceWith(...))` ra ở một bản **minor** và giữ ít nhất 2 minor, nâng `ERROR` ở minor sau, rồi `HIDDEN`, chỉ **xóa ở major** kế tiếp. Căn cứ: SemVer 2.0.0 mục 7 (deprecate thì tăng MINOR) và FAQ "How should I handle deprecating functionality?" (ít nhất một minor chứa deprecation trước khi xóa ở major: https://semver.org/#how-should-i-handle-deprecating-functionality); Kotlin API guidelines "first produce a warning, then an error, and then hide the declaration" (https://kotlinlang.org/docs/api-guidelines-backward-compatibility.html#evolve-apis-pragmatically, kiểm tra 18/11/2026). Diff API public mỗi PR bằng ABI validation có sẵn trong Kotlin Gradle Plugin 2.2+ (`abiValidation()`, task `checkKotlinAbi`); plugin `binary-compatibility-validator` cũ đang ở maintenance mode. Changelog theo Keep a Changelog, có ảnh before/after cho thay đổi visual.
 
 **Catalog / showcase app**: app riêng liệt kê mọi component với mọi state, light/dark, RTL, font scale. Cách rẻ: annotation processor như Showkase (Airbnb) gom mọi `@Preview`; cách tự làm: một `LazyColumn` của `ComponentEntry(name, content)`. Catalog là nơi screenshot test chạy (Roborazzi hoặc Compose Preview Screenshot Testing), là nơi designer QA, là demo cho interviewer.
 
@@ -406,7 +426,8 @@ Nguyên tắc: feature được phép có component cục bộ (không chặn de
 
 **Đọc thêm:**
 - https://github.com/airbnb/Showkase
-- https://github.com/Kotlin/binary-compatibility-validator
+- https://kotlinlang.org/docs/gradle-binary-compatibility-validation.html (ABI validation trong KGP)
+- https://semver.org/#how-should-i-handle-deprecating-functionality
 - https://github.com/takahirom/roborazzi
 - https://developer.android.com/studio/preview/compose-screenshot-testing
 
@@ -445,7 +466,8 @@ object DsColorTokensLight {
 - Không phải mọi thứ là token: khoảng cách nội bộ của một component là component token, không đưa vào system.
 
 **Đọc thêm:**
-- https://help.figma.com/hc/en-us/articles/15339657135383-Guide-to-variables
+- https://help.figma.com/hc/en-us/articles/15339657135383-Guide-to-variables-in-Figma (variable types: color, number, string, boolean)
+- https://help.figma.com/hc/en-us/articles/14506821864087-Overview-of-variables-collections-and-modes#variable_modes (mode: mỗi variable có một giá trị cho mỗi mode, dùng cho light/dark, ngôn ngữ, kích thước thiết bị; số mode tối đa tùy plan)
 - https://styledictionary.com/
 - https://tokens.studio/
 - https://www.designtokens.org/
@@ -502,7 +524,7 @@ fun LevelCard(title: String, subtitle: String, onClick: () -> Unit, modifier: Mo
 **Lỗi hay gặp / trade-off**
 - Copy snippet code của Dev Mode nguyên xi: hard-code `width(360.dp)`, màu hex, font size cố định. Snippet là gợi ý, không phải code.
 - Designer vẽ frame cố định 390 wide, không auto layout: không biết hành vi khi text dài hoặc màn rộng. Yêu cầu auto layout + min/max.
-- Icon xuất PNG: dùng SVG rồi import thành vector drawable (`Res.drawable` trong CMP cần SVG hoặc XML; cần kiểm tra).
+- Icon xuất PNG: dùng SVG rồi import thành vector drawable. Trong CMP, `Res.drawable` nhận ảnh raster hoặc XML vector trên mọi platform, còn "SVG images are supported on all platforms except Android" (https://kotlinlang.org/docs/multiplatform/compose-multiplatform-resources-usage.html#images, kiểm tra 18/11/2026), nên với app có Android hãy convert SVG sang XML vector (Android Studio Vector Asset) trước khi bỏ vào `composeResources/drawable`.
 
 **Đọc thêm:**
 - https://help.figma.com/hc/en-us/articles/15023124644247
@@ -526,7 +548,7 @@ fun LevelCard(title: String, subtitle: String, onClick: () -> Unit, modifier: Mo
 - [ ] Accessibility note: thứ tự đọc, label cho icon button, vùng chạm 48dp.
 - [ ] Spec hành vi: tap, long press, swipe, pull to refresh, back.
 
-**Figma MCP và AI design-to-code**: Figma có Dev Mode MCP Server cho phép agent (Claude Code, Cursor, Android Studio Agent Mode với MCP theo brief) đọc frame đang chọn: lấy cấu trúc node, variable đã gắn, ảnh render, và sinh code. `compose-template` của bạn đã có skill "ui-from-screenshot" theo hướng này. Tên tool và cách bật cần kiểm tra tại https://help.figma.com/ (tìm "Dev Mode MCP Server").
+**Figma MCP và AI design-to-code**: Figma có **Figma MCP server** (tên cũ "Dev Mode MCP Server"; URL help cũ giờ redirect sang "Guide to the Figma MCP server") cho phép MCP client (Claude Code, Cursor, VS Code, Android Studio Agent Mode khi bật MCP) đọc frame hoặc link node: lấy cấu trúc node, variable đã gắn, ảnh render, và sinh code. Hai cách chạy: **remote server** `https://mcp.figma.com/mcp` (khuyến nghị, đăng nhập OAuth) hoặc **desktop server** `http://127.0.0.1:3845/mcp` từ Figma desktop app (cần Dev hoặc Full seat trên plan trả phí). Tool chính: `get_design_context` (code gợi ý + cấu trúc của selection), `get_metadata` (cây node rút gọn cho frame lớn), `get_variable_defs` (variable/style đang dùng), `get_screenshot`, `get_code_connect_map` / `add_code_connect_map` (map node Figma sang component trong repo), `search_design_system`; `create_design_system_rules` nay là một MCP prompt chứ không phải tool (https://developers.figma.com/docs/figma-mcp-server/tools-and-prompts/ , https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server, kiểm tra 18/11/2026). Với design system, Code Connect là thứ khiến agent gọi `DsButton` thay vì tự vẽ. `compose-template` của bạn đã có skill "ui-from-screenshot" theo hướng này.
 
 Checklist review code do AI sinh từ Figma (bạn là reviewer, không phải người gõ):
 
@@ -546,7 +568,8 @@ Checklist review code do AI sinh từ Figma (bạn là reviewer, không phải n
 - Dùng MCP đọc frame chưa "Ready for dev": lấy thiết kế dở dang vào code.
 
 **Đọc thêm:**
-- https://help.figma.com/
+- https://developers.figma.com/docs/figma-mcp-server/ (cài remote/desktop server)
+- https://developers.figma.com/docs/figma-mcp-server/tools-and-prompts/ (danh sách tool và prompt)
 - https://developer.android.com/studio/gemini/features
 - `10-AI-for-Mobile-Lead.md`
 - `18-AI-Study-Workflow.md`
@@ -564,8 +587,10 @@ Checklist review code do AI sinh từ Figma (bạn là reviewer, không phải n
 | Compact | < 600dp | phone dọc, foldable gập |
 | Medium | 600 đến 839dp | foldable mở, tablet dọc nhỏ, phone ngang |
 | Expanded | 840 đến 1199dp | tablet ngang, desktop window |
-| Large | 1200 đến 1599dp | tablet lớn ngang, desktop (thêm ở androidx.window 1.4; cần kiểm tra) |
-| Extra large | >= 1600dp | màn ngoài, desktop (cần kiểm tra) |
+| Large | 1200 đến 1599dp | tablet lớn ngang, desktop window rộng (`WIDTH_DP_LARGE_LOWER_BOUND = 1200`, thêm ở androidx.window 1.5.0) |
+| Extra large | >= 1600dp | màn ngoài, desktop (`WIDTH_DP_EXTRA_LARGE_LOWER_BOUND = 1600`, androidx.window 1.5.0) |
+
+Nguồn: https://developer.android.com/reference/androidx/window/core/layout/WindowSizeClass#WIDTH_DP_LARGE_LOWER_BOUND() ; Large/Extra large vào từ 1.5.0-alpha02, stable 1.5.0 ngày 24/9/2025, bản stable mới nhất 1.5.1 (https://developer.android.com/jetpack/androidx/releases/window#1.5.0). Bộ breakpoint cũ là `BREAKPOINTS_V1` (tới expanded), bộ mới `BREAKPOINTS_V2` có thêm Large và XLarge (kiểm tra 18/11/2026).
 
 Height class: Compact < 480dp (phone ngang), Medium 480 đến 899dp, Expanded >= 900dp.
 
@@ -587,7 +612,7 @@ fun HomeRoute() {
 }
 ```
 
-`isWidthAtLeastBreakpoint` và hằng `WIDTH_DP_*_LOWER_BOUND` thuộc androidx.window 1.4+; bản cũ dùng `windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.EXPANDED` (đã deprecated ở bản mới; cần kiểm tra tại https://developer.android.com/jetpack/androidx/releases/window). `currentWindowAdaptiveInfo()` nằm trong `androidx.compose.material3.adaptive:adaptive` (Android) và `org.jetbrains.compose.material3.adaptive:adaptive` (CMP, `kmp-template-impl` dùng 1.2.0).
+`isWidthAtLeastBreakpoint` và hằng `WIDTH_DP_*_LOWER_BOUND` có từ androidx.window 1.4.0; cách cũ `windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.EXPANDED` bị deprecated từ 1.4.0. `currentWindowAdaptiveInfo()` nằm trong `androidx.compose.material3.adaptive:adaptive` (Android) và `org.jetbrains.compose.material3.adaptive:adaptive` (CMP, `kmp-template-impl` dùng 1.2.0). Mặc định nó **không** trả Large/XLarge: ở adaptive 1.2.0 phải gọi `currentWindowAdaptiveInfo(supportLargeAndXLargeWidth = true)`; từ adaptive 1.3.0 tham số này bị deprecated, dùng `currentWindowAdaptiveInfoV2()` (hỗ trợ L/XL mặc định) (https://developer.android.com/reference/kotlin/androidx/compose/material3/adaptive/currentWindowAdaptiveInfo.composable, kiểm tra 18/11/2026).
 
 Quy tắc thiết kế: không branch theo "tablet hay phone"; branch theo size class, và truyền size class xuống như tham số (hoặc CompositionLocal) chứ không gọi `currentWindowAdaptiveInfo()` ở mọi composable con.
 
@@ -651,7 +676,7 @@ fun TransactionsListDetail() {
 }
 ```
 
-`navigateTo` là `suspend` từ adaptive-navigation 1.1 (cần kiểm tra); bản 1.0 là hàm thường. Trên compact, scaffold tự hiện một pane và xử lý back; trên expanded hiện hai pane.
+`navigateTo` là `suspend` từ adaptive-navigation 1.1.0 (đổi ở 1.1.0-alpha04, cùng lúc thêm `seekBack` cho predictive back), nên gọi trong `rememberCoroutineScope().launch { ... }`; bản 1.0 là hàm thường (https://developer.android.com/reference/kotlin/androidx/compose/material3/adaptive/navigation/ThreePaneScaffoldNavigator#navigateTo(androidx.compose.material3.adaptive.layout.ThreePaneScaffoldRole,kotlin.Any), kiểm tra 18/11/2026). Trên compact, scaffold tự hiện một pane và xử lý back; trên expanded hiện hai pane.
 
 ```kotlin
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
@@ -703,7 +728,7 @@ fun VideoScreen() {
 
 Postures: **tabletop** (gập ngang nửa, như laptop), **book** (gập dọc nửa). Thiết kế: tránh đặt nội dung tương tác lên bản lề (`hingeList` cho bounds), list-detail tách theo bản lề khi hinge dọc, không khóa orientation.
 
-**Quy tắc Android 16 cho màn hình lớn** (brief): trên thiết bị sw600dp trở lên, hệ thống **bỏ qua** `android:screenOrientation`, `resizeableActivity="false"`, và các giới hạn aspect ratio (`minAspectRatio`, `maxAspectRatio`). App bị khóa portrait sẽ được xoay và resize như app bình thường. Có opt-out tạm thời (`PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY`), hết hiệu lực khi target API 37 (Android 17). Hệ quả cho lead: mọi màn hình phải sống sót khi rộng 840dp+ và khi xoay; đây không còn là "nice to have". Kế hoạch: (1) chạy app trên emulator resizable và foldable, chụp mọi màn hình; (2) sửa layout vỡ bằng size class; (3) ViewModel giữ state qua configuration change (Compose + ViewModel đã lo nếu không giữ state trong Activity); (4) camera/preview xoay đúng.
+**Quy tắc Android 16 cho màn hình lớn** (https://developer.android.com/about/versions/16/behavior-changes-16#ignore-orientation, kiểm tra 18/11/2026): với app **target API 36**, trên display có smallest width >= 600dp hệ thống **bỏ qua** `android:screenOrientation`, `resizeableActivity`, `minAspectRatio`/`maxAspectRatio`, và `setRequestedOrientation()`/`getRequestedOrientation()`. App bị khóa portrait sẽ được xoay và resize như app bình thường. Ngoại lệ (`#exceptions`): **game** khai báo `android:appCategory="game"` trong `<application>`, user tự chọn hành vi cũ trong cài đặt aspect ratio, và màn hình < sw600dp. Opt-out tạm thời (`#temporary-opt-out`): property `android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY` cho activity hoặc application; Android 17 xác nhận opt-out này không còn cho app target API 37 (https://developer.android.com/about/versions/17/behavior-changes-17). Deadline thực tế: Google Play yêu cầu app mới và bản update **target API 36 từ 31/8/2026** (Wear OS và Android Automotive OS 35, TV và XR 34; xin gia hạn được tới 1/11/2026), nên đội nào cập nhật app sau mốc này đều phải sống với quy tắc trên (https://developer.android.com/google/play/requirements/target-sdk). Blog giải thích: https://android-developers.googleblog.com/2025/01/orientation-and-resizability-changes-in-android-16.html. Hệ quả cho lead: mọi màn hình phải sống sót khi rộng 840dp+ và khi xoay; đây không còn là "nice to have". Kế hoạch: (1) chạy app trên emulator resizable và foldable, chụp mọi màn hình; (2) sửa layout vỡ bằng size class; (3) ViewModel giữ state qua configuration change (Compose + ViewModel đã lo nếu không giữ state trong Activity); (4) camera/preview xoay đúng.
 
 **Multi-window và resizing**: split screen, freeform, desktop windowing trên tablet Android 16. App nhận configuration change liên tục khi kéo cửa sổ; Compose recompose theo `currentWindowAdaptiveInfo()`; tránh làm việc nặng trong recomposition khi size đổi; `android:configChanges` không còn là cách né. Picture-in-picture cho video; drag-and-drop giữa app (`Modifier.dragAndDropSource/Target`).
 
@@ -713,7 +738,8 @@ Postures: **tabletop** (gập ngang nửa, như laptop), **book** (gập dọc n
 - Test foldable chỉ bằng preview: posture cần emulator foldable hoặc device.
 
 **Đọc thêm:**
-- https://developer.android.com/about/versions/16/behavior-changes-16
+- https://developer.android.com/about/versions/16/behavior-changes-16#ignore-orientation (phạm vi, `#exceptions`, `#temporary-opt-out`)
+- https://support.google.com/googleplay/android-developer/answer/11926878 (Play target API level requirement)
 - https://developer.android.com/develop/ui/compose/layouts/adaptive/foldables/learn-about-foldables
 - https://developer.android.com/guide/topics/large-screens
 - https://developer.android.com/develop/ui/compose/layouts/adaptive/support-multi-window-mode
@@ -722,11 +748,11 @@ Postures: **tabletop** (gập ngang nửa, như laptop), **book** (gập dọc n
 
 **CMP trên iPad/desktop**: `org.jetbrains.compose.material3.adaptive:adaptive` cung cấp `currentWindowAdaptiveInfo()` trên iOS và desktop, nên cùng code size class chạy trên iPad Split View, Stage Manager, và cửa sổ desktop resize. Khác biệt: iPad không có `Posture` (không foldable), desktop cần xử lý keyboard shortcut, hover (`Modifier.hoverable`, `PointerIcon`), scrollbar; min window size đặt khi tạo `Window` trên desktop. `kmp-template-impl` target phone trước; nói với interviewer là bạn biết chi phí iPad: Apple review chạy trên iPad và từ chối UI vỡ.
 
-**Wear OS**: Compose for Wear OS (`androidx.wear.compose:compose-material3`): màn tròn, `ScalingLazyColumn` hoặc `TransformingLazyColumn` (scale item ở mép), `TimeText`, rotary input (`Modifier.rotaryScrollable`), pin nhỏ nên ít animation, Tiles và Complications là entry point chính; data sync qua Data Layer API hoặc backend. Không reuse layout phone.
+**Wear OS**: Compose for Wear OS (`androidx.wear.compose:compose-material3`, https://developer.android.com/training/wearables/compose; Horologist https://github.com/google/horologist nay chủ yếu là bộ bổ trợ, nhất là media): màn tròn, `ScalingLazyColumn` hoặc `TransformingLazyColumn` (scale item ở mép), `TimeText`, rotary input (`Modifier.rotaryScrollable`), pin nhỏ nên ít animation, Tiles và Complications là entry point chính; data sync qua Data Layer API hoặc backend. Không reuse layout phone.
 
-**Android Auto**: không có Compose; dùng Car App Library (`androidx.car.app`) với template cố định (`ListTemplate`, `MessageTemplate`, `NavigationTemplate`) vì quy định driver distraction; logic share qua module chung, UI theo template. Automotive OS (xe tích hợp) có thể chạy app đầy đủ nhưng cũng bị giới hạn.
+**Android Auto**: không có Compose; dùng Car App Library (`androidx.car.app`) với template cố định (`ListTemplate`, `MessageTemplate`, `NavigationTemplate`); template "designed to meet driver distraction standards" (https://developer.android.com/training/cars/apps); logic share qua module chung, UI theo template. Automotive OS (xe tích hợp) có thể chạy app đầy đủ nhưng cũng bị giới hạn.
 
-**Android TV**: `androidx.tv:tv-material` và `tv-foundation`; input là D-pad và focus: mọi item phải `focusable`, có focus indication rõ (scale, border), `onFocusChanged` để hiện detail, `FocusRequester` để restore focus khi quay lại list, `Carousel` cho banner, overscan 5% padding, "10-foot UI" (text >= 16sp, ít thông tin trên một màn). Google Play yêu cầu banner, leanback launcher intent.
+**Android TV**: `androidx.tv:tv-material` và `tv-foundation` (https://developer.android.com/training/tv/playback/compose); input là D-pad và focus (hệ focus và focus indication: https://developer.android.com/design/ui/tv/guides/styles/focus-system#focus): mọi item phải `focusable`, có focus indication rõ (scale, border), `onFocusChanged` để hiện detail, `FocusRequester` để restore focus khi quay lại list, `Carousel` cho banner, overscan 5% padding, "10-foot UI" (text >= 16sp, ít thông tin trên một màn). Google Play yêu cầu banner, leanback launcher intent.
 
 **XR**: Jetpack Compose for XR (`androidx.xr.compose`): app Android 2D chạy trong "Home Space" như một panel không cần sửa; "Full Space" cho phép `Subspace`, `SpatialPanel`, orbiter, 3D model. Mức khái niệm: adaptive layout tốt tự động hợp Home Space; đầu tư XR chỉ khi sản phẩm có lý do.
 
@@ -735,7 +761,7 @@ Postures: **tabletop** (gập ngang nửa, như laptop), **book** (gập dọc n
 - Auto: cố làm UI riêng, bị từ chối vì không dùng template.
 
 **Đọc thêm:**
-- https://www.jetbrains.com/help/kotlin-multiplatform-dev/ (mục Compose Multiplatform: iOS, desktop)
+- https://kotlinlang.org/docs/multiplatform/compose-multiplatform-and-jetpack-compose.html (CMP so với Jetpack Compose, platform hỗ trợ)
 - https://developer.android.com/training/wearables/compose
 - https://developer.android.com/training/cars
 - https://developer.android.com/training/tv/playback/compose
@@ -761,7 +787,7 @@ private fun HomeRoutePreview() {
 }
 ```
 
-Multipreview annotation gom các cấu hình; CMP 1.10 có unified `@Preview` trong commonMain (brief), tham số có thể ít hơn Android `@Preview`; cần kiểm tra.
+Multipreview annotation gom các cấu hình. CMP 1.10.0 (1/2026) cho dùng chung `androidx.compose.ui.tooling.preview.Preview` trong `commonMain` và deprecate `org.jetbrains.compose.ui.tooling.preview.Preview` cùng annotation preview riêng của desktop (https://kotlinlang.org/docs/multiplatform/whats-new-compose-110.html#unified-preview-annotation, kiểm tra 18/11/2026). Docs không nói tham số nào (ví dụ `device`, `uiMode`) có hiệu lực ngoài Android, nên multipreview đầy đủ như trên vẫn để ở `androidMain` hoặc module Android-only.
 
 **Screenshot test**: Compose Preview Screenshot Testing (plugin `com.android.compose.screenshot`) chụp mọi `@Preview` trong `screenshotTest` source set và so với reference; hoặc Roborazzi trên Robolectric với `RobolectricDeviceQualifiers.MediumTablet`/`Pixel5`. Chạy trên CI Linux, không cần emulator. Cho foldable posture: test bằng emulator "7.6 Fold-in with outer display" hoặc `adb shell wm size 673x841`. Xem `19-Testing-Deep-Dive.md`.
 
@@ -792,7 +818,7 @@ TalkBack đọc **semantics tree**, không phải cây UI. Compose tự sinh sem
 | `liveRegion = LiveRegionMode.Polite` | thông báo thay đổi (số dư cập nhật, lỗi hiện ra) |
 | `customActions = listOf(CustomAccessibilityAction("Lưu trữ") { ...; true })` | hành động swipe không tiếp cận được |
 | `testTag` | cho test, không ảnh hưởng TalkBack |
-| `Modifier.semantics { invisibleToUser() }` | ẩn phần tử khỏi a11y (deprecated ở bản mới, thay bằng `hideFromAccessibility()`; cần kiểm tra) |
+| `Modifier.semantics { hideFromAccessibility() }` | ẩn phần tử khỏi a11y; thêm ở compose-ui 1.8.0, thay `invisibleToUser()` (deprecated từ 1.8.0) (https://developer.android.com/reference/kotlin/androidx/compose/ui/semantics/package-summary#(androidx.compose.ui.semantics.SemanticsPropertyReceiver).hideFromAccessibility()) |
 
 ```kotlin
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -809,7 +835,7 @@ fun TransactionRow(tx: Transaction, onArchive: () -> Unit, onClick: () -> Unit) 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)             // clickable tự merge descendants và thêm role Button
+            .clickable(role = Role.Button, onClick = onClick) // clickable tự merge descendants, nhưng role mặc định là null: phải truyền Role.Button
             .semantics {
                 customActions = listOf(CustomAccessibilityAction(label = "Lưu trữ giao dịch") { onArchive(); true })
             }
@@ -858,12 +884,12 @@ Lưu ý `spokenAmount`: "1.250.000 đ" TalkBack có thể đọc sai; cung cấp
 
 ### 5.2 Touch target 48dp, contrast, font scaling, focus order
 
-- **Touch target**: tối thiểu 48x48dp (Material; WCAG 2.2 tối thiểu 24 CSS px, Material nghiêm hơn). M3 component tự áp `LocalMinimumInteractiveComponentSize` (48.dp) cho `IconButton`, `Checkbox`; composable tùy ý dùng `Modifier.minimumInteractiveComponentSize()`. Icon 24dp trong vùng 48dp.
-- **Contrast**: WCAG AA: text thường 4.5:1, text lớn (>= 18pt hoặc 14pt bold) 3:1, UI component và graphic 3:1. M3 role đúng cặp (`primary`/`onPrimary`) đã đạt; màu brand tự thêm phải kiểm tra bằng Accessibility Scanner hoặc công cụ contrast. Không truyền thông tin chỉ bằng màu (đỏ/xanh cho tăng/giảm): thêm icon hoặc dấu.
-- **Font scaling**: `sp` cho text; không fixed `height` cho container chứa text (dùng `heightIn(min)`), `maxLines` + `overflow` có chủ đích; test ở fontScale 1.3 và 2.0 (Android 14 cho tới 200%, non-linear). Icon và spacing không scale theo font (dp) là đúng. Nếu buộc phải giới hạn (số lớn trong ô cố định): `autoSize` của `BasicText` (Compose 1.8+; cần kiểm tra) hoặc giảm `maxLines`.
+- **Touch target**: tối thiểu 48x48dp, cách nhau >= 8dp (Android: https://developer.android.com/guide/topics/ui/accessibility/apps#large-controls và https://support.google.com/accessibility/android/answer/7101858). WCAG 2.2 SC 2.5.8 Target Size (Minimum, AA) chỉ yêu cầu 24x24 CSS px, hoặc nhỏ hơn nếu vòng tròn đường kính 24px đặt giữa target không đè lên target khác (spacing exception) (https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html); SC 2.5.5 Target Size (Enhanced, AAA) là 44x44 (https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html). Material 48dp vượt cả hai. M3 component tự áp `LocalMinimumInteractiveComponentSize` (48.dp) cho `IconButton`, `Checkbox`; composable tùy ý dùng `Modifier.minimumInteractiveComponentSize()`. Icon 24dp trong vùng 48dp.
+- **Contrast**: WCAG AA: SC 1.4.3 Contrast (Minimum) text thường 4.5:1, text lớn (>= 18pt hoặc 14pt bold) 3:1 (https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html); SC 1.4.11 Non-text Contrast: viền input, icon mang nghĩa, focus indicator, trạng thái component 3:1 so với màu kề bên (https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html). M3 role đúng cặp (`primary`/`onPrimary`) đã đạt; màu brand tự thêm phải kiểm tra bằng Accessibility Scanner hoặc công cụ contrast. Không truyền thông tin chỉ bằng màu (đỏ/xanh cho tăng/giảm): thêm icon hoặc dấu.
+- **Font scaling**: `sp` cho text; không fixed `height` cho container chứa text (dùng `heightIn(min)`), `maxLines` + `overflow` có chủ đích; test ở fontScale 1.3 và 2.0 (Android 14 cho tới 200%, non-linear). Icon và spacing không scale theo font (dp) là đúng. Nếu buộc phải giới hạn (số lớn trong ô cố định): `BasicText(text, autoSize = TextAutoSize.StepBased(minFontSize, maxFontSize, stepSize))` (compose-foundation 1.8.0+, https://developer.android.com/reference/kotlin/androidx/compose/foundation/text/TextAutoSize) hoặc giảm `maxLines`.
 - **Display size**: user tăng density; layout phải cuộn được, không cắt nút dưới cùng.
 - **Focus order** (TalkBack swipe và keyboard/switch access): mặc định theo thứ tự layout; chỉnh bằng `Modifier.semantics { isTraversalGroup = true }` cho nhóm và `traversalIndex` cho thứ tự trong nhóm; keyboard focus dùng `Modifier.focusProperties { next = otherRequester }` và `FocusRequester`. Dialog/bottom sheet phải "bẫy" focus bên trong (M3 đã làm).
-- **Reduced motion**: đọc `Settings.Global.ANIMATOR_DURATION_SCALE` hoặc dùng `LocalAccessibilityManager`; tắt animation trang trí khi user tắt animation. Trên CMP iOS: `UIAccessibility.isReduceMotionEnabled` qua expect/actual.
+- **Reduced motion**: Android không có cờ "Reduce Motion" riêng như iOS. User bật Settings > Accessibility > Color and motion > "Remove animations" (https://support.google.com/accessibility/android/answer/11183305), hệ thống đặt animator duration scale = 0. App đọc gián tiếp: `Settings.Global.ANIMATOR_DURATION_SCALE` (0 = tắt), `ValueAnimator.areAnimatorsEnabled()` (API 26, cũng false khi Battery Saver), `ValueAnimator.getDurationScale()` + `registerDurationScaleChangeListener` (API 33) (https://developer.android.com/reference/android/animation/ValueAnimator#areAnimatorsEnabled()). Compose không có `LocalReduceMotion`, và `LocalAccessibilityManager` không mang thông tin này: Compose tự áp scale của hệ thống qua `MotionDurationScale` trong coroutine context của frame clock (https://developer.android.com/reference/kotlin/androidx/compose/ui/MotionDurationScale), nên animation `animate*AsState` tự kết thúc ngay khi scale = 0. Việc của app: animation **vô hạn hoặc trang trí** (shimmer, Lottie loop, parallax) phải tự kiểm tra `areAnimatorsEnabled()` và thay bằng trạng thái tĩnh. Trên CMP iOS: `UIAccessibility.isReduceMotionEnabled` qua expect/actual.
 
 **Lỗi hay gặp / trade-off**
 - Nút "x" đóng 24dp sát góc: fail touch target và dễ bấm nhầm.
@@ -873,6 +899,7 @@ Lưu ý `spokenAmount`: "1.250.000 đ" TalkBack có thể đọc sai; cung cấp
 **Đọc thêm:**
 - https://m3.material.io/foundations/accessible-design/overview
 - https://developer.android.com/develop/ui/compose/accessibility
+- https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html , https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html , https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html (Understanding pages, có ví dụ và exception)
 - https://developer.android.com/develop/ui/compose/text
 
 ### 5.3 WCAG 2.2, Accessibility Scanner, EU Accessibility Act, cách làm audit
@@ -891,9 +918,9 @@ Lưu ý `spokenAmount`: "1.250.000 đ" TalkBack có thể đọc sai; cung cấp
 
 4.1.1 Parsing bị bỏ ở 2.2.
 
-**Accessibility Scanner** (app của Google): chạy trên device, quét màn hình hiện tại, báo: thiếu label, contrast thấp, touch target nhỏ, item trùng mô tả. Dùng cho audit nhanh từng màn; không thay TalkBack thật. Trong test tự động: Espresso `AccessibilityChecks.enable()`; Compose test có thể assert `contentDescription`, `hasClickAction`, và từ Compose 1.6+ có a11y check tích hợp (`enableAccessibilityChecks()` trên `ComposeTestRule`; cần kiểm tra).
+**Accessibility Scanner** (app của Google): chạy trên device, quét màn hình hiện tại, báo: thiếu label, contrast thấp, touch target nhỏ, item trùng mô tả. Dùng cho audit nhanh từng màn; không thay TalkBack thật. Trong test tự động: Espresso `AccessibilityChecks.enable()`; Compose test có thể assert `contentDescription`, `hasClickAction`, và từ **Compose 1.8.0** có a11y check tích hợp dựa trên Accessibility Test Framework: thêm `androidx.compose.ui:ui-test-junit4-accessibility` (không dùng rule thì `ui-test-accessibility`; API được tách sang các artifact này ở 1.8.0-beta03), gọi `composeTestRule.enableAccessibilityChecks()` rồi `onRoot().tryPerformAccessibilityChecks()`; sau khi bật, các action như `performClick()` cũng tự chạy check (https://developer.android.com/develop/ui/compose/accessibility/testing#checks, kiểm tra 18/11/2026).
 
-**EU Accessibility Act (EAA)**: áp dụng từ 28/6/2025 cho sản phẩm và dịch vụ trong EU bao gồm dịch vụ ngân hàng tiêu dùng, thương mại điện tử, viễn thông, e-book, vận tải. Tiêu chuẩn kỹ thuật là EN 301 549 (tham chiếu WCAG 2.1 AA). Ý nghĩa với bạn: công ty Việt Nam làm outsourcing cho khách EU hoặc fintech có user EU phải tuân thủ; đây là lý do kinh doanh để xin budget a11y. Ngoài EU: ADA (Mỹ) qua án lệ, AODA (Canada), Việt Nam chưa có luật riêng cho app nhưng có chính sách người khuyết tật.
+**EU Accessibility Act (EAA)**: Directive (EU) 2019/882 (https://eur-lex.europa.eu/eli/dir/2019/882/oj/eng), áp dụng cho sản phẩm và dịch vụ đưa ra thị trường EU sau **28/6/2025** (Điều 31(2)), bao gồm dịch vụ ngân hàng tiêu dùng, thương mại điện tử, viễn thông, e-book, vận tải hành khách. **Miễn trừ microenterprise** cung cấp dịch vụ (Điều 4(5)): doanh nghiệp dưới 10 người **và** doanh thu năm hoặc tổng tài sản không quá 2 triệu EUR (định nghĩa ở Điều 3(23)); miễn trừ này không áp cho microenterprise làm *sản phẩm*. Tiêu chuẩn kỹ thuật: EN 301 549 (ETSI). Bản V3.2.1 (3/2021) tham chiếu WCAG 2.1 AA; ETSI đã phát hành **V4.1.1 (9/2026)** (https://www.etsi.org/deliver/etsi_en/301500_301599/301549/), còn việc V4.1.1 đã được dẫn trên Official Journal làm harmonised standard cho EAA hay chưa thì chưa xác minh được (kiểm tra 18/11/2026). Phỏng vấn: nói "WCAG 2.1 AA qua EN 301 549 là mức tối thiểu, chúng tôi nhắm WCAG 2.2 AA". Ý nghĩa với bạn: công ty Việt Nam làm outsourcing cho khách EU hoặc fintech có user EU phải tuân thủ; đây là lý do kinh doanh để xin budget a11y. Ngoài EU: ADA (Mỹ) qua án lệ, AODA (Canada), Việt Nam chưa có luật riêng cho app nhưng có chính sách người khuyết tật.
 
 **Cách làm audit a11y cho một app** (trình bày được trong phỏng vấn lead):
 
@@ -909,7 +936,8 @@ Lưu ý `spokenAmount`: "1.250.000 đ" TalkBack có thể đọc sai; cung cấp
 **Đọc thêm:**
 - https://www.w3.org/WAI/WCAG22/quickref/
 - https://support.google.com/accessibility/android/answer/6376570?hl=en (Accessibility Scanner)
-- https://ec.europa.eu/social/main.jsp?catId=1202 (European Accessibility Act)
+- https://eur-lex.europa.eu/eli/dir/2019/882/oj/eng (toàn văn EAA: Điều 2 phạm vi, Điều 3(23) microenterprise, Điều 4(5) miễn trừ, Điều 31 thời điểm áp dụng)
+- https://www.etsi.org/deliver/etsi_en/301500_301599/301549/ (các phiên bản EN 301 549)
 - https://developer.android.com/guide/topics/ui/accessibility/testing
 
 ## 6. i18n và l10n
@@ -917,9 +945,9 @@ Lưu ý `spokenAmount`: "1.250.000 đ" TalkBack có thể đọc sai; cung cấp
 ### 6.1 String resources, plurals, formatting ngày, số, tiền
 
 - `strings.xml` với placeholder có chỉ số `%1$s`, `%2$d` để dịch giả đổi thứ tự. Comment cho context: `<!-- Button: confirm money transfer -->`. `translatable="false"` cho key kỹ thuật. `xliff:g` để đánh dấu phần không dịch.
-- **Plurals**: `<plurals name="items"><item quantity="one">%d item</item><item quantity="other">%d items</item></plurals>`; Compose `pluralStringResource(R.plurals.items, count, count)`. Tiếng Việt chỉ có `other`; tiếng Nga có `one/few/many`; tiếng Ả Rập 6 dạng. Không ghép chuỗi "item" + "s".
+- **Plurals**: `<plurals name="items"><item quantity="one">%d item</item><item quantity="other">%d items</item></plurals>`; Compose `pluralStringResource(R.plurals.items, count, count)`. Category theo CLDR (https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html): tiếng Anh `one/other`; tiếng Nga `one/few/many/other`; tiếng Ả Rập 6 dạng `zero/one/two/few/many/other`. **Tiếng Việt**: trước CLDR 49 chỉ có `other`; từ **CLDR 49 (22/10/2026)** cardinal là `one` (rule `i = 0 or n = 1`, tức 0 và 1) và `other` (https://cldr.unicode.org/downloads/cldr-49#supplemental-data-changes, kiểm tra 18/11/2026). Android và ICU trên máy đang chạy dùng dữ liệu CLDR cũ hơn nên vẫn chỉ chọn `other` cho tiếng Việt; vì vậy trong `values-vi` luôn có `other`, và nếu thêm `one` thì nội dung phải đúng cho cả 0 và 1. Không ghép chuỗi "item" + "s".
 - **Số và tiền**: `java.text.NumberFormat.getCurrencyInstance(Locale("vi", "VN")).format(1250000)` ra "1.250.000 ₫"; `NumberFormat.getInstance(locale)` cho số; không tự `String.format("%,d")` vì dấu phân cách khác locale. Tiền luôn tính bằng `Long` minor unit hoặc `BigDecimal`, format ở tầng UI.
-- **Ngày giờ**: `java.time.format.DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withLocale(locale)`; `DateUtils.getRelativeTimeSpanString` cho "2 giờ trước". `kotlinx-datetime` có `LocalDate.Format { }` theo pattern nhưng không có tên tháng theo locale (cần kiểm tra); trong KMP, format theo locale nên qua expect/actual tới `NSDateFormatter`/`NSNumberFormatter` trên iOS và `java.text` trên Android.
+- **Ngày giờ**: `java.time.format.DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withLocale(locale)`; `DateUtils.getRelativeTimeSpanString` cho "2 giờ trước". `kotlinx-datetime` có `LocalDate.Format { }` và `byUnicodePattern` nhưng README ghi rõ "Internationalization (such as locale-specific month and day names) is out of the scope"; `MonthNames`/`DayOfWeekNames` chỉ có `ENGLISH_FULL`/`ENGLISH_ABBREVIATED` hoặc danh sách bạn tự cung cấp (https://github.com/Kotlin/kotlinx-datetime#working-with-other-string-formats); trong KMP, format theo locale nên qua expect/actual tới `NSDateFormatter`/`NSNumberFormatter` trên iOS và `java.text` trên Android.
 
 ```kotlin
 // commonMain
@@ -943,7 +971,7 @@ actual class LocaleFormatter actual constructor() {
 }
 ```
 
-Phần `iosMain` dùng `NSNumberFormatter` với `numberStyle = NSNumberFormatterCurrencyStyle` và `NSDateFormatter` với `dateStyle = NSDateFormatterMediumStyle` (tên hằng cần kiểm tra khi viết).
+Phần `iosMain` dùng `NSNumberFormatter` với `numberStyle = NSNumberFormatterCurrencyStyle` và `NSDateFormatter` với `dateStyle = NSDateFormatterMediumStyle`, import từ `platform.Foundation` bằng đúng tên Objective-C (Swift gọi là `NumberFormatter.Style.currency` và `DateFormatter.Style.medium`: https://developer.apple.com/documentation/foundation/numberformatter/style/currency , https://developer.apple.com/documentation/foundation/dateformatter/style/medium).
 
 **Lỗi hay gặp / trade-off**
 - Ghép chuỗi: `"Bạn có " + n + " giao dịch"`: không dịch được sang ngôn ngữ đảo thứ tự.
@@ -954,14 +982,15 @@ Phần `iosMain` dùng `NSNumberFormatter` với `numberStyle = NSNumberFormatte
 - https://developer.android.com/guide/topics/resources/localization
 - https://developer.android.com/guide/topics/resources/string-resource
 - https://developer.android.com/guide/topics/resources/string-resource#Plurals
+- https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html (bảng plural category của mọi ngôn ngữ)
 
 ### 6.2 RTL, pseudo-locale, per-app language, string freeze và workflow dịch, CMP resources
 
 - **RTL**: `android:supportsRtl="true"`; Compose `padding(start = , end = )` tự mirror theo `LocalLayoutDirection`; `Icons.AutoMirrored.Filled.ArrowBack` cho icon có hướng; `Row` tự đảo; thứ tự đọc TalkBack đảo. Số và logo không mirror. Preview: `CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) { ... }`.
-- **Pseudo-locale**: `en-XA` (text dài hơn ~30%, ký tự có dấu, lộ chuỗi hard-code) và `ar-XB` (RTL giả). Bật trong `build.gradle.kts`: `buildTypes { debug { isPseudoLocalesEnabled = true } }`, rồi chọn trong Settings > Languages. Chạy pseudo-locale trước mỗi release lớn; CMP: cần kiểm tra hỗ trợ.
-- **Per-app language** (Android 13+): khai báo `android:localeConfig="@xml/locales_config"` trong manifest; đổi qua `AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("vi"))` (backward compatible qua AppCompat) hoặc `LocaleManager` API 33. Setting hệ thống hiện ngôn ngữ app. Trên iOS: `CFBundleLocalizations` và `AppleLanguages` user default; CMP cần expect/actual.
+- **Pseudo-locale**: `en-XA` (text dài hơn ~30%, ký tự có dấu, lộ chuỗi hard-code) và `ar-XB` (RTL giả). Bật trong `build.gradle.kts`: `buildTypes { getByName("debug") { isPseudoLocalesEnabled = true } }`, bật Developer options rồi chọn "English (XA)" hoặc "AR (XB)" trong Settings > Languages (https://developer.android.com/guide/topics/resources/pseudolocales#enable_pseudolocales). Chạy pseudo-locale trước mỗi release lớn. Với CMP: pseudo-locale là tính năng của Android resource pipeline (AAPT), nên chỉ áp cho string Android; string trong `composeResources` không được docs CMP nói là hỗ trợ, coi như không có.
+- **Per-app language** (Android 13+): khai báo `android:localeConfig="@xml/locales_config"` trong manifest, hoặc để AGP 8.1+ tự sinh: `android { androidResources { generateLocaleConfig = true } }` cộng file `res/resources.properties` chứa `unqualifiedResLocale=en-US`; tạo tay LocaleConfig cùng lúc thì build fail (https://developer.android.com/guide/topics/resources/app-languages#auto-localeconfig); đổi qua `AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("vi"))` (backward compatible qua AppCompat) hoặc `LocaleManager` API 33. Setting hệ thống hiện ngôn ngữ app. Trên iOS: `CFBundleLocalizations` và `AppleLanguages` user default; CMP cần expect/actual.
 - **String freeze và workflow dịch**: mốc trong sprint sau đó không thêm/sửa string (ví dụ 5 ngày trước code freeze); string mới sau mốc đi bản sau hoặc có ngoại lệ ký bởi PM. Pipeline: dev thêm key vào `strings.xml` (source) với comment; CI push lên TMS (Crowdin/Lokalise/Phrase); dịch giả làm việc có screenshot context; CI pull về `values-xx`; lint `MissingTranslation` chặn release nếu thiếu. Đo: % key dịch, số key thay đổi sau freeze.
-- **CMP resources**: `composeResources/values/strings.xml` và `values-vi/strings.xml`; `stringResource(Res.string.greeting, name)`; `pluralStringResource(Res.plurals.items, n, n)`; chọn locale theo hệ thống; đổi locale trong app cần API platform (cần kiểm tra hỗ trợ `Locale` override của CMP). `kmp-template-impl` để string trong `core:resource`, feature chỉ tham chiếu `Res.string`.
+- **CMP resources**: `composeResources/values/strings.xml` và `values-vi/strings.xml`; `stringResource(Res.string.greeting, name)`; `pluralStringResource(Res.plurals.items, n, n)`; chọn locale theo hệ thống; đổi locale trong app: CMP **chưa có API chung**, JetBrains gọi cách hiện tại là "a temporary workaround, until a common public API is implemented": khai báo `expect object LocalAppLocale`, `actual` Android dùng `Locale.setDefault` + `LocalConfiguration`, iOS ghi `NSUserDefaults` key `AppleLanguages`, rồi bọc `CompositionLocalProvider(LocalAppLocale provides locale) { key(locale) { content() } }` (https://kotlinlang.org/docs/multiplatform/compose-resource-environment.html#locale, kiểm tra 18/11/2026). `kmp-template-impl` để string trong `core:resource`, feature chỉ tham chiếu `Res.string`.
 
 **Lỗi hay gặp / trade-off**
 - `padding(left = )` thay vì `start`: không mirror.
@@ -972,13 +1001,14 @@ Phần `iosMain` dùng `NSNumberFormatter` với `numberStyle = NSNumberFormatte
 - https://developer.android.com/guide/topics/resources/pseudolocales
 - https://developer.android.com/guide/topics/resources/app-languages
 - https://developer.android.com/training/basics/supporting-devices/languages
-- https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-multiplatform-resources.html
+- https://kotlinlang.org/docs/multiplatform/compose-multiplatform-resources.html (CMP resources) và https://kotlinlang.org/docs/multiplatform/compose-resource-environment.html#locale (đổi locale trong app)
+- https://developer.android.com/guide/topics/resources/app-languages#auto-localeconfig (`generateLocaleConfig`)
 
 ## 7. UX fundamentals cho engineer
 
 ### 7.1 Nielsen's 10 heuristics, states, skeleton, optimistic UI
 
-**10 heuristics của Nielsen** (ngôn ngữ chung với designer, dùng để review):
+**10 heuristics của Nielsen** (Jakob Nielsen, NN/g, https://www.nngroup.com/articles/ten-usability-heuristics/; ngôn ngữ chung với designer, dùng để review):
 
 1. Visibility of system status: loading, progress, "đã lưu".
 2. Match between system and real world: từ ngữ của user, không mã lỗi.
@@ -1020,7 +1050,8 @@ fun <T> AsyncLoadContents(
 }
 ```
 
-- **Skeleton vs spinner**: skeleton khi biết hình dạng nội dung (list, card) và thời gian >300ms; spinner cho hành động ngắn hoặc không biết hình dạng. Không hiện loading cho thao tác <100ms (nhấp nháy). Tránh "double loading" (skeleton + spinner).
+- **Ngưỡng thời gian phản hồi** (Nielsen, "Response Times: The 3 Important Limits", https://www.nngroup.com/articles/response-times-3-important-limits/): **0.1 s** user thấy là tức thì, không cần feedback ngoài kết quả; **1 s** là giới hạn để dòng suy nghĩ không đứt; **10 s** là giới hạn giữ sự chú ý, quá mức này cần percent-done và cách hủy.
+- **Skeleton vs spinner vs progress bar** (NN/g "Skeleton Screens 101", https://www.nngroup.com/articles/skeleton-screens/ ; "Progress Indicators Make a Slow System Less Insufferable", https://www.nngroup.com/articles/progress-indicators/): dưới ~1 s không hiện indicator (chỉ gây nhấp nháy); spinner (looped animation) cho chờ khoảng 2-10 s và cho một module nhỏ; **skeleton** cho tải cả trang/màn hình dưới 10 s khi biết hình dạng nội dung (list, card), giảm cảm giác chờ và layout shift; **progress bar có phần trăm** cho việc trên 10 s hoặc batch ("3/50"); skeleton không dùng cho upload/download. Tránh "double loading" (skeleton + spinner). (kiểm tra 18/11/2026)
 - **Empty state**: nói vì sao trống và hành động tiếp theo ("Chưa có giao dịch. Chuyển tiền ngay").
 - **Error**: nguyên nhân bằng ngôn ngữ user + hành động ("Không có mạng. Thử lại"), giữ dữ liệu đã nhập, không mã lỗi trần (mã lỗi đặt nhỏ dưới để support).
 - **Offline**: banner nhỏ, hiện dữ liệu cache với timestamp, hàng đợi hành động nếu offline-first (xem `06-Mobile-System-Design.md`).
@@ -1028,12 +1059,14 @@ fun <T> AsyncLoadContents(
 
 **Đọc thêm:**
 - https://www.nngroup.com/articles/ten-usability-heuristics/
+- https://www.nngroup.com/articles/response-times-3-important-limits/ (0.1 / 1 / 10 s)
+- https://www.nngroup.com/articles/skeleton-screens/ (khi nào skeleton, spinner, progress bar)
+- https://www.nngroup.com/articles/progress-indicators/
 - https://m3.material.io/foundations/content-design/overview
-- https://developer.android.com/develop/ui/compose/layouts/adaptive (mục state và layout)
 
 ### 7.2 Motion principles, Material motion, shared element trong Compose, microcopy
 
-**Nguyên tắc motion**: motion phải có mục đích (chỉ quan hệ, phản hồi, hướng), nhanh (phần lớn 150-400ms), và có thể tắt. M3 định nghĩa duration token (short 50-200ms, medium 250-400ms, long 450-600ms, extra long 700-1000ms) và easing (emphasized cho chuyển màn, standard cho thành phần nhỏ). M3 Expressive thêm motion scheme dựa trên spring (spatial cho vị trí/kích thước, effects cho màu/alpha) qua `MaterialTheme.motionScheme` (cần kiểm tra API).
+**Nguyên tắc motion**: motion phải có mục đích (chỉ quan hệ, phản hồi, hướng), nhanh (phần lớn 150-400ms), và có thể tắt. M3 định nghĩa duration token (short1-4 = 50/100/150/200ms, medium1-4 = 250/300/350/400ms, long1-4 = 450/500/550/600ms, extra-long1-4 = 700/800/900/1000ms; https://m3.material.io/styles/motion/easing-and-duration/tokens-specs, giá trị trùng `MotionTokens.kt` của androidx) và easing (emphasized cho chuyển màn, standard cho thành phần nhỏ). M3 Expressive thêm motion scheme dựa trên spring: **spatial** (vị trí, kích thước, có nảy) và **effects** (màu, alpha, không nảy), mỗi loại có fast/default/slow; trong `ExpressiveMotionTokens.kt` spatial default là damping 0.8 / stiffness 380, effects default damping 1.0 / stiffness 1600 (https://m3.material.io/blog/m3-expressive-motion-theming). Trong Compose: `MaterialTheme.motionScheme.defaultSpatialSpec<Float>()`, `.fastEffectsSpec()`..., theme đặt bằng `MotionScheme.expressive()` hoặc `MotionScheme.standard()` (stable ở material3 1.5.0, xem mục 1.3; kiểm tra 18/11/2026).
 
 **Transition pattern của Material**: container transform (card thành màn chi tiết), shared axis (bước tiếp theo trong flow, trục X/Y/Z), fade through (đổi tab không liên quan), fade (dialog, snackbar).
 
@@ -1065,7 +1098,7 @@ fun LevelFlow() {
 // })
 ```
 
-`sharedElement` cho nội dung giống hệt (ảnh), `sharedBounds` cho container khác nội dung (card thành màn). Với Navigation 3, `NavDisplay` cung cấp `AnimatedContentScope` qua `LocalNavAnimatedContentScope` (tên cần kiểm tra theo version). Luôn có `key` ổn định và tôn trọng reduced motion.
+`sharedElement` cho nội dung giống hệt (ảnh), `sharedBounds` cho container khác nội dung (card thành màn). Với Navigation 3, `NavDisplay` cung cấp `AnimatedContentScope` cho mỗi entry qua `LocalNavAnimatedContentScope` (package `androidx.navigation3.ui`, artifact `androidx.navigation3:navigation3-ui`, có từ 1.0.0, không có giá trị mặc định nên chỉ đọc bên trong entry của `NavDisplay`; https://developer.android.com/reference/kotlin/androidx/navigation3/ui/package-summary#LocalNavAnimatedContentScope()). Luôn có `key` ổn định và tôn trọng reduced motion.
 
 **Microcopy / UX writing**:
 
@@ -1078,6 +1111,7 @@ fun LevelFlow() {
 
 **Đọc thêm:**
 - https://m3.material.io/styles/motion/overview
+- https://m3.material.io/styles/motion/easing-and-duration/tokens-specs (duration và easing token)
 - https://developer.android.com/develop/ui/compose/animation/shared-elements
 - https://m3.material.io/foundations/content-design/overview
 
@@ -1112,6 +1146,7 @@ fun LevelFlow() {
 **Đọc thêm:**
 - https://m3.material.io/foundations/overview/principles
 - https://developer.apple.com/design/human-interface-guidelines/
+- Sách Articulating Design Decisions (Tom Greever, O'Reilly, 2nd ed. 2020, ISBN 9781492079217; https://www.oreilly.com/library/view/articulating-design-decisions/9781492079217/): Chapter 2 "Stakeholders Are People Too", Chapter 3 "Design the Meeting" (set the context, anticipate reactions, create a support network), Chapter 4 "Listen to Understand", Chapter 5 "Get in the Right Mindset" (thank, repeat, prepare), Chapter 6 "Form a Response", Chapter 9 "Follow Up Afterward". Sách viết cho designer nói với stakeholder; engineer đọc chương 4-6 để phản hồi designer theo cùng khung. O'Reilly có liệt kê bản 3rd edition (11/2026) nhưng chưa xác minh được mục lục
 - `11-Leadership-Management.md` mục code review và conflict
 - `12-Behavioral-STAR-Bank.md`
 
@@ -1135,7 +1170,7 @@ Nhóm A: Material và theming (Q1-Q6). Nhóm B: design system và token (Q7-Q14)
 **Điểm interviewer muốn nghe:** Lệch ở token rẻ, lệch ở hành vi đắt; nêu chi phí sở hữu.
 
 ### Q4. What is Material 3 Expressive and how would you adopt it safely?
-**A:** Expressive is the 2025 evolution of Material 3: spring-based motion schemes, shape morphing, emphasized typography variants and a set of new components such as button groups, split buttons, floating toolbars and new loading indicators. In Compose it arrives through the Material 3 library with an expressive theme entry point and a motion scheme on the theme. To adopt it safely I pin the library version, enable it behind the design system so only the component library touches experimental APIs, cover the affected components with screenshot tests, and roll it out per component rather than switching the whole app. In my multiplatform template the Expressive build of Material 3 is an alpha, so the pin and the screenshot tests are what make it acceptable.
+**A:** Expressive is the 2025 evolution of Material 3: spring-based motion schemes, shape morphing, emphasized typography variants and a set of new components such as button groups, split buttons, floating toolbars and new loading indicators. In Compose it arrives through the Material 3 library with `MaterialExpressiveTheme` and `MotionScheme.expressive()` on the theme; the stable 1.4.0 release stripped the experimental Expressive APIs, and the 1.5.0 line promotes most of them, with `LoadingIndicator` still experimental. To adopt it safely I pin the library version, enable it behind the design system so only the component library touches experimental APIs, cover the affected components with screenshot tests, and roll it out per component rather than switching the whole app. In my multiplatform template the Expressive build of Material 3 is an alpha, so the pin and the screenshot tests are what make it acceptable.
 **Follow-ups:** What is a motion scheme? Which Expressive components would you use in a banking app and which would you avoid? How do you handle experimental annotations in a shared module?
 **Điểm interviewer muốn nghe:** Biết Expressive là gì ở mức component và motion; chiến lược adopt có kiểm soát.
 
@@ -1165,7 +1200,7 @@ Nhóm A: Material và theming (Q1-Q6). Nhóm B: design system và token (Q7-Q14)
 **Điểm interviewer muốn nghe:** Thứ tự tham số, slot, Defaults, hoisting, stability.
 
 ### Q10. How do you version a design system and handle breaking changes?
-**A:** Semantic versioning on the published artifact, with a written definition of breaking: a changed composable signature, a renamed or removed token, or a changed default appearance. Deprecation runs over three releases, warning with `ReplaceWith`, then error, then removal, and the binary compatibility validator diffs the public API on every pull request so nothing breaks silently. Visual changes ship with before and after screenshots in the changelog. In a monorepo I prefer trunk development with the same deprecation cycle over publishing artifacts, because feature teams then migrate in small steps instead of pinning old versions.
+**A:** Semantic versioning on the published artifact, with a written definition of breaking: a changed composable signature, a renamed or removed token, or a changed default appearance. Deprecation follows SemVer and the Kotlin API guidelines: the warning with `ReplaceWith` ships in a minor release and stays for at least two minors, then it becomes an error in a later minor, then hidden, and the declaration is only removed in the next major. ABI validation in the Kotlin Gradle plugin diffs the public API on every pull request so nothing breaks silently. Visual changes ship with before and after screenshots in the changelog. In a monorepo I prefer trunk development with the same deprecation cycle over publishing artifacts, because feature teams then migrate in small steps instead of pinning old versions.
 **Follow-ups:** How do you force adoption of a new major version? What tooling diffs the Kotlin API? How do you handle a visual change that is technically compatible?
 **Điểm interviewer muốn nghe:** Định nghĩa breaking, chu kỳ deprecate, tool diff API, changelog có ảnh.
 
@@ -1215,7 +1250,7 @@ Nhóm A: Material và theming (Q1-Q6). Nhóm B: design system và token (Q7-Q14)
 **Điểm interviewer muốn nghe:** Ba layout, API đúng tên, scaffold điều hướng.
 
 ### Q20. What does Android 16 change for apps on large screens, and what is your plan?
-**A:** On devices 600 dp and wider the system ignores orientation locks, `resizeableActivity="false"` and aspect ratio restrictions, so a portrait-locked phone app is rotated and resized like any other. There is a temporary opt-out that disappears when targeting Android 17. My plan is an audit on resizable and foldable emulators, screenshots of every screen at medium and expanded widths, fixes through size classes rather than per-screen hacks, verification that state survives configuration changes through ViewModels, and a check of camera and media screens that assumed portrait. It is a deadline, not a nice-to-have, because Play requires targeting current APIs on a schedule.
+**A:** For apps targeting API 36, on displays whose smallest width is 600 dp or more the system ignores orientation locks, `resizeableActivity="false"` and aspect ratio restrictions, so a portrait-locked phone app is rotated and resized like any other. Games that declare `android:appCategory="game"` are exempt, and there is a temporary opt-out property, `PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY`, that disappears when targeting Android 17. Google Play requires new apps and updates to target API 36 from 31 August 2026, so this is no longer optional. My plan is an audit on resizable and foldable emulators, screenshots of every screen at medium and expanded widths, fixes through size classes rather than per-screen hacks, verification that state survives configuration changes through ViewModels, and a check of camera and media screens that assumed portrait. It is a deadline, not a nice-to-have, because Play requires targeting current APIs on a schedule.
 **Follow-ups:** How do you prioritize screens? What about games or camera apps that truly need portrait? How do you keep this from regressing?
 **Điểm interviewer muốn nghe:** Nêu đúng quy tắc và opt-out hết hạn; kế hoạch audit cụ thể.
 
@@ -1240,7 +1275,7 @@ Nhóm A: Material và theming (Q1-Q6). Nhóm B: design system và token (Q7-Q14)
 **Điểm interviewer muốn nghe:** Semantics tree, các API chính với lý do, lỗi phổ biến.
 
 ### Q25. What are the hard numbers you check in an accessibility review?
-**A:** Touch targets at least 48 by 48 dp, which Material enforces through the minimum interactive component size; contrast of 4.5 to 1 for body text, 3 to 1 for large text, icons and component boundaries; font scaling up to 200 percent without clipping, which means `sp` for text and no fixed heights around text; display size at maximum; and animation durations that can be disabled when the user turns animations off. Color is never the only carrier of meaning, so a red or green amount also has a sign or icon.
+**A:** Touch targets at least 48 by 48 dp, which Material enforces through the minimum interactive component size and which is double WCAG 2.2's 24 by 24 pixel minimum in criterion 2.5.8; contrast of 4.5 to 1 for body text, 3 to 1 for large text, icons and component boundaries; font scaling up to 200 percent without clipping, which means `sp` for text and no fixed heights around text; display size at maximum; and animation durations that can be disabled when the user turns animations off. Color is never the only carrier of meaning, so a red or green amount also has a sign or icon.
 **Follow-ups:** How does non-linear font scaling change the rules? What do you do with a numeric cell that must fit? Where do you check contrast for text over images?
 **Điểm interviewer muốn nghe:** Số cụ thể: 48dp, 4.5:1, 3:1, 200%.
 
@@ -1250,7 +1285,7 @@ Nhóm A: Material và theming (Q1-Q6). Nhóm B: design system và token (Q7-Q14)
 **Điểm interviewer muốn nghe:** Nêu đúng vài SC mới và liên hệ flow fintech.
 
 ### Q27. Why does the European Accessibility Act matter to a Vietnamese mobile team?
-**A:** It applies from June 2025 to services offered in the EU, including consumer banking, e-commerce, telecom and e-books, with EN 301 549 as the technical standard, which references WCAG AA. Any outsourcing contract for an EU client, and any product with EU users, inherits the obligation, and the client's compliance team will ask for evidence. For me it is the business case that funds accessibility work: an audit report, fixes in the design system, and tests that keep it fixed. Even outside the EU the same work reduces support tickets and improves usability for everyone.
+**A:** Directive 2019/882 applies from 28 June 2025 to services offered in the EU, including consumer banking, e-commerce, telecom and e-books, with EN 301 549 as the technical standard, which references WCAG 2.1 AA. Only microenterprises providing services, meaning fewer than ten people and no more than two million euros in turnover or balance sheet, are exempt, so a real client almost never is. Any outsourcing contract for an EU client, and any product with EU users, inherits the obligation, and the client's compliance team will ask for evidence. For me it is the business case that funds accessibility work: an audit report, fixes in the design system, and tests that keep it fixed. Even outside the EU the same work reduces support tickets and improves usability for everyone.
 **Follow-ups:** What evidence does a client ask for? How do you estimate an accessibility remediation? What happens on iOS with VoiceOver in a Compose Multiplatform app?
 **Điểm interviewer muốn nghe:** Biết phạm vi và ngày, chuyển thành lý do kinh doanh.
 
@@ -1260,7 +1295,7 @@ Nhóm A: Material và theming (Q1-Q6). Nhóm B: design system và token (Q7-Q14)
 **Điểm interviewer muốn nghe:** Quy trình có bước, có công cụ, có cách chặn tái phát.
 
 ### Q29. How do you handle plurals and formatting of numbers, dates and currency across locales?
-**A:** Plurals go through plural resources with the CLDR quantity categories, because languages differ: Vietnamese has only one form, Russian has several, Arabic has six, so string concatenation is never acceptable. Numbers and currency use `NumberFormat` with the current locale and the currency's fraction digits, with amounts stored as minor units in `Long` or `BigDecimal`, never `Double`. Dates use localized formatters from `java.time` on Android. In shared Kotlin, `kotlinx-datetime` handles arithmetic but locale-aware names and currency formatting go through expect/actual to `NSNumberFormatter` and `NSDateFormatter` on iOS and `java.text` on Android.
+**A:** Plurals go through plural resources with the CLDR quantity categories, because languages differ: Vietnamese used only the `other` form until CLDR 49 added `one` for 0 and 1, Russian has four, Arabic has six, so string concatenation is never acceptable. Numbers and currency use `NumberFormat` with the current locale and the currency's fraction digits, with amounts stored as minor units in `Long` or `BigDecimal`, never `Double`. Dates use localized formatters from `java.time` on Android. In shared Kotlin, `kotlinx-datetime` handles arithmetic but locale-aware names and currency formatting go through expect/actual to `NSNumberFormatter` and `NSDateFormatter` on iOS and `java.text` on Android.
 **Follow-ups:** How do you format Vietnamese dong correctly? What breaks when the user picks a per-app language? How do you unit test formatting across locales?
 **Điểm interviewer muốn nghe:** Plural category, minor unit, formatter theo locale, expect/actual cho KMP.
 
@@ -1275,7 +1310,7 @@ Nhóm A: Material và theming (Q1-Q6). Nhóm B: design system và token (Q7-Q14)
 **Điểm interviewer muốn nghe:** Pipeline, freeze có ngoại lệ ký, lint chặn, per-app language.
 
 ### Q32. Which screen states do you require, and when do you use a skeleton versus a spinner?
-**A:** Every data screen handles loading, empty, error, offline and content, plus a partial state when cached content is shown while refreshing. In my template a sealed `ScreenState` and a wrapper composable force every screen to handle them. A skeleton is for content whose shape is known and that takes longer than about three hundred milliseconds, because it reduces perceived wait and layout shift; a spinner is for short actions or unknown shapes; nothing is shown under about a hundred milliseconds to avoid flicker; and never both at once. Empty states explain why and offer the next action, errors say what happened and what to do, and offline shows cached data with a timestamp.
+**A:** Every data screen handles loading, empty, error, offline and content, plus a partial state when cached content is shown while refreshing. In my template a sealed `ScreenState` and a wrapper composable force every screen to handle them. I follow Nielsen Norman Group's thresholds: under about a second I show no indicator because it only flickers; a spinner covers a single module or a wait of roughly two to ten seconds; a skeleton is for a full screen whose shape is known and that loads in under ten seconds, because it reduces perceived wait and layout shift; anything over ten seconds gets a percent-done progress bar and a way to cancel; and never a skeleton and a spinner at once. Empty states explain why and offer the next action, errors say what happened and what to do, and offline shows cached data with a timestamp.
 **Follow-ups:** How do you implement the delay before showing loading? What is the risk of optimistic UI in a payment flow? How do you test all states?
 **Điểm interviewer muốn nghe:** Danh sách state, ngưỡng thời gian, lý do skeleton.
 

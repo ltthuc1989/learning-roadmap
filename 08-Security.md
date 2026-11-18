@@ -52,15 +52,17 @@ Liên hệ: phần network (TLS, pinning rotation, token refresh race) chi tiế
 OWASP Mobile Application Security (MAS) gồm ba tài liệu:
 - MASVS (Mobile Application Security Verification Standard): tiêu chuẩn, liệt kê control theo nhóm. Phiên bản 2 gom thành 8 nhóm: MASVS-STORAGE, MASVS-CRYPTO, MASVS-AUTH, MASVS-NETWORK, MASVS-PLATFORM, MASVS-CODE, MASVS-RESILIENCE, MASVS-PRIVACY. Ví dụ MASVS-STORAGE-1: "The app securely stores sensitive data", MASVS-NETWORK-2: "The app performs identity pinning for all remote endpoints under the developer's control", MASVS-RESILIENCE-1: "The app validates the integrity of the platform".
 - MASTG (Testing Guide): cách test từng control, công cụ (Frida, objection, jadx, apktool, MobSF, Burp), kỹ thuật bypass. Pentester đi theo MASTG.
-- MASWE (Weakness Enumeration): danh sách điểm yếu nối MASVS với test case, đang được bổ sung.
+- MASWE (Weakness Enumeration, https://mas.owasp.org/MASWE/): danh sách điểm yếu nối MASVS với test case, đang được bổ sung. Test MASTG v2 có ID dạng `MASTG-TEST-02xx/03xx`, URL `https://mas.owasp.org/MASTG/tests/android/<NHÓM>/<ID>/`; các test v1 cũ (ví dụ MASTG-TEST-0001, 0045) đã gắn nhãn deprecated, đừng trích khi phỏng vấn.
 - MAS Checklist: bảng Excel/markdown map control với test, dùng làm scope cho pentest và self-assessment.
 
-Mức xác minh (profile): L1 (mọi app), L2 (app xử lý dữ liệu nhạy cảm: bank, health), R (resilience: chống reverse engineering và tamper, bổ sung cho L1/L2, bank gần như luôn yêu cầu L2+R). Tên và cách chia profile ở bản mới nhất cần kiểm tra tại https://mas.owasp.org/MASVS/.
+Mức xác minh: từ MASVS v2 (2023), các level L1/L2/R **không còn nằm trong MASVS**; OWASP chuyển chúng sang MASTG dưới dạng "MAS Testing Profiles" (https://mas.owasp.org/Profiles/): MAS-L1 (Essential Security, mọi app), MAS-L2 (Advanced Security, app xử lý dữ liệu nhạy cảm: bank, health), MAS-R (Resilient Security: chống reverse engineering và tamper, bổ sung cho L1/L2), MAS-P (Baseline Privacy). Mỗi test MASTG được gắn profile nào áp dụng. Bank gần như luôn yêu cầu MAS-L2 + MAS-R. Khi phỏng vấn nói "MASVS v2 controls, tested against the MAS-L2 and MAS-R testing profiles" thay vì "MASVS level L2". (kiểm tra 18/11/2026)
+
+Control hay trích (trang control dạng https://mas.owasp.org/MASVS/controls/MASVS-STORAGE-1/): STORAGE-1 lưu trữ an toàn, STORAGE-2 chống rò rỉ (log, backup, clipboard), CRYPTO-1 crypto mạnh dùng đúng, CRYPTO-2 quản lý key, AUTH-1 giao thức auth/authz, AUTH-2 local auth (biometric), AUTH-3 xác thực bổ sung cho thao tác nhạy cảm, NETWORK-1 bảo vệ traffic, NETWORK-2 pinning, PLATFORM-1 IPC, PLATFORM-2 WebView, PLATFORM-3 UI (overlay, screenshot), CODE-4 validate input, RESILIENCE-1 kiểm tra platform (root), RESILIENCE-2 anti-tamper, RESILIENCE-3 anti-static analysis, RESILIENCE-4 anti-dynamic analysis (debugger, Frida).
 
 OWASP Mobile Top 10 (bản 2024) là danh sách rủi ro, hay bị hỏi để kiểm tra bạn có theo dõi không: M1 Improper Credential Usage, M2 Inadequate Supply Chain Security, M3 Insecure Authentication/Authorization, M4 Insufficient Input/Output Validation, M5 Insecure Communication, M6 Inadequate Privacy Controls, M7 Insufficient Binary Protections, M8 Security Misconfiguration, M9 Insecure Data Storage, M10 Insufficient Cryptography.
 
 Interviewer dùng thế nào:
-- "App của bạn target MASVS level nào? Ai verify?" Họ muốn nghe: L2+R cho bank, pentest hàng năm bởi bên thứ ba, finding được map theo MASVS ID.
+- "App của bạn target MASVS level nào? Ai verify?" Họ muốn nghe: MAS-L2 + MAS-R (testing profiles của MASVS v2) cho bank, pentest hàng năm bởi bên thứ ba, finding được map theo MASVS ID.
 - "Pentest report có finding MASVS-STORAGE-2 (data leak qua log/backup), bạn xử lý thế nào?" Họ muốn nghe quy trình: tái hiện, đánh giá severity, fix, retest, và đưa vào checklist để không tái phát.
 - "Bạn tự test kiểu MASTG được không?" Họ muốn nghe: bạn đã chạy MobSF, apktool/jadx trên APK của mình, biết objection bypass pinning, biết Frida hook là gì.
 
@@ -70,6 +72,8 @@ Interviewer dùng thế nào:
 - **Đọc thêm:**
   - https://mas.owasp.org/MASVS/
   - https://mas.owasp.org/MASTG/
+  - https://mas.owasp.org/Profiles/ (MAS Testing Profiles: MAS-L1, MAS-L2, MAS-R, MAS-P)
+  - https://mas.owasp.org/MASWE/
   - https://mas.owasp.org/checklists/
   - https://owasp.org/www-project-mobile-top-10/
 
@@ -106,7 +110,7 @@ Ví dụ: feature "chuyển tiền nhanh qua QR". Asset: tính toàn vẹn số 
 
 - **Đọc thêm:**
   - https://owasp.org/www-community/Threat_Modeling
-  - https://mas.owasp.org/MASTG/ (phần General Mobile App Security Testing, mục threat modeling)
+  - https://mas.owasp.org/MASTG/0x04b-Mobile-App-Security-Testing/ (MASTG chương Mobile Application Security Testing)
   - Sách Mobile System Design Interview (Manuel Vivo), chương security considerations
 
 ## 2. Storage
@@ -124,7 +128,7 @@ Các thuộc tính quan trọng của `KeyGenParameterSpec`:
 - `setAttestationChallenge(bytes)`: tạo attestation chain (xem 2.2).
 - `setRandomizedEncryptionRequired` (mặc định true cho AES-GCM, buộc IV ngẫu nhiên).
 
-Android 17 (API 37) áp dụng "Keystore key caps" cho mọi app chạy trên 17 (không chỉ target 37): giới hạn số key Keystore mỗi app được giữ. Con số cụ thể và hành vi khi vượt cần kiểm tra tại https://developer.android.com/about/versions/17/behavior-changes-all. Hệ quả thiết kế: không tạo một Keystore key cho mỗi mẩu dữ liệu; tạo một (hoặc vài) master key trong Keystore và dùng nó wrap các data key sinh trong app (envelope encryption); xóa key không dùng khi logout hoặc migrate.
+Android 17 (API 37) giới hạn số key Keystore mỗi app được giữ, áp dụng cho mọi app chạy trên Android 17: 50.000 key cho app không phải system app target API 37 trở lên, 200.000 key cho mọi app khác (kể cả system app). Vượt giới hạn thì tạo key thất bại với `KeyStoreException` (app target 37+ nhận mã `ERROR_TOO_MANY_KEYS`, app cũ hơn nhận `ERROR_INCORRECT_USAGE`). Nguồn: https://developer.android.com/about/versions/17/behavior-changes-all#per-app-keystore-limits (kiểm tra 18/11/2026). Hệ quả thiết kế: không tạo một Keystore key cho mỗi mẩu dữ liệu; tạo một (hoặc vài) master key trong Keystore và dùng nó wrap các data key sinh trong app (envelope encryption); xóa key không dùng khi logout hoặc migrate.
 
 Mẫu mã hóa token bằng AES-GCM với key trong Keystore:
 
@@ -171,7 +175,16 @@ object KeystoreCrypto {
 }
 ```
 
-Điểm để trả lời interviewer: AES-GCM cho confidentiality + integrity (tag), IV phải duy nhất cho mỗi lần mã hóa với cùng key (Keystore tự sinh, đừng tự đặt), AAD gắn ngữ cảnh (ví dụ user id) để blob của user A không giải mã được trong ngữ cảnh user B. Kiểm tra key có hardware-backed không: `KeyFactory.getInstance(alg, "AndroidKeyStore").getKeySpec(key, KeyInfo::class.java).securityLevel` (API 31) hoặc `isInsideSecureHardware` (cũ).
+Điểm để trả lời interviewer: AES-GCM cho confidentiality + integrity (tag), IV phải duy nhất cho mỗi lần mã hóa với cùng key (Keystore tự sinh, đừng tự đặt), AAD gắn ngữ cảnh (ví dụ user id) để blob của user A không giải mã được trong ngữ cảnh user B. Kiểm tra key có hardware-backed không: với `SecretKey` (AES) phải dùng `SecretKeyFactory`, với private key (EC/RSA) dùng `KeyFactory` (theo reference `KeyInfo`, https://developer.android.com/reference/android/security/keystore/KeyInfo):
+
+```kotlin
+val keyInfo = SecretKeyFactory.getInstance(key.algorithm, "AndroidKeyStore")
+    .getKeySpec(key, KeyInfo::class.java) as KeyInfo
+val hw = if (Build.VERSION.SDK_INT >= 31)
+    keyInfo.securityLevel in setOf(KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT, KeyProperties.SECURITY_LEVEL_STRONGBOX)
+else @Suppress("DEPRECATION") keyInfo.isInsideSecureHardware   // deprecated từ API 31
+// Private key: KeyFactory.getInstance(privateKey.algorithm, "AndroidKeyStore").getKeySpec(privateKey, KeyInfo::class.java)
+```
 
 Giới hạn Keystore phải nói được: key có thể bị xóa khi user xóa lock screen (với key yêu cầu auth) hoặc factory reset; một số OEM có bug (key biến mất sau update OS), nên app phải xử lý `KeyPermanentlyInvalidatedException` và `UnrecoverableKeyException` bằng cách enroll lại thay vì crash; thao tác Keystore chậm hơn software (vài ms tới vài chục ms), không gọi trong vòng lặp lớn; trên emulator không có hardware.
 
@@ -182,11 +195,12 @@ Giới hạn Keystore phải nói được: key có thể bị xóa khi user xó
 - **Đọc thêm:**
   - https://developer.android.com/privacy-and-security/keystore
   - https://developer.android.com/privacy-and-security/cryptography
-  - https://developer.android.com/about/versions/17/behavior-changes-all
+  - https://developer.android.com/about/versions/17/behavior-changes-all#per-app-keystore-limits
+  - https://developer.android.com/reference/android/security/keystore/KeyInfo
 
 ### 2.2 Key attestation
 
-Key attestation là Keystore tạo một chuỗi chứng chỉ cho key pair, ký bởi key của thiết bị do Google cấp lúc sản xuất, chứa extension mô tả: key sinh ở đâu (`attestationSecurityLevel`: Software/TEE/StrongBox), có yêu cầu user auth không, trạng thái verified boot (`verifiedBootState`: Verified/SelfSigned/Unverified/Failed), bootloader locked hay không, OS version và patch level, và challenge bạn đưa vào (chống replay).
+Key attestation là Keystore tạo một chuỗi chứng chỉ cho key pair, ký bởi attestation key của thiết bị, chain lên root attestation của Google. Attestation key đến từ đâu: mô hình cũ là "factory keys" do OEM nạp vào thiết bị lúc sản xuất; mô hình mới là RKP (Remote Key Provisioning), thiết bị nhận chứng chỉ attestation ngắn hạn từ server của Google thay vì nạp key cố định ("RKP does not program keys directly onto the device"). RKP có trong AOSP từ Android 12, tùy chọn trong chính sách Android 15, và thiết bị launch với Android 16 chỉ hỗ trợ RKP (https://developer.android.com/privacy-and-security/security-key-attestation#root_certificate_phasing_out). Chứng chỉ attestation chứa extension mô tả: key sinh ở đâu (`attestationSecurityLevel`: Software/TEE/StrongBox), có yêu cầu user auth không, trạng thái verified boot (`verifiedBootState`: Verified/SelfSigned/Unverified/Failed), bootloader locked hay không, OS version và patch level, và challenge bạn đưa vào (chống replay).
 
 Dùng cho: device binding lúc enrollment (server chỉ chấp nhận key có attestation hợp lệ với root Google, security level TEE/StrongBox, verified boot Verified), chứng minh "key này sinh trong hardware của một thiết bị hợp lệ, bootloader khóa". Khác với Play Integrity: attestation là về key và boot state, không cần Google Play services (chạy trên mọi thiết bị có Keymaster đúng chuẩn), và là bằng chứng mã học server tự verify được; Play Integrity là verdict tổng hợp từ Google về app + thiết bị + tài khoản.
 
@@ -203,7 +217,7 @@ val chain = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.getCert
 // gửi chain (DER từng cert) lên server
 ```
 
-Server verify: chain tới root Google (public key công bố), kiểm tra revocation list của Google cho attestation keys, parse extension `1.3.6.1.4.1.11129.2.1.17`, so challenge, kiểm tra security level và verified boot, lưu public key. Chi tiết và thư viện mẫu tại https://developer.android.com/privacy-and-security/security-key-attestation.
+Server verify: chain tới root Google (danh sách root công bố ở https://developer.android.com/privacy-and-security/security-key-attestation#root_certificate; từ 01/02/2026 có thêm một root ECDSA mới bắt đầu ký chain, server phải tin cả root cũ và mới), kiểm tra revocation list của Google cho attestation keys tại https://android.googleapis.com/attestation/status (#certificate_status), parse extension `1.3.6.1.4.1.11129.2.1.17`, so challenge, kiểm tra security level và verified boot, lưu public key. Chi tiết và thư viện mẫu tại https://developer.android.com/privacy-and-security/security-key-attestation.
 
 Giới hạn: thiết bị cũ hoặc OEM lạ có attestation hỏng hoặc software-level; một số thiết bị bị lộ attestation key (Google thu hồi); module "Play Integrity Fix" trên Magisk giả được một số signal cũ nhưng không giả được chữ ký hardware hợp lệ. Chính sách thực tế: attestation TEE trở lên cho device binding, software thì chỉ cho phép thao tác thấp.
 
@@ -213,7 +227,7 @@ Giới hạn: thiết bị cũ hoặc OEM lạ có attestation hỏng hoặc sof
 
 ### 2.3 Mã hóa dữ liệu: Jetpack Security, Tink, DataStore, SQLCipher
 
-Thực trạng (cần kiểm tra lại ngày phỏng vấn): thư viện `androidx.security:security-crypto` (`EncryptedSharedPreferences`, `EncryptedFile`) đã bị Google đánh dấu deprecated; hướng dẫn hiện tại là dùng trực tiếp Keystore + AES-GCM như 2.1, hoặc Tink (`AndroidKeysetManager` với master key URI `android-keystore://alias`). Nếu project cũ của bạn còn dùng `EncryptedSharedPreferences`, hãy chuẩn bị câu trả lời: "it works but is deprecated, migration plan is Keystore-wrapped AES-GCM with a versioned blob format".
+Thực trạng (kiểm tra 18/11/2026): `androidx.security:security-crypto` 1.1.0-alpha07 (09/04/2025) ghi rõ "Deprecated all APIs in favour of existing platform APIs and direct use of Android Keystore"; bản 1.1.0 stable (30/07/2025) vẫn giữ trạng thái deprecated đó (https://developer.android.com/jetpack/androidx/releases/security). `EncryptedSharedPreferences`, `EncryptedFile`, `MasterKey` đều deprecated. Hướng dẫn hiện tại là dùng trực tiếp Keystore + AES-GCM như 2.1, hoặc Tink (`com.google.crypto.tink:tink-android:1.24.0`, hỗ trợ đầy đủ từ API 24, https://developers.google.com/tink/setup/java) với `AndroidKeysetManager` và master key URI `android-keystore://alias`. Nếu project cũ của bạn còn dùng `EncryptedSharedPreferences`, hãy chuẩn bị câu trả lời: "it works but is deprecated, migration plan is Keystore-wrapped AES-GCM with a versioned blob format".
 
 Lớp dữ liệu và cách bảo vệ:
 
@@ -268,12 +282,14 @@ SQLCipher cho Room: `net.zetetic:sqlcipher-android` cung cấp `SupportOpenHelpe
   - Mã hóa toàn bộ rồi để log ghi plaintext ngay bên cạnh.
 - **Đọc thêm:**
   - https://developers.google.com/tink
+  - https://developers.google.com/tink/setup/java (Gradle `tink-android`)
+  - https://developer.android.com/jetpack/androidx/releases/security (ghi chú deprecation)
   - https://www.zetetic.net/sqlcipher/sqlcipher-for-android/
   - https://developer.android.com/topic/libraries/architecture/datastore
 
 ### 2.4 Backup: allowBackup, auto backup rules, device transfer
 
-Auto Backup sao chép dữ liệu app (SharedPreferences, DB, file nội bộ) lên Google Drive của user, và device-to-device transfer chuyển sang máy mới. Với bank: dữ liệu trong backup rời khỏi thiết bị và có thể được restore trên thiết bị khác; token/device key khi restore sang máy khác tạo "thiết bị bị nhân bản". Pentest finding kinh điển: `adb backup` hoặc restore cho thấy token.
+Auto Backup sao chép dữ liệu app (SharedPreferences, DB, file nội bộ) lên Google Drive của user, và device-to-device transfer chuyển sang máy mới. Với bank: dữ liệu trong backup rời khỏi thiết bị và có thể được restore trên thiết bị khác; token/device key khi restore sang máy khác tạo "thiết bị bị nhân bản". Pentest finding kinh điển: `adb backup` hoặc restore cho thấy token. Lưu ý finding này đã cũ với app target API 31+: từ Android 12, `adb backup` không còn chứa dữ liệu app target 31+ (trừ khi app `android:debuggable="true"`) (https://developer.android.com/about/versions/12/behavior-changes-12#adb-backup-restrictions). Đường rò thật hiện nay là cloud backup và device-to-device (D2D) transfer.
 
 Cấu hình:
 - `android:allowBackup="false"` tắt backup (Play và pentest coi là mặc định cho bank).
@@ -295,11 +311,13 @@ Cấu hình:
 </data-extraction-rules>
 ```
 
-Lưu ý: từ Android 12, cách `allowBackup` tương tác với device-to-device transfer thay đổi; hãy khai `dataExtractionRules` tường minh thay vì tin vào `allowBackup` và kiểm tra tại https://developer.android.com/identity/data/autobackup. Test: `adb shell bmgr backupnow <package>` rồi `bmgr restore`, hoặc dùng flow chuyển máy. Keystore key không được backup, nên dữ liệu mã hóa bằng Keystore khi restore sang máy khác sẽ không giải mã được: đây là tính năng, app phải xử lý bằng cách yêu cầu login lại thay vì crash.
+Lưu ý (Android 12, app target 31+, https://developer.android.com/about/versions/12/behavior-changes-12#backup-restore): trên thiết bị của một số OEM, `android:allowBackup="false"` tắt backup lên Google Drive nhưng **không tắt D2D transfer**; rule XML cũ (`fullBackupContent`) không áp dụng cho D2D; khi có `dataExtractionRules` thì `fullBackupContent` bị bỏ qua trên Android 12+. Vì vậy hãy khai `dataExtractionRules` tường minh với cả `<cloud-backup>` và `<device-transfer>` thay vì tin vào `allowBackup`. (kiểm tra 18/11/2026) Test: `adb shell bmgr backupnow <package>` rồi `bmgr restore`, hoặc dùng flow chuyển máy. Keystore key không được backup, nên dữ liệu mã hóa bằng Keystore khi restore sang máy khác sẽ không giải mã được: đây là tính năng, app phải xử lý bằng cách yêu cầu login lại thay vì crash.
 
 - **Đọc thêm:**
   - https://developer.android.com/identity/data/autobackup
-  - https://mas.owasp.org/MASTG/ (MASVS-STORAGE-2, test backup)
+  - https://developer.android.com/about/versions/12/behavior-changes-12#backup-restore
+  - https://mas.owasp.org/MASVS/controls/MASVS-STORAGE-2/
+  - https://mas.owasp.org/MASTG/tests/android/MASVS-STORAGE/MASTG-TEST-0262/ (backup config không loại dữ liệu nhạy cảm)
 
 ## 3. Network security
 
@@ -344,11 +362,13 @@ Network Security Config là file khai báo duy nhất bạn phải thuộc:
 
 ### 3.2 Pinning: pros/cons và rotation (tóm tắt)
 
-Pros: chặn CA bị hack, chứng chỉ cấp sai, user CA trên máy có proxy; là yêu cầu MASVS-NETWORK-2 (L2) và gần như mọi pentest bank. Cons: rotation sai là bricking; bị bypass trên máy root bằng Frida/objection; tốn công duy trì; không bảo vệ SDK bên thứ ba dùng stack riêng. Rotation: pin SPKI, 2+ pin (live + backup pre-generated), expiration, lịch gắn với cert expiry, monitoring `SSLPeerUnverifiedException`, force update path. Code OkHttp và Ktor xem `07-Network.md` 5.9.
+Pros: chặn CA bị hack, chứng chỉ cấp sai, user CA trên máy có proxy; là control MASVS-NETWORK-2 ("The app performs identity pinning for all remote endpoints under the developer's control") và gần như mọi pentest bank đều test. Cons: rotation sai là bricking; bị bypass trên máy root bằng Frida/objection; tốn công duy trì; không bảo vệ SDK bên thứ ba dùng stack riêng. Rotation: pin SPKI, 2+ pin (live + backup pre-generated), expiration, lịch gắn với cert expiry, monitoring `SSLPeerUnverifiedException`, force update path. Code OkHttp và Ktor xem `07-Network.md` 5.9.
 
 - **Đọc thêm:**
-  - https://github.com/square/okhttp/blob/master/docs/features/https.md
-  - https://mas.owasp.org/MASTG/ (MASVS-NETWORK-2 và kỹ thuật bypass pinning trong MASTG để biết pentester làm gì)
+  - https://lysine.dev/okhttp/features/https/#certificate-pinning-kt-java (docs OkHttp, trước ở square.github.io/okhttp nay 404)
+  - https://mas.owasp.org/MASVS/controls/MASVS-NETWORK-2/
+  - https://mas.owasp.org/MASTG/techniques/android/MASTG-TECH-0012/ (Bypassing Certificate Pinning: pentester làm gì)
+  - https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0242/ và https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0244/ (thiếu pinning trong NSC / trong traffic)
 
 ### 3.3 Proxy, VPN và MITM detection
 
@@ -360,7 +380,8 @@ Có thể lấy tín hiệu: `System.getProperty("http.proxyHost")`, `ProxySelec
 - **Đọc thêm:**
   - https://developer.android.com/privacy-and-security/security-config
   - https://developer.android.com/privacy-and-security/security-ssl
-  - https://mas.owasp.org/MASTG/ (MASVS-NETWORK)
+  - https://mas.owasp.org/MASVS/controls/MASVS-NETWORK-1/
+  - https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0286/ (NSC cho phép tin user CA)
 
 ## 4. Auth
 
@@ -465,19 +486,19 @@ class BiometricUnlock(private val activity: FragmentActivity) {
 - `setInvalidatedByBiometricEnrollment(true)`: thêm vân tay mới là key chết → `KeyPermanentlyInvalidatedException` → xóa key, yêu cầu login đầy đủ và enroll lại. Trade-off UX, nhưng chặn kịch bản "kẻ trộm biết PIN, thêm vân tay mình rồi dùng biometric".
 - `DEVICE_CREDENTIAL` fallback (PIN/pattern): tiện nhưng PIN yếu hơn; bank thường cho fallback về mật khẩu app, không phải PIN thiết bị, cho giao dịch.
 - Biometric của thiết bị không gửi lên server. Server chỉ thấy chữ ký/giải mã thành công. "Biometric login" ở bank VN thực chất là: biometric mở khóa key → key ký challenge hoặc giải mã refresh token → server xác thực. Khác với eKYC face match (so khuôn mặt với CCCD, chạy trên server).
-- Quyết định 2345/QĐ-NHNN (2023) bắt buộc xác thực sinh trắc học (khuôn mặt khớp CCCD) cho giao dịch trên 10 triệu VND hoặc tổng trên 20 triệu/ngày từ 1/7/2024; chi tiết ngưỡng và hiệu lực cần kiểm tra văn bản gốc. Interviewer bank sẽ hỏi bạn phân biệt được biometric của thiết bị và sinh trắc học theo 2345.
+- Quy định NHNN về sinh trắc học: Quyết định 2345/QĐ-NHNN (18/12/2023, hiệu lực 1/7/2024) bắt buộc xác thực sinh trắc học khớp với dữ liệu trong chip CCCD (hoặc tài khoản định danh điện tử VNeID) cho giao dịch chuyển tiền trên 10 triệu VND/lần hoặc tổng trên 20 triệu VND/ngày, và khi giao dịch lần đầu trên thiết bị mới. QĐ 2345 **đã bị bãi bỏ toàn bộ** từ 1/1/2025 bởi Quyết định 2872/QĐ-NHNN (30/12/2024); yêu cầu chuyển vào Thông tư 50/2024/TT-NHNN: Điều 10 và Phụ lục 01 phân loại giao dịch theo rủi ro với ngưỡng G ≤ 10 triệu và G + T ksth ≤ 20 triệu/ngày; Điều 11 khoản 5 quy định đối chiếu sinh trắc học với dữ liệu đã thu thập, lưu tại đơn vị (FRR < 5%, FAR < 0,01%, so khớp trong 3 phút); Điều 8 khoản 6 xác thực khách hàng khi truy cập lần đầu hoặc trên thiết bị khác. Interviewer bank sẽ hỏi bạn phân biệt được biometric của thiết bị (BiometricPrompt, chỉ mở khóa key) và sinh trắc học theo quy định NHNN (so khuôn mặt với dữ liệu tham chiếu ở server). Xem 8.3 cho nguồn. (kiểm tra 18/11/2026)
 
 - **Đọc thêm:**
   - https://developer.android.com/identity/sign-in/biometric-auth
   - https://developer.android.com/privacy-and-security/keystore (phần user authentication)
-  - https://mas.owasp.org/MASTG/ (MASVS-AUTH-2, test biometric bypass)
+  - https://mas.owasp.org/MASVS/controls/MASVS-AUTH-2/ (local authentication)
 
 ### 4.4 Device binding và session management
 
 Device binding: thiết bị được định danh bằng key pair trong Keystore (không sao chép được), đăng ký với server kèm attestation lúc enrollment (sau khi user xác thực mạnh, thường kèm OTP/eKYC). Sau đó mỗi phiên login hoặc mỗi giao dịch, app ký challenge của server bằng key đó. Lợi ích: credential bị lộ không dùng được từ máy khác; SIM swap không đủ; thiết bị bị clone (restore backup) không có key. Quản lý: danh sách thiết bị trong app và web, xóa thiết bị từ xa, giới hạn số thiết bị, thông báo khi thêm thiết bị mới. Không dùng Android ID/IMEI làm "device binding": chúng đọc được và giả được, và IMEI không còn truy cập được từ API 29.
 
 Session policy cho bank (nói được con số và lý do):
-- Idle timeout ngắn (ví dụ 5 phút không thao tác → khóa, cần biometric), absolute timeout (ví dụ 24 giờ → login lại).
+- Idle timeout ngắn (ví dụ 5 phút không thao tác → khóa, cần biometric), absolute timeout (ví dụ 24 giờ → login lại). Mốc chính chủ để biện luận: NIST SP 800-63B-4 (final, 7/2025), phần reauthentication của từng AAL: AAL1 overall timeout SHOULD ≤ 30 ngày (inactivity tùy chọn); AAL2 overall SHOULD ≤ 24 giờ, inactivity SHOULD ≤ 1 giờ; AAL3 overall SHALL ≤ 12 giờ, inactivity SHOULD ≤ 15 phút (https://pages.nist.gov/800-63-4/sp800-63b.html#aal2reauth, #aal3reauth). Ở VN, Thông tư 50/2024/TT-NHNN Điều 7 khoản 6 điểm c chỉ yêu cầu "tự động ngắt phiên giao dịch khi người sử dụng không thao tác trong một khoảng thời gian do đơn vị quy định", không ấn định số phút; 5 phút là lựa chọn phổ biến của các bank, không phải con số trong luật. (kiểm tra 18/11/2026)
 - Step-up: thao tác nhạy cảm (chuyển tiền, đổi hạn mức, thêm người nhận, đổi số điện thoại) cần biometric/OTP ngay cả khi phiên còn.
 - Một phiên active mỗi tài khoản hoặc giới hạn N thiết bị; login nơi khác thì nơi cũ bị đẩy ra (thông báo).
 - Logout: client xóa token RAM, xóa blob refresh token, xóa Room/cache/OkHttp cache/WebView cookies/Coil disk cache nếu chứa ảnh nhạy cảm, hủy WorkManager jobs có dữ liệu; server revoke refresh token family và session.
@@ -524,8 +545,8 @@ class LogoutUseCase(
 ```
 
 - **Đọc thêm:**
-  - https://pages.nist.gov/800-63-3/sp800-63b.html (session management, authenticator assurance)
-  - https://mas.owasp.org/MASTG/ (MASVS-AUTH-1, MASVS-AUTH-3)
+  - https://pages.nist.gov/800-63-4/sp800-63b.html#sessionreauthn (NIST SP 800-63B-4, July 2025, thay 800-63-3; trang chính thức https://csrc.nist.gov/pubs/sp/800/63/b/4/final)
+  - https://mas.owasp.org/MASVS/controls/MASVS-AUTH-1/, https://mas.owasp.org/MASVS/controls/MASVS-AUTH-3/
 
 ### 4.5 Transaction signing (tóm tắt, chi tiết ở phần 8)
 
@@ -533,7 +554,7 @@ Chuỗi chuẩn hóa (amount, currency, beneficiary, timestamp, nonce, idempoten
 
 - **Đọc thêm:**
   - https://developer.android.com/identity/sign-in/biometric-auth (CryptoObject với Signature)
-  - https://mas.owasp.org/MASTG/ (MASVS-AUTH-3, MASVS-CRYPTO-2)
+  - https://mas.owasp.org/MASVS/controls/MASVS-AUTH-3/ (sensitive operations), https://mas.owasp.org/MASVS/controls/MASVS-CRYPTO-2/ (key management)
 
 ## 5. App hardening
 
@@ -549,7 +570,7 @@ Chuỗi chuẩn hóa (amount, currency, beneficiary, timestamp, nonce, idempoten
 | Control-flow obfuscation, reflection hóa call | không | không | có | có |
 | Native code (SO) obfuscation | không | không | có | có |
 | RASP: root/hook/debugger/emulator/tamper detection với phản ứng | không | không | có (kèm console giám sát ThreatCast) | có |
-| Hỗ trợ Flutter/RN/KMP native | n/a | n/a | có (cần kiểm tra) | có (cần kiểm tra) |
+| Hỗ trợ Flutter/RN/KMP native | n/a | n/a | có: trang sản phẩm liệt kê Flutter, React Native; KMP Android là bytecode Kotlin thường | có: trang sản phẩm liệt kê Flutter, React Native |
 | Build time, crash symbolication | nhanh; mapping.txt upload Play/Crashlytics | | chậm hơn, cần quy trình mapping riêng | tương tự |
 
 Vendor khác hay gặp trong RFP của bank: Promon SHIELD, Appdome (no-code), Zimperium zShield/zDefend, Digital.ai (Arxan), Verimatrix, AppSealing, Talsec freeRASP (có bản miễn phí). Bank VN thường có sẵn license một trong số này và hỏi "bạn đã tích hợp cái nào, gặp vấn đề gì".
@@ -565,7 +586,7 @@ Khi nào bank yêu cầu commercial hardening: khi pentest/audit yêu cầu MASV
   - https://developer.android.com/build/shrink-code
   - https://www.guardsquare.com/dexguard
   - https://licelus.com/products/dexprotector
-  - https://mas.owasp.org/MASTG/ (MASVS-RESILIENCE)
+  - https://mas.owasp.org/MASVS/controls/MASVS-RESILIENCE-3/ (anti-static analysis: obfuscation)
 
 ### 5.2 Anti-tamper và signature verification
 
@@ -603,11 +624,11 @@ Anti-tamper khác: checksum DEX/so tự tính (yếu), phát hiện `BuildConfig
 - **Đọc thêm:**
   - https://developer.android.com/google/play/integrity/verdicts (appIntegrity là cách Google xác nhận chữ ký thay bạn)
   - https://developer.android.com/studio/publish/app-signing (Play App Signing, upload key vs app signing key)
-  - https://mas.owasp.org/MASTG/ (MASVS-RESILIENCE-2, -3)
+  - https://mas.owasp.org/MASVS/controls/MASVS-RESILIENCE-2/ (anti-tampering), https://mas.owasp.org/MASVS/controls/MASVS-RESILIENCE-3/ (anti-static analysis)
 
 ### 5.3 Root, emulator, debugger, Frida/hook detection và giới hạn
 
-Root detection (tín hiệu phổ biến, thư viện RootBeer gom lại): file `su` trong PATH, app Magisk/SuperSU, `ro.build.tags=test-keys`, `ro.debuggable=1`, `ro.secure=0`, thư mục system ghi được, Magisk mount namespace, Zygisk. Magisk DenyList/Shamiko giấu root khỏi process cụ thể, nên detection trong app bị qua mặt; Play Integrity (`MEETS_DEVICE_INTEGRITY` dựa trên verified boot và hardware attestation) khó qua mặt hơn nhiều, và từ 2025 Google chuyển verdict thiết bị sang dựa vào tín hiệu hardware trên Android 13+ (cần kiểm tra tại docs Play Integrity).
+Root detection (tín hiệu phổ biến, thư viện RootBeer gom lại): file `su` trong PATH, app Magisk/SuperSU, `ro.build.tags=test-keys`, `ro.debuggable=1`, `ro.secure=0`, thư mục system ghi được, Magisk mount namespace, Zygisk. Magisk DenyList/Shamiko giấu root khỏi process cụ thể, nên detection trong app bị qua mặt; Play Integrity (`MEETS_DEVICE_INTEGRITY` dựa trên verified boot và hardware attestation) khó qua mặt hơn nhiều, và từ tháng 5/2025 Google đổi định nghĩa verdict trên Android 13+ (https://developer.android.com/google/play/integrity/improvements#verdict-changes): `MEETS_DEVICE_INTEGRITY` yêu cầu verified boot dương tính dựa trên hardware (Android platform key attestation); `MEETS_STRONG_INTEGRITY` yêu cầu thêm bản vá bảo mật trong vòng 1 năm cho mọi partition (OS patch và vendor patch); các nhãn tùy chọn chỉ có khi app được cài hoặc cập nhật qua Google Play. Hệ quả: tỷ lệ STRONG giảm trên máy cũ ít được cập nhật, server nên xét `deviceAttributes.sdkVersion` khi áp chính sách. (kiểm tra 18/11/2026)
 
 Emulator: `Build.FINGERPRINT` chứa generic/emulator, `Build.HARDWARE` ranchu/goldfish, `ro.kernel.qemu`, không có baseband, sensor thiếu. Play Integrity có `MEETS_VIRTUAL_INTEGRITY` cho emulator được Google chứng nhận (dev dùng được, app có thể cho phép ở debug).
 
@@ -620,7 +641,9 @@ Giới hạn phải nói: mọi check client đều chạy trong tiến trình a
 - **Đọc thêm:**
   - https://github.com/scottyab/rootbeer
   - https://frida.re/docs/android/
-  - https://mas.owasp.org/MASTG/ (MASVS-RESILIENCE-1, -2, -4: root, debugger, hooking)
+  - https://mas.owasp.org/MASVS/controls/MASVS-RESILIENCE-1/ (platform integrity: root), https://mas.owasp.org/MASVS/controls/MASVS-RESILIENCE-4/ (anti-dynamic analysis: debugger, hooking)
+  - https://mas.owasp.org/MASTG/tests/android/MASVS-RESILIENCE/MASTG-TEST-0324/ và https://mas.owasp.org/MASTG/tests/android/MASVS-RESILIENCE/MASTG-TEST-0325/ (test root detection theo MASTG v2)
+  - https://developer.android.com/google/play/integrity/improvements
 
 ### 5.4 Play Integrity API: verdicts, standard vs classic, server-side verification
 
@@ -643,20 +666,33 @@ sequenceDiagram
     S-->>App: cho phép / step-up / từ chối
 ```
 
-Verdict chính (tên trường kiểm tra lại tại docs, vì Google thêm giá trị mới theo thời gian):
+Verdict chính (theo https://developer.android.com/google/play/integrity/verdicts, kiểm tra 18/11/2026; Google thêm giá trị mới theo thời gian):
 - `requestDetails`: `requestPackageName`, `requestHash` (standard) hoặc `nonce` (classic), `timestampMillis`.
 - `appIntegrity.appRecognitionVerdict`: `PLAY_RECOGNIZED` (đúng app từ Play), `UNRECOGNIZED_VERSION` (chữ ký hoặc version không khớp: sideload, repackage, hoặc bản chưa lên Play), `UNEVALUATED`.
 - `deviceIntegrity.deviceRecognitionVerdict`: tập hợp có thể chứa `MEETS_BASIC_INTEGRITY`, `MEETS_DEVICE_INTEGRITY`, `MEETS_STRONG_INTEGRITY`, `MEETS_VIRTUAL_INTEGRITY`; rỗng là thiết bị không đạt gì. Thêm `deviceAttributes`, `recentDeviceActivity` (mức độ thiết bị gọi API bất thường) tùy cấu hình.
 - `accountDetails.appLicensingVerdict`: `LICENSED`, `UNLICENSED`, `UNEVALUATED`.
-- `environmentDetails.appAccessRiskVerdict`: `KNOWN_INSTALLED`, `UNKNOWN_INSTALLED`, `UNKNOWN_CAPTURING`, `UNKNOWN_CONTROLLING` (app lạ đang ghi/điều khiển màn hình: dấu hiệu trojan accessibility), `playProtectVerdict`.
+- `environmentDetails.appAccessRiskVerdict.appsDetected` (#app_access_risk_verdict): `KNOWN_INSTALLED`, `KNOWN_CAPTURING`, `KNOWN_CONTROLLING`, `KNOWN_OVERLAYS`, `UNKNOWN_INSTALLED`, `UNKNOWN_CAPTURING`, `UNKNOWN_CONTROLLING`, `UNKNOWN_OVERLAYS`, hoặc `UNEVALUATED`. KNOWN là app được Google Play nhận diện hoặc do OEM cài sẵn trên system partition, UNKNOWN là app khác; CAPTURING là app đang chạy có quyền có thể nhìn/ghi màn hình, CONTROLLING là có quyền điều khiển thiết bị và input vào app bạn, OVERLAYS là có quyền vẽ đè lên app bạn (đều loại trừ accessibility service đã được Google Play xác minh): `UNKNOWN_CONTROLLING`/`UNKNOWN_OVERLAYS` là dấu hiệu trojan ngân hàng. Kèm `environmentDetails.playProtectVerdict`.
 
 Standard vs classic:
 - Standard (`StandardIntegrityManager`): `prepareIntegrityToken` một lần (tốn vài giây lần đầu, cache được), sau đó `request(requestHash)` nhanh và dùng nhiều lần; `requestHash` do bạn tính từ nội dung action để gắn token với giao dịch; Google khuyến nghị cho đa số use case.
-- Classic (`IntegrityManager.requestIntegrityToken`): bạn cấp `nonce` ngẫu nhiên từ server, mỗi lần gọi là một round trip tới Google (chậm hơn, có quota mặc định khoảng 10.000/ngày/app, cần xin tăng); dùng cho action hiếm, giá trị cao, hoặc khi cần nonce do server sinh.
+- Classic (`IntegrityManager.requestIntegrityToken`): bạn cấp `nonce` ngẫu nhiên từ server, mỗi lần gọi là một round trip tới Google (chậm hơn); dùng cho action hiếm, giá trị cao, hoặc khi cần nonce do server sinh.
+- Quota (bảng so sánh ở https://developer.android.com/google/play/integrity/overview): mặc định 10.000 request/ngày/app cho cả standard lẫn classic, xin tăng được; warm-up của standard giới hạn 5 lần/phút mỗi app instance.
+- Giải mã token: standard **chỉ** giải mã được qua server Google (`decodeIntegrityToken`), không giải mã cục bộ được. Classic có thể giải mã và verify cục bộ trong môi trường server an toàn, nhưng chỉ khi bạn chọn tự quản lý và tải response encryption key về (Google khuyến nghị dùng key do Google quản lý và gọi `decodeIntegrityToken`).
 
-Server-side verification bắt buộc: token chỉ có ý nghĩa khi server decode (qua Play Integrity API với service account của Cloud project, hoặc tự decrypt bằng key Google cấp cho app có lưu lượng lớn) và kiểm tra: `requestHash`/`nonce` khớp action đang xử lý (chống replay token), `timestampMillis` mới (vài phút), `requestPackageName` và `certificateSha256Digest` đúng, rồi áp chính sách theo verdict. Không bao giờ để client tự đọc verdict rồi quyết định.
+Server-side verification bắt buộc: token chỉ có ý nghĩa khi server decode (qua `decodeIntegrityToken` của Play Integrity API với service account của Cloud project; riêng classic request có thể tự decrypt và verify nếu bạn tự quản lý encryption key) và kiểm tra: `requestHash`/`nonce` khớp action đang xử lý (chống replay token), `timestampMillis` mới (vài phút), `requestPackageName` và `certificateSha256Digest` đúng, rồi áp chính sách theo verdict. Không bao giờ để client tự đọc verdict rồi quyết định.
 
 Chính sách gợi ý cho bank: login thường: yêu cầu `MEETS_DEVICE_INTEGRITY` + `PLAY_RECOGNIZED`, thiếu thì cho xem số dư nhưng chặn giao dịch hoặc bắt step-up; giao dịch lớn: `MEETS_STRONG_INTEGRITY` nếu có; `UNKNOWN_CONTROLLING`/`UNKNOWN_CAPTURING`: chặn giao dịch và cảnh báo trojan. Thiết bị không có Google Play services (Huawei): fallback sang key attestation + risk engine, hoặc không hỗ trợ (quyết định kinh doanh có số liệu thị phần).
+
+Remediation dialog (Play Integrity library 1.3.0+, https://developer.android.com/google/play/integrity/remediation): sau khi server đọc verdict, app có thể gọi `showDialog(activity, typeCode)` trên `StandardIntegrityToken` hoặc `IntegrityTokenResponse` để Google Play hướng dẫn user sửa: `GET_LICENSED` (tải bản chính chủ từ Play), `GET_INTEGRITY`, `GET_STRONG_INTEGRITY` (sửa lỗi thiết bị/Play services), `CLOSE_UNKNOWN_ACCESS_RISK`, `CLOSE_ALL_ACCESS_RISK` (đóng app đang ghi/điều khiển màn hình). Kết quả trả về `IntegrityDialogResponseCode`: `DIALOG_SUCCESSFUL`, `DIALOG_CANCELLED`, `DIALOG_FAILED`, `DIALOG_UNAVAILABLE`. Sau dialog phải xin token mới (với standard thì warm up lại provider).
+
+```kotlin
+// server quyết định typeCode dựa trên verdict đã decode, client chỉ hiển thị
+tokenResponse.showDialog(activity, IntegrityDialogTypeCode.CLOSE_UNKNOWN_ACCESS_RISK)
+    .addOnSuccessListener { result ->
+        if (result == IntegrityDialogResponseCode.DIALOG_SUCCESSFUL) retryWithFreshToken()
+        else showBlockedTransferMessage()
+    }
+```
 
 Giới hạn: cần GMS và mạng tới Google; độ trễ; quota; `UNEVALUATED` xảy ra; verdict là của Google, bạn không kiểm soát thuật toán; test với emulator Google-certified và Play Console "Integrity API responses" để giả lập verdict.
 
@@ -665,6 +701,9 @@ Giới hạn: cần GMS và mạng tới Google; độ trễ; quota; `UNEVALUATE
   - https://developer.android.com/google/play/integrity/verdicts
   - https://developer.android.com/google/play/integrity/standard
   - https://developer.android.com/google/play/integrity/classic
+  - https://developer.android.com/google/play/integrity/overview (bảng so sánh standard/classic, quota, giải mã)
+  - https://developer.android.com/google/play/integrity/remediation
+  - https://developer.android.com/google/play/integrity/improvements (thay đổi verdict 5/2025)
 
 ### 5.5 RASP, anti-fraud, device fingerprinting, tamper response
 
@@ -687,7 +726,7 @@ Không nên: crash ngay khi phát hiện (giúp attacker tìm check nhanh), hi�
 
 - **Đọc thêm:**
   - https://www.geocomply.com/
-  - https://mas.owasp.org/MASTG/ (MASVS-RESILIENCE-3, anti-tampering và phản ứng)
+  - https://mas.owasp.org/MASVS/controls/MASVS-RESILIENCE-2/ (anti-tampering; lưu ý RESILIENCE-3 là anti-static analysis, không phải anti-tamper)
   - https://developer.android.com/google/play/integrity/verdicts (environmentDetails)
 
 ## 6. IPC và entry points
@@ -763,45 +802,69 @@ WebView trong app bank hay dùng cho: điều khoản, 3DS challenge, khuyến m
 - `addJavascriptInterface` chỉ khi thật cần, chỉ method có `@JavascriptInterface`, chỉ cho origin của bạn (kiểm tra `url` trước khi inject, hoặc dùng `WebViewCompat.addWebMessageListener(webView, "bridge", setOf("https://app.mybank.vn"))` có allowlist origin sẵn). Mọi phương thức bridge coi input là untrusted.
 - `allowFileAccess = false` (mặc định false từ API 30), `allowContentAccess = false`, `allowFileAccessFromFileURLs`/`allowUniversalAccessFromFileURLs` false (deprecated, giữ false), asset nội bộ qua `WebViewAssetLoader` thay `file://`.
 - `mixedContentMode = MIXED_CONTENT_NEVER_ALLOW`; `onReceivedSslError` không bao giờ gọi `proceed()` (Play cảnh báo lỗi này).
-- Safe Browsing bật (mặc định từ API 27; `EnableSafeBrowsing` manifest meta-data), `setSafeBrowsingEnabled(true)`.
+- Safe Browsing: docs ghi "the default value of EnableSafeBrowsing is true", tắt được bằng meta-data `android.webkit.WebView.EnableSafeBrowsing` trong manifest, bật/tắt từng WebView bằng `setSafeBrowsingEnabled()` (API 26+) hoặc `WebSettingsCompat.setSafeBrowsingEnabled`; bank giữ bật (https://developer.android.com/develop/ui/views/layout/webapps/managing-webview#safe-browsing).
 - Không log URL (có thể chứa token), xóa cookie/cache/storage khi logout (`CookieManager.removeAllCookies`, `WebStorage.deleteAllData`, `clearCache`).
 - Không hiển thị dữ liệu nhạy cảm từ server bên thứ ba trong cùng WebView với bridge. Tắt `setGeolocationEnabled` nếu không dùng. Cập nhật WebView qua Play (bạn không kiểm soát version, nhưng kiểm tra `WebViewCompat.getCurrentWebViewPackage` để biết).
-- Pinning: WebView không dùng OkHttp; NSC `pin-set` có áp dụng cho WebView hay không cần kiểm tra tại docs NSC; nếu cần chặt, nội dung nhạy cảm không đi qua WebView.
+- Pinning: WebView không dùng OkHttp. Docs chính chủ chỉ xác nhận WebView tôn trọng cấu hình cleartext (`usesCleartextTraffic`) cho app target API 26+ (https://developer.android.com/guide/topics/manifest/application-element); trang Network Security Config không nói WebView áp dụng `<pin-set>` hay `<trust-anchors>` tùy biến, nên đừng khẳng định NSC pin bảo vệ WebView (kiểm tra 18/11/2026). Nếu cần chặt, nội dung nhạy cảm không đi qua WebView, hoặc kiểm thử bằng proxy với CA người dùng để xác nhận hành vi thật.
+- MASTG test liên quan: https://mas.owasp.org/MASTG/tests/android/MASVS-PLATFORM/MASTG-TEST-0252/ (local file access trong WebView), https://mas.owasp.org/MASTG/tests/android/MASVS-NETWORK/MASTG-TEST-0284/ (xử lý lỗi SSL sai trong WebView).
 
 - **Đọc thêm:**
   - https://developer.android.com/develop/ui/views/layout/webapps
+  - https://developer.android.com/develop/ui/views/layout/webapps/managing-webview#safe-browsing
   - https://developer.android.com/privacy-and-security/risks (các mục WebView)
+  - https://mas.owasp.org/MASVS/controls/MASVS-PLATFORM-2/ (WebView)
 
 ### 6.6 Clipboard, screenshots (FLAG_SECURE), tapjacking
 
 Clipboard: mọi app foreground đọc được clipboard (Android 10+ giới hạn app background, Android 13 hiện toast khi app đọc). Không tự động copy số thẻ/OTP; nếu copy số tài khoản, đánh dấu nhạy cảm bằng `ClipDescription.extras` với `EXTRA_IS_SENSITIVE` (API 33) để không hiện preview, và cân nhắc tự xóa sau 30-60 giây. Không paste tự động token từ clipboard.
 
-FLAG_SECURE: `window.setFlags(FLAG_SECURE, FLAG_SECURE)` chặn screenshot, screen recording, hiện trong recents (thumbnail đen), và casting. Đặt cho màn hình số dư, thẻ, OTP, xác nhận giao dịch, eKYC. Trong Compose: `Dialog`/`ModalBottomSheet` có window riêng, cần `DialogProperties(securePolicy = SecureFlagPolicy.SecureOn)`; với Navigation, bật/tắt flag theo destination trong một `DisposableEffect` hoặc đặt cho cả Activity nếu đơn giản. Android 14 có `Activity.registerScreenCaptureCallback` (quyền `DETECT_SCREEN_CAPTURE`) để biết user chụp màn hình và cảnh báo. FLAG_SECURE không chặn accessibility đọc nội dung và không chặn camera ngoài chụp màn hình.
+FLAG_SECURE: `window.setFlags(FLAG_SECURE, FLAG_SECURE)` chặn screenshot, screen recording, hiện trong recents (thumbnail đen), và casting. Đặt cho màn hình số dư, thẻ, OTP, xác nhận giao dịch, eKYC. Trong Compose: `Dialog`/`ModalBottomSheet` có window riêng, cần `DialogProperties(securePolicy = SecureFlagPolicy.SecureOn)`; với Navigation, bật/tắt flag theo destination trong một `DisposableEffect` hoặc đặt cho cả Activity nếu đơn giản. Android 14 (API 34) có `Activity.registerScreenCaptureCallback` (`Activity.ScreenCaptureCallback`, quyền normal `DETECT_SCREEN_CAPTURE`) để biết user chụp màn hình, nhưng chỉ phát hiện tổ hợp phím cứng chụp màn hình (https://developer.android.com/about/versions/14/features/screenshot-detection). Android 15 (API 35) thêm phát hiện ghi màn hình: `WindowManager.addScreenRecordingCallback(executor, callback)` trả `SCREEN_RECORDING_STATE_VISIBLE`/`NOT_VISIBLE` khi app đang bị ghi, quyền normal `DETECT_SCREEN_RECORDING` (https://developer.android.com/about/versions/15/features#screen-recording-detection).
 
-Tapjacking: app độc vẽ overlay (SYSTEM_ALERT_WINDOW) trong suốt hoặc che một phần, dụ user bấm vào nút "Xác nhận" của app bạn mà họ tưởng là nút khác. Phòng: `android:filterTouchesWhenObscured="true"` cho nút nhạy cảm (touch bị bỏ nếu có cửa sổ che), hoặc kiểm tra `MotionEvent.FLAG_WINDOW_IS_OBSCURED`/`FLAG_WINDOW_IS_PARTIALLY_OBSCURED`; Android 12+ chặn touch xuyên qua overlay không tin cậy cho app target 31; `Window.setHideOverlayWindows(true)` (API 31, quyền `HIDE_OVERLAY_WINDOWS`) ẩn overlay của app khác khi màn hình nhạy cảm hiển thị. Compose: dùng `Modifier.pointerInteropFilter` hoặc bọc trong `AndroidView` cho nút quan trọng nếu cần kiểm tra flag; cần kiểm tra API Compose hiện tại cho việc này.
+```kotlin
+// API 35+, khai <uses-permission android:name="android.permission.DETECT_SCREEN_RECORDING" />
+private val recordingCallback = Consumer<Int> { state ->
+    val recorded = state == WindowManager.SCREEN_RECORDING_STATE_VISIBLE
+    viewModel.onScreenRecording(recorded)          // ví dụ: che số dư, gửi tín hiệu risk engine
+}
+override fun onStart() {
+    super.onStart()
+    val initial = windowManager.addScreenRecordingCallback(mainExecutor, recordingCallback)
+    recordingCallback.accept(initial)
+}
+override fun onStop() {
+    super.onStop()
+    windowManager.removeScreenRecordingCallback(recordingCallback)
+}
+``` FLAG_SECURE không chặn accessibility đọc nội dung và không chặn camera ngoài chụp màn hình.
+
+Tapjacking: app độc vẽ overlay (SYSTEM_ALERT_WINDOW) trong suốt hoặc che một phần, dụ user bấm vào nút "Xác nhận" của app bạn mà họ tưởng là nút khác. Phòng: `android:filterTouchesWhenObscured="true"` cho nút nhạy cảm (touch bị bỏ nếu có cửa sổ che), hoặc kiểm tra `MotionEvent.FLAG_WINDOW_IS_OBSCURED`/`FLAG_WINDOW_IS_PARTIALLY_OBSCURED`; Android 12+ chặn touch xuyên qua overlay không tin cậy cho app target 31; `Window.setHideOverlayWindows(true)` (API 31, quyền `HIDE_OVERLAY_WINDOWS`) ẩn overlay của app khác khi màn hình nhạy cảm hiển thị. Trang tapjacking chính chủ (https://developer.android.com/privacy-and-security/risks/tapjacking) phân biệt full occlusion (chặn bằng `setFilterTouchesWhenObscured(true)`) và partial occlusion (không có bảo vệ mặc định, phải tự kiểm tra `FLAG_WINDOW_IS_PARTIALLY_OBSCURED`), và khuyến nghị `setHideOverlayWindows(true)` từ API 31. Compose: trang này không đưa API Compose riêng; cách thực dụng là đặt `filterTouchesWhenObscured = true` trên `ComposeView`/root view của màn hình xác nhận, hoặc kiểm tra flag trong `Modifier.pointerInteropFilter { it.flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED != 0 }` cho nút quan trọng. (kiểm tra 18/11/2026)
 
 - **Đọc thêm:**
-  - https://developer.android.com/privacy-and-security/risks (Tapjacking)
+  - https://developer.android.com/privacy-and-security/risks/tapjacking
   - https://developer.android.com/about/versions/14/features/screenshot-detection
-  - https://developer.android.com/about/versions/12/behavior-changes-all (untrusted touch events)
+  - https://developer.android.com/about/versions/15/features#screen-recording-detection
+  - https://developer.android.com/about/versions/12/behavior-changes-all#untrusted-touch-events
+  - https://mas.owasp.org/MASTG/tests/android/MASVS-PLATFORM/MASTG-TEST-0291/ (screen capture prevention APIs), https://mas.owasp.org/MASTG/tests/android/MASVS-PLATFORM/MASTG-TEST-0294/ (`SecureOn` trong Compose dialog)
 
 ### 6.7 Accessibility abuse: banking overlay trojans
 
-Mẫu tấn công thực tế ở VN: trojan (GoldDigger được Group-IB báo cáo năm 2023 nhắm vào bank VN, biến thể iOS GoldPickaxe năm 2024, cùng họ Anatsa/Octo/Vultur ở nơi khác) dụ user cài APK ngoài Play ("app dịch vụ công", "app thuế"), xin quyền Accessibility, rồi: đọc mọi text trên màn hình bank (số dư, OTP), tự bấm nút, vẽ overlay giả màn hình login để lấy mật khẩu, đọc SMS OTP, giữ màn hình sáng và ẩn mình.
+Mẫu tấn công thực tế ở VN: trojan (GoldDigger, Android trojan nhắm vào hơn 50 tổ chức tài chính Việt Nam, Group-IB phát hiện 2023; báo cáo "GoldFactory" ngày 15/02/2024 mô tả họ GoldPickaxe cho iOS và Android thu thập dữ liệu khuôn mặt để vượt xác thực sinh trắc học của bank, https://www.group-ib.com/blog/goldfactory-ios-trojan/; cùng họ Anatsa/Octo/Vultur ở nơi khác) dụ user cài APK ngoài Play ("app dịch vụ công", "app thuế"), xin quyền Accessibility, rồi: đọc mọi text trên màn hình bank (số dư, OTP), tự bấm nút, vẽ overlay giả màn hình login để lấy mật khẩu, đọc SMS OTP, giữ màn hình sáng và ẩn mình.
 
 Phòng thủ phía app (mỗi cái chỉ là một lớp):
-- `android:accessibilityDataSensitive="accessibilityDataSensitiveYes"` (API 34) trên view/màn hình nhạy cảm: chỉ accessibility tool "thật" (được hệ thống coi là accessibility tool, như TalkBack) đọc được, service lạ không. Compose có semantics tương ứng cần kiểm tra tại docs.
+- `android:accessibilityDataSensitive="accessibilityDataSensitiveYes"` (API 34) trên view/màn hình nhạy cảm: chỉ accessibility tool "thật" (được hệ thống coi là accessibility tool, như TalkBack) đọc được, service lạ không. Compose: `Modifier.semantics { sensitiveData = true }`. Theo Android Developers Blog (11/12/2025, "Enhancing Android security: Stop malware from snooping on your app data", https://android-developers.googleblog.com/2025/12/enhancing-android-security-stop-malware.html), trên Android 16 view đã đặt `setFilterTouchesWhenObscured(true)` được tự động coi là dữ liệu nhạy cảm với accessibility.
 - Phát hiện accessibility service không phải hệ thống đang bật: `AccessibilityManager.getEnabledAccessibilityServiceList(FEEDBACK_ALL_MASK)`, so với allowlist (TalkBack, Select to Speak, Switch Access, app hỗ trợ tiếp cận phổ biến) → cảnh báo hoặc chặn giao dịch. Nhiều bank VN chặn hẳn ("Ứng dụng không hỗ trợ khi bật trợ năng") theo yêu cầu từ cơ quan quản lý và vendor RASP; trade-off: user khiếm thị bị ảnh hưởng, cần allowlist và kênh hỗ trợ.
 - Play Integrity `appAccessRiskVerdict` `UNKNOWN_CONTROLLING`/`UNKNOWN_CAPTURING` ở server cho giao dịch.
 - FLAG_SECURE (chống ghi màn hình), `filterTouchesWhenObscured`, `setHideOverlayWindows`.
 - Không dùng SMS OTP cho giao dịch lớn (trojan đọc được SMS); Smart OTP/push + biometric.
 - Phát hiện mất focus bất thường (`onWindowFocusChanged(false)` khi màn hình login đang hiển thị) để cảnh báo overlay.
-- Hệ thống: Android 13+ "Restricted settings" chặn app sideload bật Accessibility nếu không qua bước mở khóa; Play Protect; giáo dục user.
+- Hệ thống: Android 13+ "Restricted settings": với một số app (thực tế là app cài ngoài store), Android chặn bật Accessibility và Notification listener cho tới khi user vào App info và chủ động "Allow restricted settings" (https://support.google.com/android/answer/12623953; trang hỗ trợ không nêu chính xác tiêu chí sideload, việc mở rộng ở Android 15 chưa có nguồn chính thức); Play Protect; giáo dục user.
 
 - **Đọc thêm:**
   - https://developer.android.com/reference/android/view/View#setAccessibilityDataSensitive(int)
   - https://developer.android.com/google/play/integrity/verdicts (appAccessRiskVerdict)
-  - https://mas.owasp.org/MASTG/ (MASVS-PLATFORM-3, overlay attacks)
+  - https://mas.owasp.org/MASVS/controls/MASVS-PLATFORM-3/ (UI security)
+  - https://mas.owasp.org/MASTG/tests/android/MASVS-PLATFORM/MASTG-TEST-0340/ (overlay attack protections)
+  - https://www.group-ib.com/blog/goldfactory-ios-trojan/
 
 ## 7. Secrets
 
@@ -814,7 +877,7 @@ Phân loại:
 - Secret thật (payment gateway secret, HMAC key với đối tác, private key ký, Gemini/Claude API key trả tiền theo lượt): không bao giờ vào app. Backend làm proxy; app xác thực với backend bằng user token + App Check/Play Integrity.
 - Remote config giao key lúc runtime: vẫn đọc được từ RAM/proxy, chỉ dùng cho key giá trị thấp, thu hồi được, hoặc có hạn ngắn (token tạm do backend cấp cho session).
 
-Firebase App Check: app lấy token chứng minh "request đến từ app thật" (provider Play Integrity trên Android, App Attest/DeviceCheck trên iOS, debug provider khi dev), gửi kèm request tới Firestore/Storage/Functions/Realtime DB/AI Logic; backend Firebase từ chối request không có token hợp lệ khi bật enforcement. Với Firebase AI Logic (Gemini), App Check được tự động enforce từ 7/2026 (theo brief), nên app gọi Gemini qua AI Logic phải tích hợp App Check, và token "limited use" (`getLimitedUseAppCheckToken`) chống replay cho call quan trọng. App Check không phải auth user và không chống được attacker chạy app thật trên máy thật rồi gọi quota; vẫn cần rate limit per user và giới hạn chi phí.
+Firebase App Check: app lấy token chứng minh "request đến từ app thật" (provider Play Integrity trên Android, App Attest/DeviceCheck trên iOS, debug provider khi dev), gửi kèm request tới Firestore/Storage/Functions/Realtime DB/AI Logic; backend Firebase từ chối request không có token hợp lệ khi bật enforcement. Với Firebase AI Logic (Gemini), docs chính chủ ghi: "On November 2, 2026, Firebase automatically enforced App Check for Firebase AI Logic in all projects" (https://firebase.google.com/docs/ai-logic/app-check#enforce-app-check); project chưa tích hợp sẽ nhận 403 `PERMISSION_DENIED`, có tùy chọn tạm hoãn auto-enforcement (#app-check-delay-auto-enforcement). Vì vậy app gọi Gemini qua AI Logic phải tích hợp App Check. Chống replay: bật limited-use token (mỗi token dùng một lần) bằng `Firebase.ai(backend = GenerativeBackend.googleAI(), useLimitedUseAppCheckTokens = true)` rồi bật replay protection phía Firebase (#replay-protection); với backend tự viết thì dùng `getLimitedUseAppCheckToken()`. (kiểm tra 18/11/2026) App Check không phải auth user và không chống được attacker chạy app thật trên máy thật rồi gọi quota; vẫn cần rate limit per user và giới hạn chi phí.
 
 CI secrets: GitHub Actions `secrets.*` và environment protection rules; keystore ký app lưu dạng base64 trong secret, decode ra file tạm trong job, không bao giờ `echo`; dùng OIDC federation tới GCP/AWS thay vì static service account key; PR từ fork không nhận secrets (và không dùng `pull_request_target` với checkout code fork); log được mask nhưng không tin mask tuyệt đối; rotate ngay khi nghi lộ; Play App Signing giữ release key, bạn chỉ giữ upload key (reset được). Chi tiết pipeline ở `20-Git-CICD.md`. Pre-commit: gitleaks/git-secrets; `local.properties`, `*.jks`, `google-services.json` (tùy chính sách) trong `.gitignore`.
 
@@ -824,7 +887,7 @@ CI secrets: GitHub Actions `secrets.*` và environment protection rules; keystor
   - Secrets trong log CI khi build fail in ra env.
 - **Đọc thêm:**
   - https://firebase.google.com/docs/app-check
-  - https://firebase.google.com/docs/ai-logic
+  - https://firebase.google.com/docs/ai-logic/app-check (auto-enforcement 2/11/2026, limited-use tokens, replay protection)
   - https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions
 
 ## 8. Fintech specifics
@@ -845,9 +908,9 @@ flowchart LR
 
 Điểm kỹ thuật phải nói được:
 - OCR trên thiết bị (ML Kit text recognition, vendor SDK) để hướng dẫn chụp, nhưng kết quả có giá trị pháp lý lấy từ server hoặc từ chip.
-- CCCD gắn chip theo chuẩn ICAO 9303 (như hộ chiếu): app đọc qua NFC (`IsoDep`), dùng dữ liệu MRZ (số, ngày sinh, ngày hết hạn) làm khóa mở BAC/PACE, đọc DG1 (thông tin), DG2 (ảnh mặt), và verify SOD (chữ ký của cơ quan cấp) để biết dữ liệu chip là thật (passive authentication); active/chip authentication chứng minh chip không bị clone. Thư viện: JMRTD (Java), vendor VN đóng gói sẵn. Dữ liệu chip là nguồn tin cậy cao nhất, ảnh chip dùng để face match thay vì ảnh chụp mặt trước (dễ giả).
-- Liveness: chống presentation attack (ảnh in, màn hình, mặt nạ, deepfake). Active (bắt quay đầu, chớp mắt) dễ hướng dẫn nhưng bị video deepfake qua mặt; passive (một ảnh, phân tích texture/độ sâu) tiện hơn; chuẩn kiểm định ISO/IEC 30107-3 (iBeta Level 1/2). Injection attack (feed video giả vào camera qua virtual camera trên máy root/emulator) là mối đe dọa mới: phòng bằng Play Integrity, phát hiện virtual camera, ký frame trong SDK, và server-side analytics.
-- Vendor VN hay gặp: VNPT eKYC, FPT.AI eKYC, TrueID (VNG), và tích hợp VNeID/NEAC cho xác thực định danh điện tử (cần kiểm tra trạng thái tích hợp hiện tại). Quyết định 2345 yêu cầu đối chiếu sinh trắc với dữ liệu CCCD chip/VNeID cho giao dịch lớn.
+- CCCD gắn chip theo chuẩn ICAO Doc 9303 (như hộ chiếu; https://www.icao.int/publications/doc-series/doc-9303). Phần cần biết: Part 10 (Logical Data Structure: DG1, DG2, SOD), Part 11 "Security Mechanisms for MRTDs" (BAC, PACE, Active Authentication, Chip Authentication), Part 12 "Public Key Infrastructure for MRTDs" (CSCA/Document Signer, nền của passive authentication). Luồng: app đọc qua NFC (`IsoDep`), dùng dữ liệu MRZ (số, ngày sinh, ngày hết hạn) làm khóa mở BAC/PACE, đọc DG1 (thông tin), DG2 (ảnh mặt), và verify SOD (chữ ký của cơ quan cấp) để biết dữ liệu chip là thật (passive authentication); active/chip authentication chứng minh chip không bị clone. Thư viện: JMRTD (Java), vendor VN đóng gói sẵn. Dữ liệu chip là nguồn tin cậy cao nhất, ảnh chip dùng để face match thay vì ảnh chụp mặt trước (dễ giả).
+- Liveness: chống presentation attack (ảnh in, màn hình, mặt nạ, deepfake). Active (bắt quay đầu, chớp mắt) dễ hướng dẫn nhưng bị video deepfake qua mặt; passive (một ảnh, phân tích texture/độ sâu) tiện hơn; chuẩn kiểm định ISO/IEC 30107-3:2023 (bản 2, kiểm thử và báo cáo PAD, https://www.iso.org/standard/79520.html; lab như iBeta chứng nhận Level 1/2 theo chuẩn này) và ISO/IEC 30107-4:2024 (profile kiểm thử cho thiết bị di động, https://www.iso.org/standard/82584.html). Injection attack (feed video giả vào camera qua virtual camera trên máy root/emulator) là mối đe dọa mới: phòng bằng Play Integrity, phát hiện virtual camera, ký frame trong SDK, và server-side analytics.
+- Vendor VN hay gặp: VNPT eKYC, FPT.AI eKYC, TrueID (VNG), và tích hợp VNeID/NEAC cho xác thực định danh điện tử (trạng thái tích hợp của từng vendor thay đổi theo hợp đồng, hỏi trực tiếp vendor; tài liệu này không có nguồn chính thức). Quyết định 2345/QĐ-NHNN (hiệu lực 1/7/2024) từng yêu cầu đối chiếu sinh trắc với dữ liệu trong chip CCCD/VNeID cho giao dịch lớn; QĐ này đã bị bãi bỏ từ 1/1/2025 và yêu cầu chuyển sang Thông tư 50/2024/TT-NHNN (xem 4.3, 8.3).
 - Bảo vệ dữ liệu eKYC trên client: không lưu ảnh CCCD/selfie lâu hơn cần thiết, lưu tạm mã hóa, xóa sau upload, FLAG_SECURE, không vào cache ảnh, upload qua TLS có pinning, log không chứa số CCCD.
 
 - **Lỗi hay gặp / trade-off**
@@ -855,15 +918,16 @@ flowchart LR
   - Giữ ảnh selfie trong `cacheDir` không mã hóa "để retry upload", rồi quên xóa.
   - Chọn vendor liveness theo demo, không theo chứng nhận và false reject rate đo trên thiết bị phổ biến ở VN.
 - **Đọc thêm:**
-  - https://www.icao.int/ (tìm "Doc 9303 Machine Readable Travel Documents") (ICAO Doc 9303, chuẩn chip eMRTD)
+  - https://www.icao.int/publications/doc-series/doc-9303 (ICAO Doc 9303, các Part 10, 11, 12)
   - https://jmrtd.org/ (thư viện đọc chip theo ICAO 9303)
-  - https://mas.owasp.org/MASTG/ (MASVS-STORAGE và MASVS-PLATFORM cho dữ liệu eKYC)
+  - https://www.iso.org/standard/79520.html (ISO/IEC 30107-3:2023)
+  - https://mas.owasp.org/MASVS/controls/MASVS-STORAGE-1/, https://mas.owasp.org/MASVS/controls/MASVS-PLATFORM-3/ (lưu trữ và UI cho dữ liệu eKYC)
 
 ### 8.2 PCI-DSS cho mobile, 3DS, transaction signing
 
-PCI-DSS (v4.0) áp dụng cho ai lưu/xử lý/truyền dữ liệu thẻ. Mobile app nên tự loại mình khỏi scope càng nhiều càng tốt: không bao giờ lưu PAN đầy đủ, CVV, track data; hiển thị PAN che (6 đầu 4 cuối hoặc chỉ 4 cuối); nhập thẻ qua SDK của PSP (Stripe/Adyen/cổng VN) để PAN đi thẳng tới PSP và app chỉ nhận token; TLS 1.2+; log/crash report/analytics không chứa PAN (mask ở Timber tree và HTTP logging); screenshot chặn; không cache response có PAN. Tap to Phone/softPOS có chuẩn riêng PCI MPoC. Nếu bạn là issuer app (ngân hàng), card data hiển thị từ server dạng token hóa, có step-up khi xem số thẻ đầy đủ.
+PCI DSS v4.0.1 (phát hành 11/06/2024; v4.0 đã retire ngày 31/12/2024, https://blog.pcisecuritystandards.org/just-published-pci-dss-v4-0-1) áp dụng cho ai lưu/xử lý/truyền dữ liệu thẻ. Mobile app nên tự loại mình khỏi scope càng nhiều càng tốt: không bao giờ lưu PAN đầy đủ, CVV, track data; hiển thị PAN che theo Requirement 3.4.1: "PAN is masked when displayed (the BIN and last four digits are the maximum number of digits to be displayed)", tức tối đa BIN (6 hoặc 8 số đầu) + 4 số cuối, an toàn nhất là chỉ 4 cuối; nhập thẻ qua SDK của PSP (Stripe/Adyen/cổng VN) để PAN đi thẳng tới PSP và app chỉ nhận token; TLS 1.2+; log/crash report/analytics không chứa PAN (mask ở Timber tree và HTTP logging); screenshot chặn; không cache response có PAN. Tap to Phone/softPOS có chuẩn riêng PCI MPoC (Mobile Payments on COTS, https://www.pcisecuritystandards.org/standards/mobile-payments-on-cots-mpoc/). Nếu bạn là issuer app (ngân hàng), card data hiển thị từ server dạng token hóa, có step-up khi xem số thẻ đầy đủ.
 
-3-D Secure 2 (EMVCo): xác thực chủ thẻ khi thanh toán online. Thành phần: 3DS Server (merchant side), Directory Server (scheme: Visa/Mastercard), ACS (issuer). Luồng: 3DS SDK (được EMVCo chứng nhận) trong app merchant thu thập device data → frictionless (risk-based, không hỏi gì) hoặc challenge (OTP, hoặc OOB: push sang app bank để xác nhận bằng biometric). Vai trò: nếu bạn làm app merchant/ví, tích hợp PSP SDK có 3DS; nếu làm app bank (issuer), bạn làm OOB authentication: nhận push, hiện chi tiết giao dịch, biometric, ký, trả kết quả cho ACS.
+3-D Secure 2 (EMVCo): xác thực chủ thẻ khi thanh toán online. Bản spec hiện hành là EMV 3DS v2.3.1.1 (30/05/2023); EMVCo đã công bố draft v2.4.0.0 ngày 4/11/2026 để lấy ý kiến tới 8/1/2027 (https://www.emvco.com/emv-technologies/3-d-secure/). (kiểm tra 18/11/2026) Thành phần: 3DS Server (merchant side), Directory Server (scheme: Visa/Mastercard), ACS (issuer). Luồng: 3DS SDK (được EMVCo chứng nhận) trong app merchant thu thập device data → frictionless (risk-based, không hỏi gì) hoặc challenge (OTP, hoặc OOB: push sang app bank để xác nhận bằng biometric). Vai trò: nếu bạn làm app merchant/ví, tích hợp PSP SDK có 3DS; nếu làm app bank (issuer), bạn làm OOB authentication: nhận push, hiện chi tiết giao dịch, biometric, ký, trả kết quả cho ACS.
 
 Transaction signing (WYSIWYS): thiết kế đầy đủ ở Q&A nhóm bank. Nguyên tắc: dữ liệu ký = dữ liệu user thấy; key trong Keystore yêu cầu biometric; nonce + timestamp + idempotency key; server verify; audit log lưu chữ ký để chống chối bỏ. Soft OTP/Smart OTP: seed TOTP được cấp lúc enrollment, lưu mã hóa Keystore (yêu cầu biometric để giải mã), sinh OTP offline; "OTP nâng cao" ký cả nội dung giao dịch (transaction data signing) chứ không chỉ thời gian.
 
@@ -903,7 +967,8 @@ class TransactionSigner(private val alias: String = "device.binding.v1") {
 Điểm hay bị hỏi: số tiền dùng đơn vị nhỏ nhất (Long) để không có vấn đề float; tên người nhận chuẩn hóa NFC vì iOS và Android có thể encode khác nhau; version prefix `v1` để đổi format sau này; nonce do server cấp hoặc UUID client nhưng server lưu để chống replay trong cửa sổ timestamp.
 
 - **Đọc thêm:**
-  - https://www.pcisecuritystandards.org/
+  - https://blog.pcisecuritystandards.org/just-published-pci-dss-v4-0-1 (PCI DSS v4.0.1)
+  - https://www.pcisecuritystandards.org/standards/mobile-payments-on-cots-mpoc/
   - https://www.emvco.com/emv-technologies/3-d-secure/
   - https://developer.android.com/identity/sign-in/biometric-auth (CryptoObject với Signature)
 
@@ -913,13 +978,27 @@ Log masking: `Timber.Tree` cho release chỉ gửi level WARN+ tới Crashlytics
 
 SIM swap: attacker thuyết phục nhà mạng cấp lại SIM, nhận SMS OTP, đổi mật khẩu. Hệ quả cho thiết kế: SMS OTP chỉ cho thao tác thấp; giao dịch lớn dùng Smart OTP/push + biometric + device binding; phát hiện đổi SIM (subscription thay đổi qua `SubscriptionManager`, cần `READ_PHONE_STATE`, giới hạn từ API 29) chỉ là tín hiệu; server kiểm tra "đổi số điện thoại gần đây" để tăng mức xác thực; SMS Retriever API/User Consent API để đọc OTP không cần quyền SMS.
 
-Google Play Data safety form: khai dữ liệu thu thập/chia sẻ (loại, mục đích, bắt buộc hay không), có mã hóa khi truyền không, cách xóa dữ liệu, và phải khớp hành vi thật của app và mọi SDK (Firebase, Datadog, anti-fraud SDK có tài liệu "data disclosure" riêng). Sai lệch là lý do bị gỡ. Kèm chính sách account deletion (app có tạo tài khoản phải có xóa tài khoản trong app và qua web). Luật VN: Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân và Luật Bảo vệ dữ liệu cá nhân (thông qua 2025, hiệu lực 2026) đặt yêu cầu về đồng ý, mục đích, chuyển dữ liệu xuyên biên giới; xem `22-Product-Metrics-Compliance.md` và kiểm tra văn bản gốc trước khi dẫn trong phỏng vấn.
+Google Play Data safety form: khai dữ liệu thu thập/chia sẻ (loại, mục đích, bắt buộc hay không), có mã hóa khi truyền không, cách xóa dữ liệu, và phải khớp hành vi thật của app và mọi SDK (Firebase, Datadog, anti-fraud SDK có tài liệu "data disclosure" riêng). Sai lệch là lý do bị gỡ. Kèm chính sách account deletion (app có tạo tài khoản phải có xóa tài khoản trong app và qua web). Luật VN về dữ liệu cá nhân (kiểm tra 18/11/2026):
+- Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15: Quốc hội thông qua 26/06/2025, hiệu lực 01/01/2026 (Điều 38). Điều 23 khoản 1: thông báo cơ quan chuyên trách bảo vệ dữ liệu cá nhân chậm nhất 72 giờ kể từ khi phát hiện vi phạm có thể gây hại. Điều 8: phạt tối đa 5% doanh thu năm trước với vi phạm chuyển dữ liệu xuyên biên giới (khoản 4), tối đa 3 tỷ đồng với vi phạm khác (khoản 5), mua bán dữ liệu cá nhân phạt tới 10 lần khoản thu (khoản 3). Văn bản: https://vanban.chinhphu.vn/?pageid=27160&docid=214590&classid=1&typegroupid=3
+- Nghị định 356/2025/NĐ-CP (31/12/2025, hiệu lực 01/01/2026) hướng dẫn Luật; Điều 8 khoản 3: lĩnh vực tài chính, ngân hàng phải thông báo cơ quan chức năng và chủ thể dữ liệu trong 72 giờ khi lộ, mất dữ liệu nhạy cảm (https://luatvietnam.vn/dan-su/nghi-dinh-356-2025-nd-cp-quy-dinh-chi-tiet-luat-bao-ve-du-lieu-ca-nhan-422896-d1.html).
+- Nghị định 13/2023/NĐ-CP (hiệu lực 01/07/2023, Điều 23: báo Bộ Công an/A05 trong 72 giờ kể từ khi vi phạm xảy ra) **đã hết hiệu lực từ 01/01/2026** theo Điều 42 khoản 2 NĐ 356/2025; chỉ còn ý nghĩa lịch sử và chuyển tiếp (Điều 39 Luật 91 giữ hiệu lực các văn bản đồng ý, hồ sơ đánh giá tác động đã làm theo NĐ 13).
+Xem thêm `22-Product-Metrics-Compliance.md`. Nguồn điều khoản ở đây là bản đăng lại trên luatvietnam.vn; trước khi trích dẫn chính thức, đối chiếu văn bản gốc trên vanban.chinhphu.vn.
 
-Quy định SBV hay được nhắc: Quyết định 2345/QĐ-NHNN (2023, hiệu lực 1/7/2024) về xác thực sinh trắc học; Thông tư 50/2024/TT-NHNN về an toàn, bảo mật cho dịch vụ trực tuyến ngành ngân hàng (hiệu lực 1/1/2025) có yêu cầu về ứng dụng di động (phát hiện root/jailbreak, chống can thiệp, định danh thiết bị, hạn chế khi bật trợ năng không rõ nguồn gốc...). Nội dung chi tiết từng điều khoản cần kiểm tra văn bản gốc; trong phỏng vấn nói "tôi biết hai văn bản này và đã map yêu cầu vào checklist release" là đủ và trung thực.
+Quy định NHNN hay được nhắc (kiểm tra 18/11/2026):
+- Quyết định 2345/QĐ-NHNN (18/12/2023, hiệu lực 01/07/2024) về giải pháp an toàn bảo mật trong thanh toán trực tuyến và thanh toán thẻ: sinh trắc học khớp chip CCCD/VNeID cho giao dịch trên 10 triệu/lần hoặc 20 triệu/ngày. **Đã bị bãi bỏ toàn bộ từ 01/01/2025** bởi Quyết định 2872/QĐ-NHNN (30/12/2024, https://luatvietnam.vn/tai-chinh/quyet-dinh-2872-qd-nhnn-405747-d1.html). Phỏng vấn vẫn hay hỏi vì nó tạo ra luồng sinh trắc hiện nay.
+- Thông tư 50/2024/TT-NHNN "Quy định về an toàn, bảo mật cho việc cung cấp dịch vụ trực tuyến trong ngành Ngân hàng" (31/10/2024, hiệu lực 01/01/2025, thay TT 35/2016 và TT 35/2018; sửa đổi bởi TT 77/2025/TT-NHNN hiệu lực 01/03/2026; bản hợp nhất 25/VBHN-NHNN ngày 20/01/2026, https://luatvietnam.vn/tai-chinh/van-ban-hop-nhat-25-vbhn-nhnn-2026-quy-dinh-an-toan-bao-mat-dich-vu-truc-tuyen-nganh-ngan-hang-431744-d5.html). Điều khoản map thẳng vào app mobile:
+  - Điều 7 khoản 6 điểm c: tự động ngắt phiên khi không thao tác trong thời gian do đơn vị quy định.
+  - Điều 8 khoản 2: biện pháp hạn chế dịch ngược mã nguồn (obfuscation); khoản 3: bảo vệ luồng dữ liệu của app.
+  - Điều 8 khoản 4: app phải tự thoát hoặc dừng và báo lý do cho khách hàng khi phát hiện debugger, emulator (a), hooking/repackage (b), thiết bị root/jailbreak (c).
+  - Điều 8 khoản 5: app không được ghi nhớ mật khẩu truy cập (trừ trường hợp ở Điều 11 khoản 6).
+  - Điều 8 khoản 6: xác thực khách hàng khi truy cập lần đầu hoặc trên thiết bị khác (OTP SMS/Voice hoặc sinh trắc học).
+  - Điều 10 + Phụ lục 01: phân loại giao dịch theo rủi ro, ngưỡng 10 triệu/giao dịch và 20 triệu/ngày.
+  - Điều 11 khoản 3: hiệu lực OTP tối đa 5 phút (SMS, email), 3 phút (voice), 2 phút (thẻ ma trận, Soft OTP, token); Soft OTP chỉ kích hoạt trên một thiết bị. Khoản 5: sinh trắc học FRR < 5%, FAR < 0,01%. Khoản 6 điểm a: chỉ dùng sinh trắc học của thiết bị sau khi khách hàng đồng ý và đã có một giao dịch thành công trước đó.
+  Trong phỏng vấn, nói được 3-4 điều khoản trên và "tôi đã map chúng vào checklist release" là đủ và trung thực. Bản tóm tắt điều khoản dựa trên bản hợp nhất đăng ở luatvietnam.vn, đối chiếu văn bản gốc trước khi dùng cho audit.
 
 - **Đọc thêm:**
-  - https://www.pcisecuritystandards.org/
-  - https://www.emvco.com/emv-technologies/3-d-secure/
+  - https://vanban.chinhphu.vn/?pageid=27160&docid=214590&classid=1&typegroupid=3 (Luật 91/2025/QH15)
+  - https://luatvietnam.vn/tai-chinh/van-ban-hop-nhat-25-vbhn-nhnn-2026-quy-dinh-an-toan-bao-mat-dich-vu-truc-tuyen-nganh-ngan-hang-431744-d5.html (TT 50/2024 hợp nhất)
   - https://support.google.com/googleplay/android-developer/answer/10787469?hl=en (Data safety)
   - https://developers.google.com/identity/sms-retriever/overview
 
@@ -935,7 +1014,7 @@ Quy định SBV hay được nhắc: Quyết định 2345/QĐ-NHNN (2023, hiệu
 | Build | SAST trên CI, secret scanning, dependency scanning, SBOM | Semgrep (rule Android/Kotlin), MobSF static, gitleaks, OWASP Dependency-Check hoặc Snyk, CycloneDX Gradle plugin, Gradle dependency verification (checksum/signature) và dependency locking |
 | Test | DAST nội bộ trước release lớn: MobSF dynamic, objection, Frida script bypass pinning/root để xác nhận phản ứng | MobSF, objection, Frida |
 | Release | R8 + hardening, mapping upload, Play Integrity policy bật, NSC đúng, `debuggable=false`, signing qua Play App Signing | AGP, Play Console |
-| Pentest | bên thứ ba hàng năm và trước release lớn, scope MASVS L2+R, SLA fix theo severity (critical 7 ngày, high 30 ngày, ví dụ), retest | báo cáo map MASVS |
+| Pentest | bên thứ ba hàng năm và trước release lớn, scope MASVS v2 theo testing profile MAS-L2 + MAS-R, SLA fix theo severity (critical 7 ngày, high 30 ngày, ví dụ), retest | báo cáo map MASVS |
 | Runtime | telemetry RASP/Play Integrity rate, pinning fail rate, Crashlytics security keys, Play Console warnings | dashboard |
 | Supply chain | review SDK mới (quyền, data disclosure, kích thước, reputation), Renovate/Dependabot, pin version, GitHub Advisory, không dùng repo lạ | Renovate, Dependabot |
 
@@ -955,7 +1034,7 @@ Ví dụ: một dev commit `google-services.json` cùng key của payment gatewa
 1. Xác định phạm vi: key gì, quyền gì, dùng ở đâu, lộ từ khi nào, có dấu hiệu bị dùng không (log gateway, billing).
 2. Contain: thu hồi/rotate key ở nhà cung cấp ngay; nếu app đang dùng key đó thì hệ thống phải có cách cấp key mới (remote config, backend proxy) hoặc chấp nhận một phần tính năng chết tới khi update; bật rate limit/API key restriction; đổi secret CI liên quan.
 3. Remediate: chuyển key về backend proxy, ship app mới, server chặn app version cũ nếu cần (min version), xóa key khỏi lịch sử git (và coi như đã lộ dù đã xóa).
-4. Communicate: security team, lead backend, quản lý; nếu liên quan PII hoặc là tổ chức tín dụng thì có nghĩa vụ báo cáo theo quy định (Nghị định 13, Thông tư 50 có yêu cầu báo cáo sự cố; thời hạn cụ thể cần kiểm tra).
+4. Communicate: security team, lead backend, quản lý; nếu liên quan PII hoặc là tổ chức tín dụng thì có nghĩa vụ báo cáo theo quy định (Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 Điều 23: báo cơ quan chuyên trách trong 72 giờ kể từ khi phát hiện; NĐ 356/2025 Điều 8 khoản 3: ngân hàng báo cả chủ thể dữ liệu trong 72 giờ nếu lộ dữ liệu nhạy cảm; NĐ 13/2023 đã hết hiệu lực từ 01/01/2026; xem 8.3).
 5. Postmortem không đổ lỗi: vì sao scanner không bắt, thêm pre-commit gitleaks, thêm rule CI, thêm vào checklist.
 Câu chuyện STAR cho mục này xem `12-Behavioral-STAR-Bank.md`.
 
@@ -1009,9 +1088,9 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Nhóm A: MASVS và threat model (Q1-Q6)**
 
 ### Q1. What is OWASP MASVS and how have you used it in practice?
-**A:** MASVS is the Mobile Application Security Verification Standard: a list of controls grouped into storage, crypto, auth, network, platform, code, resilience and privacy, with verification profiles L1 for every app, L2 for apps handling sensitive data, and R for resilience against reverse engineering, which banks require on top of L2. MASTG is the companion testing guide that tells a pentester how to test each control with Frida, objection, jadx, MobSF and so on, and the MAS checklist maps controls to tests. I use it in three ways: as the scope definition when we commission a pentest so findings come back with MASVS IDs we can track; as a self-assessment before major releases, where I run MobSF and objection on our own build; and as the vocabulary in PR review, for example "this violates STORAGE-2, tokens must not be in backups". It keeps conversations with the bank's security team concrete instead of arguing about opinions.
-**Follow-ups:** Which MASVS controls do you find most often violated in real apps? What is the difference between L2 and R? How do you prioritize findings from a report?
-**Điểm interviewer muốn nghe:** Biết ba tài liệu, profile L1/L2/R, và dùng thật trong pentest scope và review.
+**A:** MASVS is the Mobile Application Security Verification Standard: a list of controls grouped into storage, crypto, auth, network, platform, code, resilience and privacy. Since MASVS v2 the old L1, L2 and R levels are no longer part of the standard itself; OWASP moved them into the MASTG as MAS Testing Profiles: MAS-L1 for every app, MAS-L2 for apps handling sensitive data, MAS-R for resilience against reverse engineering, which banks require on top of L2, plus MAS-P for privacy. MASTG is the companion testing guide that tells a pentester how to test each control with Frida, objection, jadx, MobSF and so on, and the MAS checklist maps controls to tests. I use it in three ways: as the scope definition when we commission a pentest so findings come back with MASVS IDs we can track; as a self-assessment before major releases, where I run MobSF and objection on our own build; and as the vocabulary in PR review, for example "this violates STORAGE-2, tokens must not be in backups". It keeps conversations with the bank's security team concrete instead of arguing about opinions.
+**Follow-ups:** Which MASVS controls do you find most often violated in real apps? What is the difference between MAS-L2 and MAS-R? How do you prioritize findings from a report?
+**Điểm interviewer muốn nghe:** Biết ba tài liệu, biết từ MASVS v2 level đã thành MAS Testing Profiles (MAS-L1/L2/R/P), và dùng thật trong pentest scope và review.
 
 ### Q2. Walk me through threat modeling a mobile banking feature, say QR transfers.
 **A:** I start with assets: the integrity of amount and beneficiary, the user's credentials and session, and PII. Then entry points: the API, the QR scanner input, the confirmation screen, deep links that prefill a transfer, local storage, and the binary itself. Then attackers: a remote attacker with stolen credentials, a MITM on public Wi-Fi, malware on the victim's phone using accessibility and overlays, and the device owner with root trying to abuse promotions or bypass limits. Walking STRIDE: spoofing is a fake confirmation overlay, mitigated with FLAG_SECURE, filterTouchesWhenObscured and accessibilityDataSensitive; tampering is a modified request, mitigated by signing the canonical transfer data with a Keystore key gated by biometrics and validating everything server-side; repudiation is handled by that signature plus audit logs; information disclosure covers screenshots, logs and clipboard; denial of service is OTP spam, so rate limits; elevation is an exported activity skipping login, so exported audits. Finally, I rank by likelihood times impact, pick the top mitigations for this sprint and record residual risks with owners. The whole exercise is two hours with mobile, backend and security in the room.
@@ -1034,9 +1113,9 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** Tái hiện trước, phân loại theo điều kiện khai thác, SLA, retest, học quy trình.
 
 ### Q6. What is the difference between MASVS L1, L2 and R, and which would you target for a fintech wallet?
-**A:** L1 is baseline hygiene every app should meet: no cleartext, no secrets in code, sane storage. L2 adds defense in depth for sensitive data: encrypted local storage, pinning, stronger auth with step-up, strict platform interaction. R is resilience, a separate dimension about resisting reverse engineering and tampering: obfuscation, anti-debug, root and hook detection, integrity checks, and it only makes sense combined with L1 or L2. A wallet that moves money targets L2 plus R because the attacker model includes both malware on the victim's device and the device owner committing fraud. I would phase it: L2 before launch because those are correctness issues, R incrementally with telemetry first and enforcement later, since resilience controls have false positives on custom ROMs and need tuning.
+**A:** First a precision: since MASVS v2 these are MAS Testing Profiles in the MASTG, MAS-L1, MAS-L2 and MAS-R, rather than levels inside MASVS, but the meaning is the same. L1 is baseline hygiene every app should meet: no cleartext, no secrets in code, sane storage. L2 adds defense in depth for sensitive data: encrypted local storage, pinning, stronger auth with step-up, strict platform interaction. R is resilience, a separate dimension about resisting reverse engineering and tampering: obfuscation, anti-debug, root and hook detection, integrity checks, and it only makes sense combined with L1 or L2. A wallet that moves money targets L2 plus R because the attacker model includes both malware on the victim's device and the device owner committing fraud. I would phase it: L2 before launch because those are correctness issues, R incrementally with telemetry first and enforcement later, since resilience controls have false positives on custom ROMs and need tuning.
 **Follow-ups:** How do you verify R controls actually work? What is the cost of R on user experience? Which R controls can you do without a commercial product?
-**Điểm interviewer muốn nghe:** R là chiều riêng, bank cần L2+R, bật R theo giai đoạn với telemetry.
+**Điểm interviewer muốn nghe:** Biết L1/L2/R nay là MAS Testing Profiles (MAS-L1/L2/R), R là chiều riêng, bank cần MAS-L2 + MAS-R, bật R theo giai đoạn với telemetry.
 
 **Nhóm B: Storage và crypto (Q7-Q14)**
 
@@ -1051,7 +1130,7 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** AES-GCM + Keystore, loại khỏi backup, biometric gate cho bank, xử lý invalidation.
 
 ### Q9. Jetpack Security's EncryptedSharedPreferences is deprecated. What do you use instead?
-**A:** The library wrapped Tink with a Keystore master key, and its deprecation means no fixes for its known issues, so new code should go directly to the primitives. Two reasonable paths: use Tink directly with AndroidKeysetManager and an android-keystore master key URI, which gives key rotation and well-reviewed primitives; or write a small Keystore-backed AES-GCM helper as I showed, which is about fifty lines and easier to audit. Either way the storage container is my choice: a private file or Proto DataStore with a serializer that encrypts on write and decrypts on read. For existing users, I keep the old library only to read and migrate on first launch, then delete the old file. I verify the exact deprecation notice and recommended replacement in the AndroidX release notes before quoting it in a design doc.
+**A:** The library wrapped Tink with a Keystore master key, and its deprecation means no fixes for its known issues, so new code should go directly to the primitives. Two reasonable paths: use Tink directly with AndroidKeysetManager and an android-keystore master key URI, which gives key rotation and well-reviewed primitives; or write a small Keystore-backed AES-GCM helper as I showed, which is about fifty lines and easier to audit. Either way the storage container is my choice: a private file or Proto DataStore with a serializer that encrypts on write and decrypts on read. For existing users, I keep the old library only to read and migrate on first launch, then delete the old file. The AndroidX release notes for security-crypto 1.1.0-alpha07, April 2025, say all APIs were deprecated in favour of platform APIs and direct use of Android Keystore, and the 1.1.0 stable release keeps that status, so this is the official direction.
 **Follow-ups:** How do you rotate the master key? How do you test crypto code deterministically? What about KMP and iOS Keychain?
 **Điểm interviewer muốn nghe:** Biết deprecation, chọn Tink hoặc Keystore trực tiếp, có migration.
 
@@ -1061,12 +1140,12 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** FBE không chống root/backup sau unlock; key ngẫu nhiên qua Keystore; đo chi phí.
 
 ### Q11. What does Android key attestation prove, and how does your server verify it?
-**A:** When generating a key pair with an attestation challenge, Keystore returns a certificate chain signed by a device key that Google provisioned at manufacturing, containing an extension that states the key's security level, software, TEE or StrongBox, whether user authentication is required, the verified boot state and bootloader lock status, the OS and patch level, and my challenge. The server validates the chain to Google's published attestation roots, checks Google's revocation list, matches the challenge to the enrollment session, requires TEE or StrongBox and verified boot, and stores the public key for later signature verification. It proves the key was generated in hardware on a device with intact boot, which is exactly what device binding needs, and unlike Play Integrity it does not need Google Play services and is cryptographic rather than a Google verdict. Limits: some older or obscure devices attest poorly, some attestation keys have leaked and been revoked, so policy must be tiered rather than binary.
+**A:** When generating a key pair with an attestation challenge, Keystore returns a certificate chain signed by the device's attestation key and chaining to Google's attestation root; that key was either a factory key injected by the OEM at manufacturing or, with Remote Key Provisioning, a short-lived certificate fetched from Google's servers, and devices launching with Android 16 support only RKP. The leaf contains an extension that states the key's security level, software, TEE or StrongBox, whether user authentication is required, the verified boot state and bootloader lock status, the OS and patch level, and my challenge. The server validates the chain to Google's published attestation roots, including the new ECDSA root that began signing chains on February 1, 2026, checks Google's revocation list at android.googleapis.com/attestation/status, matches the challenge to the enrollment session, requires TEE or StrongBox and verified boot, and stores the public key for later signature verification. It proves the key was generated in hardware on a device with intact boot, which is exactly what device binding needs, and unlike Play Integrity it does not need Google Play services and is cryptographic rather than a Google verdict. Limits: some older or obscure devices attest poorly, some attestation keys have leaked and been revoked, so policy must be tiered rather than binary.
 **Follow-ups:** How does this differ from Play Integrity? What do you do for devices without valid attestation? How do you rotate the device key?
 **Điểm interviewer muốn nghe:** Chain ký bởi Google, extension có security level và boot state, server tự verify, khác Play Integrity.
 
 ### Q12. What are the risks of backups, and how do you configure them for a banking app?
-**A:** Auto Backup copies app data to the user's Google Drive and device-to-device transfer copies it to a new phone; a token or device identifier inside that data means the session can be restored on another device, which breaks device binding, and on debuggable builds adb backup exposes it directly. For a bank I set allowBackup to false, and because Android 12 changed how device transfer interacts with that flag, I also declare dataExtractionRules with explicit exclusions for both cloud-backup and device-transfer, keeping fullBackupContent for older API levels. Keystore keys are never backed up, so even if an encrypted blob is restored it is undecryptable, and the app must handle that by requiring login rather than crashing. I verify with bmgr backupnow and restore on a test device and include it in the pre-release checklist, since this is a frequent MASVS-STORAGE-2 finding.
+**A:** Auto Backup copies app data to the user's Google Drive and device-to-device transfer copies it to a new phone; a token or device identifier inside that data means the session can be restored on another device, which breaks device binding, and on debuggable builds adb backup exposes it directly; since Android 12, adb backup excludes data of apps targeting API 31 or higher unless they are debuggable, so the classic adb backup finding is dated and the real paths are cloud backup and device transfer. For a bank I set allowBackup to false, and because on Android 12 with targetSdk 31 some manufacturers' devices still perform device-to-device transfer even when allowBackup is false, I also declare dataExtractionRules with explicit exclusions for both cloud-backup and device-transfer, keeping fullBackupContent for older API levels. Keystore keys are never backed up, so even if an encrypted blob is restored it is undecryptable, and the app must handle that by requiring login rather than crashing. I verify with bmgr backupnow and restore on a test device and include it in the pre-release checklist, since this is a frequent MASVS-STORAGE-2 finding.
 **Follow-ups:** What data would you allow to back up? How do you test device-to-device transfer? What about Wear or companion devices?
 **Điểm interviewer muốn nghe:** allowBackup=false + dataExtractionRules tường minh, Keystore không backup, test bmgr.
 
@@ -1088,7 +1167,7 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** base-config, domain-config, debug-overrides, expiration fail-open, phạm vi.
 
 ### Q16. Pinning: pros, cons, and your rotation plan in two minutes.
-**A:** Pros: it removes trust in a hundred-plus public CAs, so mis-issued certificates and user-installed proxy CAs cannot intercept traffic, and it is a MASVS L2 requirement. Cons: a rotation mistake locks every user out, it is bypassable on rooted devices with Frida, and it adds operational work. The plan: pin SPKI hashes, not certificates; always ship the live key plus a pre-generated backup key kept offline; put an expiration on the NSC pin set so forgotten rotations fail open; schedule rotation against certificate expiry with the new app version shipping the next backup before the server switches; monitor SSLPeerUnverifiedException rates by version; and keep a force-update path. Details and code are in my network notes; the interview-level point is that pinning is one layer next to Play Integrity and request signing, not the layer.
+**A:** Pros: it removes trust in a hundred-plus public CAs, so mis-issued certificates and user-installed proxy CAs cannot intercept traffic, and it is the MASVS-NETWORK-2 control that every banking pentest checks. Cons: a rotation mistake locks every user out, it is bypassable on rooted devices with Frida, and it adds operational work. The plan: pin SPKI hashes, not certificates; always ship the live key plus a pre-generated backup key kept offline; put an expiration on the NSC pin set so forgotten rotations fail open; schedule rotation against certificate expiry with the new app version shipping the next backup before the server switches; monitor SSLPeerUnverifiedException rates by version; and keep a force-update path. Details and code are in my network notes; the interview-level point is that pinning is one layer next to Play Integrity and request signing, not the layer.
 **Follow-ups:** Leaf or intermediate? How do you handle CDN and third-party domains? What is your kill switch?
 **Điểm interviewer muốn nghe:** Gọn, có backup pin, expiration, monitoring, và "một lớp trong nhiều lớp".
 
@@ -1145,7 +1224,7 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** Key trong Keystore + attestation + server lưu public key, quản lý thiết bị, không dùng ID giả được.
 
 ### Q27. What session management policy would you implement for a mobile bank, and why?
-**A:** Short idle timeout, around five minutes of inactivity, after which the app locks and requires a biometric to resume, because phones are left unlocked on desks; an absolute session lifetime of hours to a day, after which full login is required; step-up authentication for sensitive actions, transfers, adding beneficiaries, changing limits or contact details, regardless of session age; one active mobile session or a small number of registered devices, with notification when a new device logs in; and server-side session records so support and the user can terminate sessions. On the client, the lock state is enforced in a top-level observer of ProcessLifecycleOwner and a timestamp, sensitive screens use FLAG_SECURE, and background shows a blank task snapshot. Logout clears tokens, local databases, caches, WebView cookies and queued work, and calls the server to revoke. These numbers come from regulator expectations and risk appetite, so I confirm them with the bank's security team rather than inventing them.
+**A:** Short idle timeout, around five minutes of inactivity, after which the app locks and requires a biometric to resume, because phones are left unlocked on desks; an absolute session lifetime of hours to a day, after which full login is required; step-up authentication for sensitive actions, transfers, adding beneficiaries, changing limits or contact details, regardless of session age; one active mobile session or a small number of registered devices, with notification when a new device logs in; and server-side session records so support and the user can terminate sessions. On the client, the lock state is enforced in a top-level observer of ProcessLifecycleOwner and a timestamp, sensitive screens use FLAG_SECURE, and background shows a blank task snapshot. Logout clears tokens, local databases, caches, WebView cookies and queued work, and calls the server to revoke. For grounding I cite NIST SP 800-63B-4 from July 2025: at AAL2 an overall timeout of no more than 24 hours and inactivity of no more than one hour, at AAL3 no more than 12 hours overall and 15 minutes of inactivity. Vietnam's Circular 50/2024 requires automatic session termination after inactivity but leaves the duration to the institution, so the five minutes is the bank's risk choice, which I confirm with the security team rather than inventing.
 **Follow-ups:** How do you implement the idle timer in Compose? What should survive a logout? How do you handle sessions across app and web?
 **Điểm interviewer muốn nghe:** Số liệu kèm lý do, step-up, revoke server-side, xóa sạch khi logout.
 
@@ -1167,7 +1246,7 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** Rõ ràng "không", nhưng vẫn làm vì chi phí tấn công và yêu cầu, quyết định ở server.
 
 ### Q31. How do you detect root, and what are the limits?
-**A:** Root detection is a bundle of heuristics: su binaries on the path, Magisk or SuperSU packages, test-keys build tags, ro.debuggable and ro.secure properties, writable system partitions, Magisk mount artifacts and Zygisk traces; libraries like RootBeer collect these. The limits are structural: the checks run inside a process the attacker controls, so Magisk's DenyList and modules like Shamiko hide root from specific apps, and Frida can hook the checks directly. Therefore I treat local root detection as a signal, implemented in native code and spread across multiple points without obvious names, and I rely on Play Integrity's device verdict, which is backed by verified boot and hardware attestation and which Google has been moving toward hardware signals, plus key attestation for binding. The response policy is tiered and decided on the server: read-only access or step-up on weak signals, block on strong ones, with telemetry first to measure false positives on custom ROMs and some OEMs.
+**A:** Root detection is a bundle of heuristics: su binaries on the path, Magisk or SuperSU packages, test-keys build tags, ro.debuggable and ro.secure properties, writable system partitions, Magisk mount artifacts and Zygisk traces; libraries like RootBeer collect these. The limits are structural: the checks run inside a process the attacker controls, so Magisk's DenyList and modules like Shamiko hide root from specific apps, and Frida can hook the checks directly. Therefore I treat local root detection as a signal, implemented in native code and spread across multiple points without obvious names, and I rely on Play Integrity's device verdict, which since May 2025 on Android 13 and later requires hardware-backed verified boot for DEVICE_INTEGRITY and a security patch within the last year for STRONG_INTEGRITY, plus key attestation for binding. The response policy is tiered and decided on the server: read-only access or step-up on weak signals, block on strong ones, with telemetry first to measure false positives on custom ROMs and some OEMs.
 **Follow-ups:** How does Magisk hide itself? Why is MEETS_STRONG_INTEGRITY harder to fake? What do you do about a user who is rooted but legitimate?
 **Điểm interviewer muốn nghe:** Các tín hiệu, vì sao bị qua mặt, chuyển trọng tâm sang Play Integrity và server.
 
@@ -1177,12 +1256,12 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** Hiểu cơ chế inject và hook, các dấu hiệu, và giới hạn.
 
 ### Q33. Walk through Play Integrity: request flow, verdicts and server-side verification.
-**A:** On app start I call prepareIntegrityToken with our Cloud project number so the standard provider is warm. When a sensitive action begins, the server issues a request ID and the app computes a requestHash over the action, amount, beneficiary and that ID, requests a token, and sends the token with the transaction. The server calls Google's decodeIntegrityToken, gets JSON, and checks requestDetails: package name, requestHash equal to its own computation, and a timestamp within a few minutes; appIntegrity: PLAY_RECOGNIZED means the exact app and signature from Play, UNRECOGNIZED_VERSION means sideloaded or repackaged; deviceIntegrity: a set that may include MEETS_BASIC_INTEGRITY, MEETS_DEVICE_INTEGRITY, MEETS_STRONG_INTEGRITY, or MEETS_VIRTUAL_INTEGRITY for certified emulators; accountDetails: LICENSED; and environmentDetails if enabled, where appAccessRiskVerdict values like UNKNOWN_CAPTURING or UNKNOWN_CONTROLLING indicate screen capture or remote control apps, which is exactly the accessibility trojan pattern. Policy lives on the server: view-only without DEVICE_INTEGRITY, step-up or block for transfers without it, block outright on CONTROLLING. The client never interprets the token, which is encrypted anyway.
+**A:** On app start I call prepareIntegrityToken with our Cloud project number so the standard provider is warm. When a sensitive action begins, the server issues a request ID and the app computes a requestHash over the action, amount, beneficiary and that ID, requests a token, and sends the token with the transaction. The server calls Google's decodeIntegrityToken, gets JSON, and checks requestDetails: package name, requestHash equal to its own computation, and a timestamp within a few minutes; appIntegrity: PLAY_RECOGNIZED means the exact app and signature from Play, UNRECOGNIZED_VERSION means sideloaded or repackaged; deviceIntegrity: a set that may include MEETS_BASIC_INTEGRITY, MEETS_DEVICE_INTEGRITY, MEETS_STRONG_INTEGRITY, or MEETS_VIRTUAL_INTEGRITY for certified emulators; accountDetails: LICENSED; and environmentDetails if enabled, where appAccessRiskVerdict values like UNKNOWN_CAPTURING, UNKNOWN_CONTROLLING or UNKNOWN_OVERLAYS indicate non-Play apps that can capture the screen, control input or draw overlays, which is exactly the accessibility trojan pattern; the server can then ask the app to show a Play remediation dialog such as CLOSE_UNKNOWN_ACCESS_RISK or GET_INTEGRITY. Since May 2025, on Android 13 and later, DEVICE_INTEGRITY requires hardware-backed verified boot and STRONG_INTEGRITY also requires a security patch from the last year. Policy lives on the server: view-only without DEVICE_INTEGRITY, step-up or block for transfers without it, block outright on CONTROLLING. The client never interprets the token, which is encrypted anyway.
 **Follow-ups:** Standard versus classic request? What do you do when the verdict is UNEVALUATED? How do you test verdict handling without rooted devices?
 **Điểm interviewer muốn nghe:** Luồng app-Google-server, các verdict và ý nghĩa, requestHash chống replay, quyết định ở server.
 
 ### Q34. Standard versus classic Play Integrity requests: when do you use which, and what are nonce and requestHash for?
-**A:** The classic API takes a server-generated nonce, performs a round trip to Google per call, is slower and quota-limited, around ten thousand per day by default, and is meant for infrequent high-value actions where the server wants to generate the nonce itself. The standard API prepares a token provider once, then issues tokens quickly and many times; you pass a requestHash you compute from the request content, and Google puts it in the verdict so the server can confirm the token belongs to this exact action. Both exist to bind a verdict to a specific request so an attacker cannot obtain a token on a clean device and replay it with a tampered transaction from a rooted one. I use standard for login and transaction flows, with the requestHash covering the transaction fields and a server-issued ID, and classic only if a security review demands server-side nonce generation. In both cases the server checks freshness via the timestamp and stores used IDs to reject replays.
+**A:** The classic API takes a server-generated nonce, performs a round trip to Google per call, is slower, and is meant for infrequent high-value actions where the server wants to generate the nonce itself. Both request types share a default quota of 10,000 requests per app per day, which can be raised. Another difference is decryption: standard tokens can only be decoded by Google's server through decodeIntegrityToken, while classic tokens can also be decrypted and verified locally on your server if you opt to manage your own response encryption keys. The standard API prepares a token provider once, then issues tokens quickly and many times; you pass a requestHash you compute from the request content, and Google puts it in the verdict so the server can confirm the token belongs to this exact action. Both exist to bind a verdict to a specific request so an attacker cannot obtain a token on a clean device and replay it with a tampered transaction from a rooted one. I use standard for login and transaction flows, with the requestHash covering the transaction fields and a server-issued ID, and classic only if a security review demands server-side nonce generation. In both cases the server checks freshness via the timestamp and stores used IDs to reject replays.
 **Follow-ups:** What goes into the requestHash and what must not? How do you handle quota exhaustion? What is the latency budget you allow for the token request?
 **Điểm interviewer muốn nghe:** Khác biệt quota/latency, nonce vs requestHash, mục đích gắn verdict với action.
 
@@ -1193,7 +1272,7 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 
 ### Q36. How do you detect emulators and debuggers, and should you block them?
 **A:** Emulator signals: Build fingerprint and hardware values such as generic, goldfish or ranchu, qemu properties, missing baseband and sensors, and Play Integrity's MEETS_VIRTUAL_INTEGRITY for Google-certified emulators. Debugger signals: Debug.isDebuggerConnected, a non-zero TracerPid in /proc/self/status, the debuggable flag in a release build, and timing checks. Blocking is a policy question: our own debug builds must work on emulators, certified emulators are fine for low-risk use, and attackers use physical rooted devices anyway, so I block emulators only for money movement in release and rely on Play Integrity rather than string matching. Debuggers attached to a release build are a strong signal of analysis; the app can refuse sensitive operations and report, but crashing immediately only helps the analyst locate the check. All of it is telemetry into the risk engine first.
-**Follow-ups:** How do you keep developer workflows working with these checks? Can an attacker avoid TracerPid detection? What about Android Studio's Rabbit features that drive devices?
+**Follow-ups:** How do you keep developer workflows working with these checks? Can an attacker avoid TracerPid detection? How do you treat automated test or agent tooling that drives the device over adb?
 **Điểm interviewer muốn nghe:** Tín hiệu cụ thể, chính sách theo rủi ro, không crash, không chặn dev.
 
 ### Q37. What signals go into anti-fraud and device fingerprinting, and what is your role as the Android lead?
@@ -1229,7 +1308,7 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** Danh sách đầy đủ, hiểu bridge là bề mặt tấn công lớn nhất, pinning không áp dụng.
 
 ### Q43. How do you prevent screenshots and screen recording, including in Compose dialogs?
-**A:** FLAG_SECURE on the window blocks screenshots, screen recording, casting and the thumbnail in recents, so I set it for balance, card, OTP, transaction confirmation and KYC screens, toggled per destination through a lifecycle-aware effect on the activity window, or for the whole activity when the app is mostly sensitive. Compose dialogs and modal bottom sheets create their own windows, so they need DialogProperties with securePolicy set to SecureOn, otherwise the dialog content leaks while the activity is protected. On Android 14 I register a screen capture callback with the DETECT_SCREEN_CAPTURE permission to warn the user when a screenshot was taken on a sensitive screen. FLAG_SECURE does not stop accessibility services from reading text or a second phone's camera, so it pairs with accessibilityDataSensitive and user education, and for internal QA builds I expose a debug switch to disable it so testers can attach screenshots to bug reports.
+**A:** FLAG_SECURE on the window blocks screenshots, screen recording, casting and the thumbnail in recents, so I set it for balance, card, OTP, transaction confirmation and KYC screens, toggled per destination through a lifecycle-aware effect on the activity window, or for the whole activity when the app is mostly sensitive. Compose dialogs and modal bottom sheets create their own windows, so they need DialogProperties with securePolicy set to SecureOn, otherwise the dialog content leaks while the activity is protected. On Android 14 I register a screen capture callback with the DETECT_SCREEN_CAPTURE permission to warn the user when a screenshot was taken on a sensitive screen, knowing it only detects the hardware-button screenshot, and on Android 15 I add WindowManager.addScreenRecordingCallback with DETECT_SCREEN_RECORDING to know when the app is being recorded and hide sensitive values. FLAG_SECURE does not stop accessibility services from reading text or a second phone's camera, so it pairs with accessibilityDataSensitive and user education, and for internal QA builds I expose a debug switch to disable it so testers can attach screenshots to bug reports.
 **Follow-ups:** How do you handle FLAG_SECURE with Picture-in-Picture or multi-window? What about the share sheet preview? How do you test that it is actually set?
 **Điểm interviewer muốn nghe:** FLAG_SECURE per window, Compose dialog có window riêng, giới hạn với accessibility.
 
@@ -1239,7 +1318,7 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** Mô tả tấn công, các API cụ thể, lớp cuối là biometric gắn dữ liệu.
 
 ### Q45. How do accessibility-based banking trojans work, and how do you defend a Vietnamese banking app against them?
-**A:** Families like GoldDigger, reported targeting Vietnamese banks, trick users into sideloading an app posing as a government or tax service and granting the Accessibility permission; with it the malware reads every view on screen including balances and OTPs, performs taps to initiate transfers, draws overlays to phish credentials, reads SMS OTPs and hides itself. Defenses in layers: mark sensitive views with accessibilityDataSensitive on Android 14 so only real accessibility tools can read them; enumerate enabled accessibility services and compare with an allowlist of known assistive tools, then warn or block transactions, which many Vietnamese banks do under regulatory pressure, with a support path for visually impaired users; use Play Integrity's appAccessRiskVerdict on the server to block when an unknown app is controlling or capturing the screen; FLAG_SECURE against screen capture; filterTouchesWhenObscured and setHideOverlayWindows against overlays; no SMS OTP for high-value transfers, replaced by push or soft OTP plus biometrics bound to the transaction; and anomaly detection on the server for unusual transfer patterns. The platform helps too: Android 13's restricted settings make it harder for sideloaded apps to enable accessibility, and Play Protect flags known families.
+**A:** Families like GoldDigger, which Group-IB reported targeting more than 50 Vietnamese financial institutions, and its GoldPickaxe sibling that also steals face data, trick users into sideloading an app posing as a government or tax service and granting the Accessibility permission; with it the malware reads every view on screen including balances and OTPs, performs taps to initiate transfers, draws overlays to phish credentials, reads SMS OTPs and hides itself. Defenses in layers: mark sensitive views with accessibilityDataSensitive, available since Android 14, or semantics sensitiveData in Compose, so only real accessibility tools can read them; enumerate enabled accessibility services and compare with an allowlist of known assistive tools, then warn or block transactions, which many Vietnamese banks do under regulatory pressure, with a support path for visually impaired users; use Play Integrity's appAccessRiskVerdict on the server to block when an unknown app is controlling or capturing the screen; FLAG_SECURE against screen capture; filterTouchesWhenObscured and setHideOverlayWindows against overlays; no SMS OTP for high-value transfers, replaced by push or soft OTP plus biometrics bound to the transaction; and anomaly detection on the server for unusual transfer patterns. The platform helps too: Android 13's restricted settings make it harder for sideloaded apps to enable accessibility, and Play Protect flags known families.
 **Follow-ups:** How do you build the allowlist without excluding legitimate users? What does accessibilityDataSensitive hide exactly? How do you test against a simulated accessibility attacker?
 **Điểm interviewer muốn nghe:** Biết họ malware ở VN, các API cụ thể, trade-off với user khiếm thị, server-side verdict.
 
@@ -1256,7 +1335,7 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** Phân loại identifier vs secret, backend proxy, App Check, tự quét APK.
 
 ### Q48. What does Firebase App Check do, and what does it not do?
-**A:** App Check has the app obtain an attestation token from a provider, Play Integrity on Android, App Attest or DeviceCheck on iOS, a debug provider in development, and attaches it to requests to Firebase services such as Firestore, Storage, Functions, Realtime Database and AI Logic; with enforcement on, the backend rejects requests without a valid token, so scripts and tampered apps cannot use your Firebase project directly. Limited-use tokens add replay protection for important calls. It does not authenticate users, does not stop an attacker running the genuine app on a genuine device from consuming your quota, and does not protect non-Firebase backends unless you verify the token yourself through the Admin SDK. So it pairs with Firebase Auth or our own auth, per-user rate limits and security rules. For AI Logic, where enforcement became automatic in 2026 per the Firebase docs, App Check integration is a release blocker, not an option.
+**A:** App Check has the app obtain an attestation token from a provider, Play Integrity on Android, App Attest or DeviceCheck on iOS, a debug provider in development, and attaches it to requests to Firebase services such as Firestore, Storage, Functions, Realtime Database and AI Logic; with enforcement on, the backend rejects requests without a valid token, so scripts and tampered apps cannot use your Firebase project directly. Limited-use tokens add replay protection for important calls. It does not authenticate users, does not stop an attacker running the genuine app on a genuine device from consuming your quota, and does not protect non-Firebase backends unless you verify the token yourself through the Admin SDK. So it pairs with Firebase Auth or our own auth, per-user rate limits and security rules. For AI Logic, Firebase automatically enforced App Check in all projects on November 2, 2026, and unprotected calls now fail with a 403, so App Check integration, ideally with useLimitedUseAppCheckTokens and replay protection, is a release blocker, not an option.
 **Follow-ups:** How do you handle devices without Google Play services with App Check? What is the token TTL trade-off? How do you verify App Check tokens on your own backend?
 **Điểm interviewer muốn nghe:** Chứng minh app thật tới Firebase, không phải auth user, không chống abuse từ app thật.
 
@@ -1298,7 +1377,7 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** Trade-off UX vs an toàn, chứng nhận ISO 30107-3, injection attack không được giải quyết bởi liveness.
 
 ### Q56. What does PCI-DSS imply for a mobile app that handles cards?
-**A:** PCI-DSS applies to any system that stores, processes or transmits cardholder data, and the smartest mobile strategy is to minimize scope: never store the full PAN, CVV or track data; display masked numbers; capture card data through a certified PSP SDK so the PAN goes directly to the processor and the app only ever holds a token; use TLS 1.2 or better; keep PAN out of logs, crash reports, analytics, caches and screenshots; and treat any screen showing full card details as sensitive with step-up and FLAG_SECURE. If we are the issuer app, card data comes from the server already tokenized or masked, and revealing the full number is a privileged, audited operation. Tap-to-phone acceptance falls under the separate PCI MPoC standard with its own SDK requirements. The pentest and the PCI assessor will specifically check memory dumps, logs and local storage for PAN, so I test that myself with a proxy and a memory dump on a rooted device before they do.
+**A:** PCI-DSS applies to any system that stores, processes or transmits cardholder data, and the smartest mobile strategy is to minimize scope: never store the full PAN, CVV or track data; display masked numbers, which under PCI DSS v4.0.1 requirement 3.4.1 means at most the BIN and last four digits; capture card data through a certified PSP SDK so the PAN goes directly to the processor and the app only ever holds a token; use TLS 1.2 or better; keep PAN out of logs, crash reports, analytics, caches and screenshots; and treat any screen showing full card details as sensitive with step-up and FLAG_SECURE. If we are the issuer app, card data comes from the server already tokenized or masked, and revealing the full number is a privileged, audited operation. Tap-to-phone acceptance falls under the separate PCI MPoC standard with its own SDK requirements. Version-wise, v4.0.1 has been the only active PCI DSS since v4.0 retired at the end of 2024. The pentest and the PCI assessor will specifically check memory dumps, logs and local storage for PAN, so I test that myself with a proxy and a memory dump on a rooted device before they do.
 **Follow-ups:** What is the difference between tokenization and encryption here? Which SAQ applies when using a PSP SDK? How do you ensure third-party SDKs do not capture card input?
 **Điểm interviewer muốn nghe:** Giảm scope, PSP SDK + token, không PAN trong log/cache, tự test trước.
 
@@ -1318,8 +1397,8 @@ Cách dùng: với mỗi câu, mở đầu bằng threat model (ai tấn công, 
 **Điểm interviewer muốn nghe:** SMS không phải authenticator, device binding, step-up và tín hiệu server, quy định VN.
 
 ### Q60. Which Vietnamese banking regulations affect your Android work, and how do you map them to engineering?
-**A:** Two I work with directly. SBV Decision 2345 from 2023, effective July 2024, requires biometric verification matched against chip-based ID data for transfers above certain thresholds, which drives the eKYC pipeline, the biometric reference enrollment, and step-up logic in the transfer flow. Circular 50 from 2024, effective in 2025, sets security requirements for online banking services including the mobile app: things like detecting rooted or jailbroken devices, protecting against tampering, identifying devices, restricting operation when unknown accessibility services are enabled, and incident reporting duties; I treat each relevant clause as a line in our release checklist with an owning control, Play Integrity, hardening, device binding, accessibility checks. I keep the exact thresholds and clauses in a compliance document rather than from memory and check with the bank's compliance team before interpreting them, because the details are updated. Beyond banking, Decree 13 and the Personal Data Protection Law shape consent, data minimization and the Data safety form.
-**Follow-ups:** How did 2345 change your transfer UX? What do you do for users who cannot pass biometric matching? How do you evidence compliance to auditors?
+**A:** Two I work with directly. SBV Decision 2345 from December 2023, effective July 2024, introduced biometric verification matched against chip-based ID data for transfers above 10 million dong per transaction or 20 million per day, which drove the eKYC pipeline, the biometric reference enrollment, and step-up logic in the transfer flow; it was repealed from January 2025 by Decision 2872 and its rules moved into Circular 50/2024. Circular 50, effective January 2025 and amended by Circular 77/2025, sets security requirements for online banking including the mobile app: Article 8 requires obfuscation against decompiling, exiting and informing the user when it detects a debugger, emulator, hooking, repackaging or a rooted or jailbroken device, never remembering the login password, and verifying the customer on first use or a new device; Article 10 classifies transactions by risk with the 10 and 20 million thresholds; Article 11 sets OTP lifetimes such as five minutes for SMS and two for soft OTP, and biometric accuracy targets; I treat each relevant clause as a line in our release checklist with an owning control, Play Integrity, hardening, device binding, accessibility checks. I keep the exact thresholds and clauses in a compliance document rather than from memory and check with the bank's compliance team before interpreting them, because the details are updated. Beyond banking, the Personal Data Protection Law 91/2025, effective January 2026 with Decree 356/2025 replacing Decree 13/2023, shapes consent, data minimization and the Data safety form, and sets a 72-hour breach notification duty.
+**Follow-ups:** How did the 2345 rules, now in Circular 50, change your transfer UX? What do you do for users who cannot pass biometric matching? How do you evidence compliance to auditors?
 **Điểm interviewer muốn nghe:** Biết hai văn bản và ảnh hưởng kỹ thuật, trung thực về chi tiết, map vào checklist.
 
 ### Q61. How would you protect the app against a GoldDigger-style accessibility trojan end to end?
@@ -1366,7 +1445,7 @@ Làm trên side project (`compose-template` hoặc `kmp-template-impl`). Ghi k�
 
 ### Bài 4. Hardening nền tảng cho màn hình nhạy cảm (2 giờ)
 1. Màn hình "Số dư": `FLAG_SECURE` theo destination; `Dialog` với `SecureFlagPolicy.SecureOn`; chụp màn hình để xác nhận bị chặn, mở recents xem thumbnail.
-2. Nút "Xác nhận": `filterTouchesWhenObscured` (AndroidView hoặc API Compose tương đương, kiểm tra docs); cài một app overlay vô hại (ví dụ app lọc ánh sáng xanh) và xác nhận touch bị bỏ.
+2. Nút "Xác nhận": `filterTouchesWhenObscured` (đặt trên `ComposeView`/root view của màn hình, hoặc kiểm tra `FLAG_WINDOW_IS_PARTIALLY_OBSCURED` trong `pointerInteropFilter`, xem 6.6); cài một app overlay vô hại (ví dụ app lọc ánh sáng xanh) và xác nhận touch bị bỏ.
 3. `accessibilityDataSensitive` cho view số dư (API 34); bật TalkBack và một accessibility service test để xem khác biệt.
 4. Liệt kê accessibility service đang bật bằng `AccessibilityManager`, hiện cảnh báo nếu ngoài allowlist.
 5. Kiểm tra mọi `PendingIntent` trong project (notification, widget Glance, WorkManager) có `FLAG_IMMUTABLE`.
@@ -1388,7 +1467,7 @@ Làm trên side project (`compose-template` hoặc `kmp-template-impl`). Ghi k�
 
 ## Checklist tự đánh giá
 
-- [ ] Tôi mô tả được MASVS/MASTG, profile L1/L2/R, và dùng MASVS ID khi nói về pentest finding.
+- [ ] Tôi mô tả được MASVS/MASTG, MAS Testing Profiles (MAS-L1/L2/R/P, trước là level L1/L2/R), và dùng MASVS ID khi nói về pentest finding.
 - [ ] Tôi threat model được một feature trong 10 phút với asset, entry point, attacker, STRIDE và residual risk.
 - [ ] Tôi phát biểu và áp dụng được nguyên tắc "device owner là attacker, server quyết định".
 - [ ] Tôi giải thích được Keystore (TEE vs StrongBox), các flag user auth, attestation, và giới hạn.

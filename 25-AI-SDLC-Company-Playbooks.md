@@ -122,7 +122,7 @@
 
 ## 3. Quy trình chuẩn tham khảo (tổng hợp từ các công ty trên)
 
-Ghép AWS AI-DLC, GitHub Spec Kit, Spotify/Stripe (verifier và sandbox), Uber/Atlassian (AI review), Meta (lọc và review theo rủi ro) thành một quy trình bạn có thể đề xuất ở bất kỳ công ty nào, rồi cắt bớt theo quy mô ở mục 4. Bản làm theo từng bước của quy trình này (cho cá nhân và team) ở `26-AI-SDLC-Step-by-Step.md`.
+Ghép AWS AI-DLC, GitHub Spec Kit, Spotify/Stripe (verifier và sandbox), Uber/Atlassian (AI review), Meta (lọc và review theo rủi ro) thành một quy trình bạn có thể đề xuất ở bất kỳ công ty nào, rồi cắt bớt theo quy mô ở mục 4. Bản làm theo từng bước của quy trình này (cho cá nhân và team) ở `26-AI-SDLC-Step-by-Step.md`. **Mô hình pha chuẩn là 10 pha ở `26`**; bảng 7 pha dưới đây gộp intake+spec và implement+verify, ánh xạ: 0→1, 1→2, 2→3, 3→4, 4→5, 5→6+7, 6→8+9+10.
 
 ### 3.1 Bảy pha và cổng duyệt
 
@@ -136,7 +136,7 @@ Ghép AWS AI-DLC, GitHub Spec Kit, Spotify/Stripe (verifier và sandbox), Uber/A
 | 5. Review | AI review vòng đầu (lọc nit), rồi người review; mức review theo rủi ro (billing, auth, migration DB cần senior) | PR, nhãn `ai-assisted` | Người approve, không bao giờ là agent | GitHub, Uber, Atlassian, Meta DRS |
 | 6. Release và vận hành | Release notes nháp, staged rollout, triage crash, postmortem nháp | release draft, runbook | Người publish và quyết định rollout | AWS (người duyệt thay đổi production) |
 
-Hai lớp xuyên suốt: **Platform** (ai sở hữu harness: rule file, skill, MCP, sandbox, chọn model, chi phí) và **Measurement** (cycle time, review load, rework, change failure, chi phí, khảo sát dev).
+Hai lớp xuyên suốt: **Platform** (ai sở hữu harness: rule file, skill, MCP, sandbox, chọn model, chi phí) và **Measurement** (cycle time, review load, AI rework rate nội bộ, change fail rate, chi phí, khảo sát dev). "AI rework rate (nội bộ)" = % PR `ai-assisted` cần sửa lớn sau review, định nghĩa và công thức ở `24` mục 8.2; nó **khác** chỉ số DORA "deployment rework rate" (tỷ lệ deployment ngoài kế hoạch phát sinh do sự cố production, https://dora.dev/guides/dora-metrics-four-keys/ , kiểm tra 18/11/2026).
 
 ### 3.2 Vai trò
 | Vai | Trách nhiệm |
@@ -164,6 +164,8 @@ Hai lớp xuyên suốt: **Platform** (ai sở hữu harness: rule file, skill, 
 | Đo | Learning log | 3 chỉ số | 5-7 chỉ số + khảo sát | Dashboard, audit, chi phí theo team |
 | Owner cấu hình | Bạn | Tech lead | Platform/DevEx team | Platform + security + governance board |
 
+**Bảng này lấy gì từ đâu.** Mỗi hàng dựa trên thực hành đã có nguồn ở mục 1; chia theo cột quy mô là phán đoán của tài liệu này, không công ty nào công bố bảng như vậy. Context file và rule theo thư mục: Stripe (1.9), Grab rule cấu hình sẵn (1.13). Spec trước code, mob elaboration: GitHub Spec Kit (1.3), AWS AI-DLC (1.5). Plan duyệt, reviewer context mới: Google Elephant-Goldfish (1.1). Verifier, LLM judge, sandbox: Airbnb (1.7), Spotify (1.8), Stripe (1.9). Agent tự mở PR: GitHub Copilot coding agent (1.3), Spotify Honk (1.8), Stripe Minions (1.9). Người merge, review theo rủi ro: guardrail GitHub (1.3), Meta Diff Risk Score (1.4), Coinbase (1.11). Nhiều công cụ đã duyệt: Grab (1.13). Đo outcome: Booking.com (1.11), Atlassian (1.10). Policy enterprise: NIST AI 600-1 (mục 4.5). Ngưỡng 2-15, 15-150, 150+ kỹ sư là quy ước của tài liệu.
+
 ### 4.2 Cá nhân / freelancer (và dự án side project của bạn)
 - **Làm:** AGENTS.md + CLAUDE.md; plan trước việc lớn; commit trước mỗi lần chạy agent để giữ hoặc bỏ dễ dàng; test là definition of done; deny rule cho secret; learning log.
 - **Đừng:** đưa credential production cho agent; chạy `bypassPermissions` trên máy thật; dùng code khách hàng trong công cụ khách chưa duyệt.
@@ -173,7 +175,7 @@ Hai lớp xuyên suốt: **Platform** (ai sở hữu harness: rule file, skill, 
 ### 4.3 Startup (2-15 kỹ sư)
 - **Làm trong 2 tuần đầu:** policy 1 trang (công cụ, dữ liệu, "mọi PR có người review"); AI review vòng đầu tắt comment style; CI gate build/test/lint trước merge; PR nhỏ; gán cho agent việc tẻ nhạt; review thêm 1 người cho code thanh toán/auth.
 - **Đừng:** ép dùng bằng KPI "% code do AI"; cho agent CI quyền write và đọc comment của người ngoài.
-- **Đo:** PR cycle time, rework rate, chi phí/tháng.
+- **Đo:** PR cycle time, AI rework rate (nội bộ, `24` mục 8.2), chi phí/tháng.
 - **Từ:** DORA (AI stance rõ), Uber (lọc nhiễu), Spotify/Stripe (CI gate), GitHub (việc giao cho agent), Coinbase (review code liên quan tiền).
 
 ### 4.4 Scale-up (15-150 kỹ sư)
@@ -188,12 +190,12 @@ Hai lớp xuyên suốt: **Platform** (ai sở hữu harness: rule file, skill, 
 - **Từ:** Spotify, Stripe, GitHub (sandbox, không merge), Meta (review theo rủi ro), Amazon (sau sự cố), AWS adaptive AI-DLC (log), NIST, ISO.
 
 ### 4.6 Điều chỉnh riêng cho team mobile (công khai còn rất ít, đây là lợi thế của bạn)
-- **Verifier phải phủ cả iOS** với KMP: build framework iOS và chạy test `iosSimulatorArm64` khi đổi `commonMain` hoặc `iosMain`. Spotify tự nhận verifier của họ chưa phủ iOS; bạn nêu được điều này là điểm cộng.
-- **Test sinh tự động qua chuỗi lọc** như Meta TestGen-LLM (Kotlin/Android): build được → pass nhiều lần → tăng coverage, rồi mới đưa người review.
-- **UI:** screenshot test (Roborazzi, Compose Preview Screenshot Testing) làm verifier cho thay đổi UI do agent làm; E2E viết bằng ngôn ngữ tự nhiên (Journeys) hoặc Maestro (YAML deterministic, có MCP).
+- **Verifier phải phủ cả iOS** với KMP: build framework iOS và chạy test `iosSimulatorArm64` khi đổi `commonMain` hoặc `iosMain`; task `allTests` chạy test mọi target (https://kotlinlang.org/docs/multiplatform/multiplatform-run-tests.html#run-tests). Spotify tự nhận verifier của họ chỉ chạy Linux x86 nên chưa phủ iOS (1.8, https://engineering.atspotify.com/2025/12/feedback-loops-background-coding-agents-part-3); bạn nêu được điều này là điểm cộng.
+- **Test sinh tự động qua chuỗi lọc** như Meta TestGen-LLM (Kotlin/Android, https://arxiv.org/abs/2402.09171): build được → pass nhiều lần → tăng coverage, rồi mới đưa người review.
+- **UI:** screenshot test làm verifier cho thay đổi UI do agent làm. Compose Preview Screenshot Testing của Android Studio: `./gradlew updateDebugScreenshotTest` ghi ảnh chuẩn, `validateDebugScreenshotTest` so sánh (https://developer.android.com/studio/preview/compose-screenshot-testing). Roborazzi chạy trên JVM/Robolectric, có cả target Compose Multiplatform iOS: `recordRoborazziDebug`, `verifyRoborazziDebug` (https://github.com/takahirom/roborazzi). E2E viết bằng ngôn ngữ tự nhiên với Journeys for Android Studio (https://developer.android.com/studio/gemini/journeys) hoặc Maestro (flow YAML deterministic, có MCP server cho coding agent: https://docs.maestro.dev/get-started/maestro-mcp).
 - **Release:** agent soạn release notes và checklist QA theo vùng thay đổi; người quyết định % rollout và halt.
 - **Store policy:** checklist target SDK, Data safety, quyền mới trước mỗi release (agent kiểm tra manifest và diff).
-- **Migration mobile có ROI cao:** nâng AGP/Kotlin/Compose BOM, Navigation 2 sang 3, RxJava sang Flow, XML sang Compose (Views đã vào maintenance mode từ 5/2026), Room 2 sang Room 3.
+- **Migration mobile có ROI cao:** nâng AGP/Kotlin/Compose BOM, Navigation 2 sang 3, RxJava sang Flow, XML sang Compose (Google coi View components mà Compose thay thế, cùng Fragments, RecyclerView, ViewPager, là maintenance mode từ 19/5/2026: https://android-developers.googleblog.com/2026/05/android-ui-development-is-compose-first.html), Room 2 sang Room 3 (package `androidx.room3`, chỉ KSP, mọi thao tác DB là coroutine, cần `SQLiteDriver`; 3.0.0 stable 1/7/2026: https://developer.android.com/jetpack/androidx/releases/room3). Cả hai là migration có tiêu chí đúng/sai kiểm bằng máy (build, test, screenshot), đúng loại việc mục 0 điều 5 nói. Kiểm tra 18/11/2026.
 
 ## 5. Kế hoạch rollout 30 ngày (dùng cho câu "what would you do in your first month")
 
@@ -209,7 +211,7 @@ Câu mở đầu khi trả lời phỏng vấn: "I wouldn't start with a tool. I
 ## 6. Interview Q&A (English)
 
 ### Q1. How would you introduce AI-assisted development into our team?
-**A:** Baseline first: cycle time, review load, rework and change failure, plus a short survey. Then a two-week pilot with two volunteers on real work, building a shared context file, a few skills and an AI first-pass review in CI with nits turned off. Write a one-page policy covering tools, data, review and security. Roll out with a workshop, pairing and a sharing channel, and re-measure after a month. I'd borrow the gates from AWS's AI-DLC and GitHub's Spec Kit: spec, plan and merge are human-approved, and everything between is automated with deterministic checks.
+**A:** Baseline first: cycle time, review load, an internal rework rate on AI-assisted PRs (not DORA's deployment rework rate) and change fail rate, plus a short survey. Then a two-week pilot with two volunteers on real work, building a shared context file, a few skills and an AI first-pass review in CI with nits turned off. Write a one-page policy covering tools, data, review and security. Roll out with a workshop, pairing and a sharing channel, and re-measure after a month. I'd borrow the gates from AWS's AI-DLC and GitHub's Spec Kit: spec, plan and merge are human-approved, and everything between is automated with deterministic checks.
 **Follow-ups:** What would you measure first? How would you handle a team that resists?
 **Điểm interviewer muốn nghe:** Baseline, pilot, policy, gate, đo lại.
 

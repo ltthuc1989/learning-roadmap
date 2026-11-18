@@ -3,7 +3,7 @@
 > Mục tiêu: sau 4 tuần, bạn **thiết kế, vận hành và đo được** một quy trình phát triển có AI cho team mobile, giải thích được vì sao từng phần tồn tại, và chứng minh bằng repo thật. Đây là câu trả lời cho dòng JD "Experience with AI-assisted development, workflow automation, or AI tools is a must".
 > Thời lượng: 30% tổng thời gian học, khoảng 1 giờ mỗi ngày trong tuần + 2-3 giờ cuối tuần, tổng ~28 giờ. 70% còn lại vẫn theo `03-Roadmap-12-Weeks.md`.
 > Phạm vi: AI **trong quy trình làm phần mềm** (spec, code, review, test, CI/CD, release, vận hành, tài liệu, migration). AI **trong sản phẩm** (Gemini Nano, ML Kit) ở `10-AI-for-Mobile-Lead.md` mục 2, không lặp lại ở đây.
-> **Muốn biết làm gì, theo thứ tự nào: đọc `26-AI-SDLC-Step-by-Step.md` trước.** File này giải thích cơ chế; file 26 là runbook từng pha, kèm sách theo pha và cách tối ưu skill/agent bằng eval.
+> **Muốn biết làm gì, theo thứ tự nào: đọc `26-AI-SDLC-Step-by-Step.md` trước. Muốn biết thế nào là tốt (spec, PR, unit test, review, CI, release) để viết và chấm skill: `27-Engineering-Standards-Per-Phase.md`.** File này giải thích cơ chế; file 26 là runbook từng pha, kèm sách theo pha và cách tối ưu skill/agent bằng eval.
 > Đi kèm: `ai-sdlc-kit/` (đáp án tham khảo, chỉ mở sau khi tự làm lab), `25-AI-SDLC-Company-Playbooks.md` (quy trình của các công ty lớn và cách áp dụng theo quy mô).
 > Facts kiểm tra ngày 11/11/2026 từ docs chính thức (code.claude.com, platform.claude.com, docs.github.com, developer.android.com) và báo cáo DORA 2025, Stack Overflow 2026, METR, OWASP. Công cụ AI đổi hằng tháng: mọi tên lệnh, giá, version hãy kiểm tra lại tại link đi kèm trước khi nói trong phỏng vấn.
 
@@ -17,7 +17,7 @@ Một tháng không đủ để biết mọi công cụ. Nhưng đủ để đ�
 |---|---|---|
 | L0 Người dùng chat | Hỏi ChatGPT/Claude, copy code | Không có quy trình |
 | L1 Người dùng agent | Dùng Claude Code/Cursor/Copilot giao task, đọc diff | Ship được feature với agent, nhưng không giải thích được setup |
-| L2 Người vận hành | Có CLAUDE.md/AGENTS.md tốt, permissions, plan mode, verify loop, biết khi nào `/clear` | Repo có context file < 200 dòng, task có test làm "definition of done" |
+| L2 Người vận hành | Có CLAUDE.md/AGENTS.md tốt, permissions, plan mode, verify loop, biết khi nào `/clear` | Repo có context file < 200 dòng (mục tiêu docs chính thức), task có test làm "definition of done" |
 | L3 Người mở rộng | Tự viết skill, subagent, hook, dùng MCP, chạy song song bằng worktree, chạy headless | Ít nhất 3 skill + 2 subagent + 2 hook tự viết, giải thích được từng dòng |
 | L4 Người tự động hoá | AI trong CI (PR review, `@claude`, release notes), script headless có schema và ngân sách, hiểu agent loop ở tầng API | Workflow chạy thật trên GitHub, 1 agent loop tự viết bằng Kotlin |
 | L5 Người dẫn dắt | Đo impact, đặt policy, bảo mật (OWASP LLM/Agentic), chọn công cụ theo quy mô, đào tạo team | Báo cáo số đo 2 tuần, policy 1 trang, kể được câu chuyện 2 phút |
@@ -174,6 +174,7 @@ Năm pattern workflow kinh điển (nhớ tên để nói trong phỏng vấn): 
 ### 3.1 Context window là ngân sách, không phải kho chứa
 - Model đọc lại **toàn bộ** context ở mỗi lượt. Context dài thì chậm hơn, tốn tiền hơn, và model dễ "quên" phần giữa. Model Claude hiện tại có cửa sổ 1M token, nhưng to không có nghĩa là nên nhồi.
 - Mọi dòng trong CLAUDE.md bị đọc **ở mọi lượt của mọi session**. 200 dòng thừa x 50 lượt x 20 session mỗi tuần là rất nhiều token và nhiễu.
+- **Kích thước chuẩn của bộ tài liệu này: < 200 dòng mỗi file CLAUDE.md**, đúng câu của docs memory: "target under 200 lines per CLAUDE.md file. Longer files consume more context and reduce adherence" (https://code.claude.com/docs/en/memory#write-effective-instructions). Import `@path` giúp tổ chức nhưng **không** giảm chi phí context, vì file import được nạp cùng file gốc; muốn giảm thì dùng path-scoped rules trong `.claude/rules/` hoặc chuyển quy trình dài thành skill. Nhiều người tự đặt mục tiêu ngắn hơn: HumanLayer ghi root CLAUDE.md của họ "less than sixty lines" (https://www.humanlayer.dev/blog/writing-a-good-claude-md). Con số này khớp với `26` (kiểm tra 18/11/2026).
 - Xem context đang chứa gì: `/context`. Xem chi phí theo skill, subagent, MCP: `/usage`. Hai lệnh này nên chạy mỗi khi bạn thêm cấu hình mới.
 
 ### 3.2 Bốn cách tổ chức "luật của repo"
@@ -182,7 +183,7 @@ Năm pattern workflow kinh điển (nhớ tên để nói trong phỏng vấn): 
 |---|---|---|---|---|
 | A. Một CLAUDE.md lớn | Mọi luật, mọi quy trình trong 1 file | Đơn giản, dễ tìm | Tốn context, model bỏ qua phần giữa, khó bảo trì | Repo nhỏ, 1 người |
 | B. AGENTS.md chung + CLAUDE.md mỏng import `@AGENTS.md` | Luật chung trung lập công cụ, phần riêng Claude ngắn | Team dùng nhiều tool vẫn cùng luật; AGENTS.md là chuẩn mở (Agentic AI Foundation) | Phải giữ 2 file đồng bộ ý | Team nhiều tool (khuyến nghị) |
-| C. Luật thường trực tối thiểu + skills theo yêu cầu | CLAUDE.md < 100 dòng; quy trình dài (release, migration, scaffold) thành skill | Context gọn; quy trình chỉ nạp khi cần | Skill có thể không được kích hoạt nếu description kém | Repo lớn, quy trình nhiều |
+| C. Luật thường trực tối thiểu + skills theo yêu cầu | CLAUDE.md < 200 dòng theo docs chính thức (nhiều team tự đặt ngắn hơn, ~60-100 dòng); quy trình dài (release, migration, scaffold) thành skill | Context gọn; quy trình chỉ nạp khi cần | Skill có thể không được kích hoạt nếu description kém | Repo lớn, quy trình nhiều |
 | D. CLAUDE.md theo thư mục | `feature/billing/CLAUDE.md` chỉ nạp khi làm việc trong thư mục đó | Luật cục bộ đúng chỗ | Rải rác, khó review tổng thể | Monorepo, module có luật riêng (billing, security) |
 
 Khuyến nghị cho bạn: **B + C** (đúng như `ai-sdlc-kit`), thêm D cho `core/billing` và `core/datasource` nếu có luật đặc thù.
@@ -246,7 +247,7 @@ Deny rule giữ hiệu lực ở **mọi** mode, kể cả bypass. Đó là lý 
 Cách viết rule: `Bash(./gradlew test*)`, `Read(./**/*.jks)`. Kiểm tra cú pháp và thứ tự ưu tiên tại docs permissions trước khi dùng cho team.
 
 ### 4.3 Hooks: luật bằng code
-Hook là lệnh (hoặc HTTP, MCP tool, prompt) chạy ở các sự kiện của vòng lặp: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, `PreCompact`... (docs liệt kê 33 sự kiện). Hook `command` nhận JSON qua stdin; **exit 0** là ổn, **exit 2** là chặn (stderr gửi lại cho model làm lý do), mã khác là lỗi không chặn. PreToolUse còn có thể trả JSON `permissionDecision: allow | deny | ask | defer`.
+Hook là handler thuộc 1 trong 5 loại (`command`, `http`, `mcp_tool`, `prompt`, `agent`; `agent` còn experimental) chạy ở các sự kiện của vòng lặp: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, `PreCompact`... (bảng lifecycle ở https://code.claude.com/docs/en/hooks liệt kê đúng 33 sự kiện, kiểm tra 18/11/2026; con số này tăng theo bản phát hành, đừng học thuộc). Hook `command` nhận JSON qua stdin; **exit 0** là ổn, **exit 2** là chặn (stderr gửi lại cho model làm lý do), mã khác là lỗi không chặn. PreToolUse còn có thể trả JSON `permissionDecision: allow | deny | ask | defer`.
 
 Năm hook có giá trị nhất cho team mobile, theo thứ tự nên làm:
 | Hook | Sự kiện | Giá trị | Chi phí |
@@ -317,7 +318,7 @@ Subagent là một vòng lặp agent con với context window riêng, system pro
 Nhược: tốn thêm token (context con), kết quả bị tóm tắt nên mất chi tiết, debug khó hơn. Đừng tạo subagent cho mọi thứ: 2-4 subagent có vai trò rõ là đủ. Thay thế khác: chạy **session thứ hai trong worktree khác** làm reviewer; độc lập hơn nữa, nhưng thao tác thủ công.
 
 ### 5.4 MCP: nối agent với hệ thống ngoài
-MCP (Model Context Protocol) chuẩn hoá cách một ứng dụng AI (client) dùng tool, resource, prompt từ một server. Spec mới nhất 2026-07-28 (core stateless, extension Tasks, MCP Apps); MCP thuộc Agentic AI Foundation (Linux Foundation) từ 12/2025.
+MCP (Model Context Protocol) chuẩn hoá cách một ứng dụng AI (client) dùng tool, resource, prompt từ một server. Spec mới nhất 2026-07-28 (https://modelcontextprotocol.io/specification/2026-07-28 : base protocol "stateless, self-contained requests", capability negotiation theo từng request; extension opt-in gồm Tasks, MCP Apps, Skills over MCP; kiểm tra 18/11/2026); MCP thuộc Agentic AI Foundation (Linux Foundation) từ 12/2025.
 - Thêm server: `claude mcp add --transport http <name> <url>` hoặc stdio `claude mcp add --transport stdio <name> -- <command>`. Scope: `local` (mặc định), `project` (`.mcp.json` commit chung), `user`.
 - MCP hữu ích cho mobile team: GitHub (issue, PR), Jira/Linear, Figma (design context), Firebase, Sentry/Crashlytics (crash), docs nội bộ, Maestro (UI test bằng YAML deterministic, có MCP), Android CLI / Android Studio.
 - **Ưu:** viết 1 lần, mọi client hỗ trợ MCP dùng được; agent lấy dữ liệu thật thay vì đoán.
@@ -334,7 +335,8 @@ MCP (Model Context Protocol) chuẩn hoá cách một ứng dụng AI (client) d
 - Subagents: https://code.claude.com/docs/en/sub-agents
 - MCP trong Claude Code: https://code.claude.com/docs/en/mcp , spec: https://modelcontextprotocol.io
 - Worktrees: https://code.claude.com/docs/en/worktrees
-- MCP tool poisoning: https://invariantlabs.ai/blog/mcp-github-vulnerability
+- MCP tool poisoning: https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks
+- GitHub MCP vulnerability (prompt injection qua issue): https://invariantlabs.ai/blog/mcp-github-vulnerability
 
 ## 6. AI qua từng pha của SDLC
 
@@ -342,20 +344,22 @@ Câu hỏi phỏng vấn "How do you use AI in your development process?" cần 
 
 ### 6.1 Bảng pha: AI làm gì, người làm gì, rủi ro, đo gì
 
-| Pha | AI làm tốt | Người phải làm | Rủi ro chính | Đo bằng | Trong kit |
-|---|---|---|---|---|---|
-| **Requirement / spec** | Biến yêu cầu thành acceptance criteria, liệt kê edge case (offline, process death, RTL, a11y), câu hỏi mở | Duyệt spec, chốt phạm vi với PM | Spec "nghe hay" nhưng sai nghiệp vụ | Số câu hỏi bị phát hiện muộn ở review | `spec-to-tasks` |
-| **Design / kiến trúc** | Liệt kê phương án, trade-off, viết nháp ADR, vẽ sơ đồ mermaid | Quyết định, chịu trách nhiệm | Chọn phương án phổ biến thay vì phù hợp | ADR có "revisit when" | `write-adr`, plan mode |
-| **Implementation** | Code theo plan, scaffold, refactor cơ học, migration hàng loạt | Chia task nhỏ, đặt definition of done, review từng diff | Code chạy được nhưng sai lifecycle/concurrency; API cũ; package bịa | Rework rate, số vòng sửa | CLAUDE.md, `new-feature-module` |
-| **Testing** | Viết unit test, tìm edge case, sinh test data, viết E2E bằng ngôn ngữ tự nhiên (Journeys), Maestro flow | Kiểm tra test có assert hành vi thật; không để AI sửa test cho "xanh" | Test bám implementation; test tautology | Mutation score hoặc "test fail khi bug được cấy" | `test-writer` |
-| **Code review** | Vòng review đầu: lỗi phổ biến, security, test thiếu | Review thiết kế, nghiệp vụ, approve | Người ỷ vào bot, bỏ review | Thời gian review, defect escape | `code-reviewer`, `claude-pr-review.yml` |
-| **CI/CD** | Review bot, `@claude` sửa CI fail, soạn release notes, phân tích log build fail | Duyệt, publish | Agent có quyền write trên repo + đọc input không tin cậy | Thời gian từ PR tới merge | 3 workflow |
-| **Release** | Release notes đa ngôn ngữ, checklist QA theo vùng thay đổi, kiểm tra Play policy | Quyết định rollout %, halt | Notes bịa tính năng | Số lỗi release notes | `release-notes`, `ai-release-notes.yml` |
-| **Vận hành** | Triage crash hàng loạt, gom cụm, gợi ý root cause, soạn postmortem nháp | Xác nhận root cause, quyết định fix | Kết luận tự tin trên trace bị obfuscate | Thời gian từ crash tới fix | `crash_triage.py`, `fix-crash` |
-| **Tài liệu / tri thức** | Cập nhật README, onboarding doc, giải thích module cho người mới | Kiểm tra đúng sự thật | Tài liệu sai nhưng trôi chảy | Thời gian onboarding | `pr_describe.py` |
-| **Bảo trì / migration** | Nâng version hàng loạt (AGP, Kotlin, Compose), đổi API (Nav2 sang Nav3, RxJava sang Flow), dọn deprecation | Chia đợt, kiểm tra từng đợt | Thay đổi lớn khó review | % file migrate tự động pass CI | worktree, `/batch` |
+| Pha | AI làm tốt | Người phải làm | Rủi ro chính | Đo bằng | Trong kit | Pha `26` / chuẩn `27` |
+|---|---|---|---|---|---|---|
+| **Requirement / spec** | Biến yêu cầu thành acceptance criteria, liệt kê edge case (offline, process death, RTL, a11y), câu hỏi mở | Duyệt spec, chốt phạm vi với PM | Spec "nghe hay" nhưng sai nghiệp vụ | Số câu hỏi bị phát hiện muộn ở review | `spec-to-tasks` | Pha 1-2 / `27` §1 |
+| **Design / kiến trúc** | Liệt kê phương án, trade-off, viết nháp ADR, vẽ sơ đồ mermaid | Quyết định, chịu trách nhiệm | Chọn phương án phổ biến thay vì phù hợp | ADR có "revisit when" | `write-adr`, plan mode | Pha 3 / `27` §2 |
+| **Implementation** | Code theo plan, scaffold, refactor cơ học, migration hàng loạt | Chia task nhỏ, đặt definition of done, review từng diff | Code chạy được nhưng sai lifecycle/concurrency; API cũ; package bịa | AI rework rate (nội bộ, mục 8.2), số vòng sửa | CLAUDE.md, `new-feature-module` | Pha 4 / `27` §3 |
+| **Testing** | Viết unit test, tìm edge case, sinh test data, viết E2E bằng ngôn ngữ tự nhiên (Journeys), Maestro flow | Kiểm tra test có assert hành vi thật; không để AI sửa test cho "xanh" | Test bám implementation; test tautology | Mutation score hoặc "test fail khi bug được cấy" | `test-writer` | Pha 5 / `27` §4 |
+| **Code review** | Vòng review đầu: lỗi phổ biến, security, test thiếu | Review thiết kế, nghiệp vụ, approve | Người ỷ vào bot, bỏ review | Thời gian review, defect escape | `code-reviewer`, `claude-pr-review.yml` | Pha 6-7 / `27` §6, §7 |
+| **CI/CD** | Review bot, `@claude` sửa CI fail, soạn release notes, phân tích log build fail | Duyệt, publish | Agent có quyền write trên repo + đọc input không tin cậy | Thời gian từ PR tới merge | 3 workflow | Pha 8 / `27` §8 |
+| **Release** | Release notes đa ngôn ngữ, checklist QA theo vùng thay đổi, kiểm tra Play policy | Quyết định rollout %, halt | Notes bịa tính năng | Số lỗi release notes | `release-notes`, `ai-release-notes.yml` | Pha 9 / `27` §9 |
+| **Vận hành** | Triage crash hàng loạt, gom cụm, gợi ý root cause, soạn postmortem nháp | Xác nhận root cause, quyết định fix | Kết luận tự tin trên trace bị obfuscate | Thời gian từ crash tới fix | `crash_triage.py`, `fix-crash` | Pha 9-10 / `27` §10 |
+| **Tài liệu / tri thức** | Cập nhật README, onboarding doc, giải thích module cho người mới | Kiểm tra đúng sự thật | Tài liệu sai nhưng trôi chảy | Thời gian onboarding | `pr_describe.py` | Pha 6 (mô tả PR), Pha 10 / `27` §6 |
+| **Bảo trì / migration** | Nâng version hàng loạt (AGP, Kotlin, Compose), đổi API (Nav2 sang Nav3, RxJava sang Flow), dọn deprecation | Chia đợt, kiểm tra từng đợt | Thay đổi lớn khó review | % file migrate tự động pass CI | worktree, `/batch` | Pha 4-8 theo đợt / `27` §3, §8 |
 
-Theo báo cáo công khai của các công ty lớn (chi tiết ở `25-AI-SDLC-Company-Playbooks.md`), **migration quy mô lớn và test** là nơi ROI cao nhất, vì việc lặp lại, có tiêu chí đúng/sai rõ.
+Cột cuối nối mỗi hàng với **pha chuẩn ở `26`** (mô hình 10 pha) và **mục chuẩn kỹ thuật ở `27`** (thế nào là spec, test, PR, review tốt); bảng này chỉ là khung trả lời phỏng vấn, chi tiết từng pha không lặp lại ở đây.
+
+Về ROI: các báo cáo mà `25` tổng hợp (mục 0 điều 5 và mục 1: Google migration int32 sang int64 và JUnit3 sang JUnit4 theo arXiv 2501.06972, Amazon nâng cấp Java bằng Amazon Q, Meta TestGen-LLM sinh test Kotlin) cho thấy **migration quy mô lớn và sinh test** là nơi lợi ích được chứng minh rõ nhất, vì việc lặp lại và có tiêu chí đúng/sai kiểm bằng máy. Đây là số liệu công ty tự báo cáo, không phải nghiên cứu ROI độc lập; khi phỏng vấn nói "best-documented", đừng nói "highest ROI".
 
 ### 6.2 Quy trình chuẩn cho một feature (dùng hằng ngày)
 ```mermaid
@@ -370,14 +374,14 @@ flowchart LR
 ```
 Ba điểm người **bắt buộc** có mặt: duyệt spec, duyệt plan, approve PR. Còn lại agent làm, người kiểm.
 
-Phiên bản chi tiết từng bước (10 pha, mỗi pha có mục đích, sách cần đọc, spec + rubric + golden set cho artifact, lab) nằm ở `26-AI-SDLC-Step-by-Step.md`. Lab 2.6 ở mục 11 được thay bằng chuỗi lab 26.1-26.7.
+**Mô hình pha chuẩn của bộ tài liệu là 10 pha ở `26`**; sơ đồ 8 bước ở trên là bản rút gọn cũ, giữ để tham khảo. Phiên bản chi tiết từng bước (10 pha, mỗi pha có mục đích, sách cần đọc, spec + rubric + golden set cho artifact, lab) nằm ở `26-AI-SDLC-Step-by-Step.md`. Lab 2.6 ở mục 11 được thay bằng chuỗi lab 26.1-26.7.
 
 ### 6.3 Biết nhiều công cụ ở mức so sánh (đi sâu 1, hiểu 5)
 | Công cụ | Điểm mạnh | File context | Ghi chú 11/2026 |
 |---|---|---|---|
 | **Claude Code** | Agent terminal/IDE/web, hooks, skills, subagents, MCP, headless, GitHub Action | `CLAUDE.md` (+ import `AGENTS.md`) | 66% người dùng coding agent (Stack Overflow 2026) |
 | **GitHub Copilot** | Tích hợp GitHub: coding agent nhận issue tạo PR, code review, CLI (GA 2/2026) | `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, đọc cả `AGENTS.md`/`CLAUDE.md` | Tính phí theo AI Credits từ 1/6/2026 |
-| **Cursor** | IDE AI-first, cloud agents, Bugbot review, đã mua Graphite | `.cursor/rules` (kiểm tra docs) | Gói Premium trở lên mới có cloud agents/Bugbot |
+| **Cursor** | IDE AI-first, cloud agents, Bugbot review, đã mua Graphite | `.cursor/rules/*.mdc`, đọc cả `AGENTS.md` (https://cursor.com/docs/context/rules) | Gói Premium trở lên mới có cloud agents/Bugbot |
 | **OpenAI Codex** | CLI, cloud, IDE, `codex-action` | `AGENTS.md` | Có trong các gói ChatGPT |
 | **Gemini in Android Studio** | Agent Mode trong IDE Android, Journeys (E2E bằng ngôn ngữ tự nhiên), skills, điều khiển device | `AGENTS.md` (root, module, thư mục con) | Rabbit 2 Canary: Bring Your Own Agent qua ACP |
 | **Antigravity (Google)** | Thay Gemini CLI từ 6/2026; desktop, CLI, SDK | | Giá đổi nhiều lần, kiểm tra trước khi dùng |
@@ -418,20 +422,26 @@ claude --bare -p "..."              # bỏ qua hooks, skills, MCP, CLAUDE.md: t�
 ```
 Docs best practices: chỉ để chạy không người khi đã định nghĩa **done, bước verify, phạm vi được phép, điểm dừng, và người review cuối**.
 
-### 7.3 Mười automation đáng làm cho team mobile (xếp theo ROI)
-1. AI review vòng đầu cho mọi PR (`claude-pr-review.yml`).
-2. `@claude` sửa CI fail / lint / test fail trên PR (`claude-mention.yml`).
-3. Release notes đa ngôn ngữ khi tag (`ai-release-notes.yml`).
-4. Triage crash hằng ngày từ export Crashlytics, gom cụm, gán module (`crash_triage.py`).
-5. PR description từ diff (`pr_describe.py`).
-6. Dịch và kiểm tra strings mới (`values-vi`, độ dài, placeholder) khi PR đổi `strings.xml`.
-7. Nâng dependency theo đợt: Renovate/Dependabot mở PR, agent đọc changelog, sửa breaking change, chạy test.
-8. Kiểm tra Play policy/target SDK trước release (checklist + đọc manifest).
-9. Tóm tắt review store 1 sao hằng tuần, gom chủ đề, link tới crash.
-10. Onboarding: agent trả lời câu hỏi về repo cho người mới (`kotlin-agent-loop` là phiên bản tối giản).
+### 7.3 Mười automation đáng làm cho team mobile (xếp theo thứ tự nên làm)
+Mỗi automation phải ghi được 3 thứ trước khi bật: **trigger** (sự kiện nào), **quyền tối thiểu** (block `permissions:` của job, hoặc tool được phép), **tiêu chí pass** (khi nào coi là chạy đúng). Trigger và quyền dưới đây lấy theo docs https://code.claude.com/docs/en/github-actions (mục "Respond to @claude mentions", "Run a skill", "Run on a schedule", "Who can trigger runs") và các workflow mẫu ở https://github.com/anthropics/claude-code-action/tree/main/examples (kiểm tra 18/11/2026). Mọi workflow dùng `anthropics/claude-code-action@v1` đều cần `id-token: write` cho xác thực mặc định qua GitHub App.
+
+| # | Automation | Trigger | Quyền tối thiểu | Tiêu chí pass |
+|---|---|---|---|---|
+| 1 | AI review vòng đầu (`claude-pr-review.yml`) | `pull_request: [opened, synchronize, ready_for_review, reopened]` | `contents: read`, `pull-requests: read`, `issues: read`; chỉ cho tool `mcp__github_inline_comment__create_inline_comment` qua `claude_args` (mẫu docs "Run a skill"; comment được đăng bằng token của Claude GitHub App nên `GITHUB_TOKEN` chỉ cần `read`, kit đang để `pull-requests: write` dư quyền; mẫu `pr-review-filtered-paths.yml` lọc theo `paths:`) | Bắt được bug cấy sẵn trên nhánh thử; tỷ lệ comment được xử lý ≥ 50% sau 2 tuần; không chạy trên draft |
+| 2 | `@claude` sửa CI/lint/test fail (`claude-mention.yml`) | `issue_comment`, `pull_request_review_comment` `[created]` có `@claude` | `contents: write`, `pull-requests: write`, `issues: write`, `actions: read`; action tự chặn người không có quyền write và bot (`allowed_bots`) | Commit mới làm job CI chuyển xanh; diff chỉ đụng file liên quan lỗi |
+| 3 | Release notes khi tag (`ai-release-notes.yml`) | `push: tags: ["v*"]` | `contents: write` (tạo release draft); tool chỉ `git log/describe/tag`, `Read`, `Write` | Mọi dòng notes trỏ được về commit/PR có thật; người publish |
+| 4 | Triage crash hằng ngày (`crash_triage.py`) | `schedule` (cron) hoặc cron local | Chỉ đọc file export Crashlytics; headless `--allowedTools "Read,Grep"` + `--json-schema` | JSON hợp lệ theo schema; mỗi cụm gán đúng module trên 10 crash đã biết |
+| 5 | PR description từ diff (`pr_describe.py`) | Người chạy trước khi mở PR, hoặc `pull_request: [opened]` | `contents: read`, `pull-requests: write` nếu ghi vào PR | Mô tả có đủ mục template `27` §6; không nhắc file không có trong diff |
+| 6 | Dịch và kiểm tra strings | `pull_request` với `paths: ["**/res/values/strings.xml"]` | `contents: write` trên nhánh PR (commit `values-vi`) | Placeholder (`%1$s`, `%d`) khớp 100%; lint `MissingTranslation` sạch |
+| 7 | Nâng dependency theo đợt | PR do Renovate/Dependabot mở (`pull_request`, lọc `github.actor`; thêm bot vào `allowed_bots`) | `contents: write`, `pull-requests: write` | Build + unit test xanh; agent ghi breaking change đọc được từ changelog |
+| 8 | Kiểm tra Play policy / target SDK | `pull_request` vào nhánh release, hoặc `workflow_dispatch` | `contents: read` | Checklist target SDK, permission mới, Data safety đủ mục; người ký |
+| 9 | Tóm tắt review store 1 sao | `schedule` hằng tuần | Chỉ đọc export review; không quyền repo | Mỗi chủ đề có ≥ 3 review dẫn chứng; link được tới crash cluster nếu có |
+| 10 | Onboarding Q&A về repo (`kotlin-agent-loop` tối giản) | Người hỏi | Chỉ tool đọc (`Read`, `Grep`, `Glob`) | Trả lời đúng 8/10 câu trong bộ câu hỏi chuẩn, có trích file:dòng |
+
+Mẫu chính chủ đáng đọc cho mục 2 và 4: `ci-failure-auto-fix.yml` (trigger `workflow_run` khi workflow "CI" `completed` với `conclusion == 'failure'`, quyền `contents: write`, `pull-requests: write`, `actions: read`) và `test-failure-analysis.yml` (phân loại flaky bằng structured output, chỉ hành động khi `confidence >= 0.7`). Chi tiết thiết kế CI xem `26` Pha 8 và chuẩn `27` §8.
 
 ### 7.4 Tầng API: hiểu để quyết định đúng
-- **Model hiện tại** (docs 11/2026): `claude-fable-5-2` (suy luận khó, agent dài), `claude-opus-5-5` (mặc định cho coding agent), `claude-sonnet-5-5` (cân bằng), `claude-haiku-5-5` (phân loại, trích xuất, routing, rẻ nhất). Giá thay đổi; kiểm tra trang models trước khi tính ngân sách.
+- **Model hiện tại** (https://platform.claude.com/docs/en/about-claude/models/overview , kiểm tra 18/11/2026): `claude-fable-5-2` ("demanding reasoning and long-horizon agentic work", $8/$40 mỗi MTok input/output), `claude-opus-5-5` (docs khuyên bắt đầu từ đây cho phần lớn workload, $4/$20), `claude-sonnet-5-5` (cân bằng tốc độ và trí tuệ, $2/$10), `claude-haiku-5-5` (phân loại, trích xuất, routing, từ $0.10/$0.50). Cả 4 có context 1M token, max output 128K. Giá đổi theo thời gian; tính ngân sách thì mở lại trang này.
 - **Tool use loop:** gửi `tools` (name, description, input_schema) → model trả `stop_reason: "tool_use"` + block `tool_use` → code của bạn chạy tool → gửi `tool_result` → lặp tới `end_turn`. Lab 3.4 tự viết vòng này bằng Kotlin.
 - **Structured outputs:** JSON theo schema (`output_config.format` loại `json_schema`, hoặc `strict: true` trên tool); dùng cho mọi output mà code phía sau cần parse.
 - **Prompt caching:** đặt phần cố định (tools, system, tài liệu dài) lên đầu, đánh dấu `cache_control`; đọc từ cache rẻ hơn nhiều so với input thường và không tính vào giới hạn ITPM. Đổi một phần phía trước làm mất cache phía sau.
@@ -457,15 +467,18 @@ Docs best practices: chỉ để chạy không người khi đã định nghĩa 
 - Đây là cơ hội của bạn: **lead nào có số đo thì nổi bật**.
 
 ### 8.2 Bộ chỉ số cho một team mobile (chọn 5)
-| Chỉ số | Cách lấy | Ý nghĩa |
-|---|---|---|
-| PR cycle time (mở tới merge) | GitHub API / Insights | Tốc độ |
-| Review time và số vòng review | GitHub | AI review vòng đầu có giảm tải không |
-| Rework rate: % PR `ai-assisted` cần sửa lớn sau review | Nhãn PR + đếm | Chất lượng output AI |
-| Change failure rate, crash-free users sau release | DORA + Crashlytics | AI có làm hỏng production không |
-| Defect escape: bug lọt production | Issue tracker | Chất lượng tổng |
-| Chi phí AI mỗi PR / mỗi dev | `/usage`, `total_cost_usd`, billing | Bền vững |
-| Mức độ tin tưởng và hài lòng của dev | Khảo sát 3 câu mỗi 2 tuần | Adoption thật |
+| Chỉ số | Định nghĩa / công thức | Cách lấy | Ý nghĩa |
+|---|---|---|---|
+| PR cycle time | Trung vị của (`merged_at` − `created_at`) trên các PR merge trong kỳ; báo trung vị và p90, không báo trung bình | GitHub API / Insights | Tốc độ |
+| Review time và số vòng review | Thời gian từ lúc PR ready tới review đầu tiên; số lần reviewer bấm "Request changes" mỗi PR | GitHub | AI review vòng đầu có giảm tải không |
+| **AI rework rate (nội bộ)** | Số PR nhãn `ai-assisted` cần sửa lớn sau review ÷ tổng PR `ai-assisted` merge trong kỳ. "Sửa lớn" phải định nghĩa trước, ví dụ: ≥ 1 vòng "Request changes" về logic, hoặc diff sau review > 30% diff ban đầu | Nhãn PR + đếm | Chất lượng output AI |
+| Change fail rate (DORA) | Số deployment cần can thiệp ngay (rollback, hotfix) ÷ tổng deployment. Với mobile: release cần halt rollout hoặc hotfix ÷ tổng release | DORA + Play Console + Crashlytics | AI có làm hỏng production không |
+| Crash-free users | % user không gặp crash trong kỳ (định nghĩa của Crashlytics) | Crashlytics | Ổn định thực tế |
+| Defect escape | Bug tìm thấy sau release ÷ (bug trước release + sau release), theo từng release | Issue tracker | Chất lượng tổng |
+| Chi phí AI mỗi PR / mỗi dev | Tổng chi phí AI trong kỳ ÷ số PR merge (hoặc ÷ số dev) | `/usage`, `total_cost_usd`, billing | Bền vững |
+| Mức độ tin tưởng và hài lòng của dev | Điểm trung bình 1-5 của 3 câu khảo sát, cùng câu hỏi mỗi 2 tuần | Khảo sát | Adoption thật |
+
+**Đừng nhầm hai chữ "rework".** "AI rework rate" ở trên là chỉ số **nội bộ** của bộ tài liệu này, đo ở tầng PR. DORA có chỉ số khác tên gần giống: **deployment rework rate** = "the ratio of deployments that are unplanned but happen as a result of an incident in production", tức đo ở tầng deployment, cùng nhóm "instability" với change fail rate (https://dora.dev/guides/dora-metrics-four-keys/ , kiểm tra 18/11/2026). Khi phỏng vấn nói "rework on AI-assisted PRs" thì nói rõ là chỉ số tự định nghĩa, không phải DORA.
 
 ### 8.3 Thí nghiệm trên chính mình (tuần 4)
 Chọn 6 task tương đương: 3 làm theo quy trình mới (spec → plan → test → agent → verify), 3 làm kiểu cũ hoặc agent không cấu hình. Ghi thời gian, số vòng sửa, bug sau review, chi phí. Không khoa học tuyệt đối, nhưng đủ để kể trung thực: "Trên 6 task, quy trình mới giảm số vòng sửa từ X xuống Y; thời gian không giảm ở task UI vì...". Câu trả lời có số và có giới hạn thì đáng tin hơn "AI làm tôi nhanh gấp 10".
@@ -523,7 +536,23 @@ OWASP Top 10 cho Agentic Applications 2026 bổ sung góc agent: goal hijack, to
 10. Managed settings (cấp tổ chức) cho luật mà cá nhân không được ghi đè.
 
 ### 9.4 Policy AI cho team (1 trang, viết ở tuần 4)
-Nội dung tối thiểu: (1) công cụ được phép và gói (dữ liệu có bị dùng để train không, retention); (2) dữ liệu được/không được đưa vào AI (code khách hàng, PII, secret); (3) luật review: người chịu trách nhiệm code AI như code mình, PR gắn nhãn; (4) luật bảo mật (mục 9.3); (5) đo gì, báo cáo khi nào; (6) đào tạo và "AI-off" cho junior; (7) ai sở hữu cấu hình (CLAUDE.md, skills, workflow). Bài học Samsung 2023 (rò mã nguồn qua chatbot) là ví dụ kinh điển cho mục (2). Mẫu đầy đủ ở `10-AI-for-Mobile-Lead.md` mục 3.10; quy trình theo quy mô ở `25-AI-SDLC-Company-Playbooks.md`.
+Mẫu dưới đây là khung 1 trang: mỗi heading một dòng, bạn điền giá trị của team. Cột cuối map tới hai khung chính chủ: **NIST AI 600-1** "Generative AI Profile" (7/2024, https://doi.org/10.6028/NIST.AI.600-1 ; mục 2 liệt kê 12 rủi ro, mục 3 là hành động gợi ý theo 4 chức năng GOVERN/MAP/MEASURE/MANAGE của AI RMF) và **OWASP Top 10 for LLM Applications 2025** (https://genai.owasp.org/llm-top-10/). Kiểm tra 18/11/2026.
+
+| # | Heading | Một dòng nội dung (ví dụ) | Map NIST AI 600-1 §2 / OWASP |
+|---|---|---|---|
+| 1 | Mục đích và phạm vi | Áp dụng cho mọi việc dùng AI khi viết, review, test, release code của team | GOVERN |
+| 2 | Công cụ được phép | Danh sách tool + gói (dữ liệu không dùng để train, retention bao lâu); tool khác phải xin duyệt | §2.12 Value Chain and Component Integration; LLM03 Supply Chain |
+| 3 | Dữ liệu cấm đưa vào AI | Secret, keystore, PII người dùng, code khách hàng chưa được hợp đồng cho phép | §2.4 Data Privacy, §2.9 Information Security; LLM02 Sensitive Information Disclosure |
+| 4 | Trách nhiệm và review | Người mở PR chịu trách nhiệm code AI như code mình; PR gắn nhãn `ai-assisted`; luôn có người approve | §2.7 Human-AI Configuration, §2.2 Confabulation; LLM09 Misinformation |
+| 5 | Quyền của agent | Allow hẹp, deny secret, CI không cho người ngoài kích hoạt, quyền workflow tối thiểu (mục 9.3) | §2.9; LLM06 Excessive Agency, LLM01 Prompt Injection |
+| 6 | Dependency và output | Package mới phải người duyệt; không chạy thẳng lệnh/SQL do model sinh | §2.12; LLM03, LLM05 Improper Output Handling |
+| 7 | Bản quyền và license | Không chấp nhận code có license lạ; ghi nguồn khi agent copy | §2.10 Intellectual Property |
+| 8 | Chi phí và giới hạn | Trần `--max-turns`, `--max-budget-usd` cho mọi automation; báo chi phí hằng tháng | LLM10 Unbounded Consumption |
+| 9 | Đo và báo cáo | 5 chỉ số mục 8.2, báo cáo 2 tuần một lần trong 2 tháng đầu | MEASURE |
+| 10 | Đào tạo và "AI-off" | Onboarding 1 giờ; junior có task AI-off để giữ kỹ năng nền | GOVERN, §2.7 |
+| 11 | Sở hữu cấu hình và sự cố | Ai sở hữu CLAUDE.md, skills, workflow; báo sự cố AI (lộ dữ liệu, PR sai) cho ai, trong bao lâu | MANAGE; LLM04 Data and Model Poisoning, LLM07 System Prompt Leakage |
+
+Bài học Samsung 2023 (rò mã nguồn qua chatbot) là ví dụ kinh điển cho dòng 3. Mẫu đầy đủ ở `10-AI-for-Mobile-Lead.md` mục 3.10; quy trình theo quy mô ở `25-AI-SDLC-Company-Playbooks.md` mục 4.
 
 **Đọc thêm:**
 - OWASP GenAI Security Project: https://genai.owasp.org/llm-top-10/
@@ -551,7 +580,7 @@ Mỗi tuần khoảng 7 giờ: 5 buổi x 1 giờ trong tuần + 1 buổi cuối
 | Cuối tuần | So bản của bạn với kit; sửa; ghi 3 khác biệt vào log. Ghi âm 3 phút EN: "How I set up an AI agent for an Android repo" | |
 
 **Lab 1.1: context file của chính bạn**
-- Mục tiêu: AGENTS.md (trung lập công cụ) + CLAUDE.md (< 100 dòng, import `@AGENTS.md`).
+- Mục tiêu: AGENTS.md (trung lập công cụ) + CLAUDE.md (< 200 dòng theo docs chính thức; nên tự đặt mục tiêu ngắn hơn, ~60-100 dòng như HumanLayer; import `@AGENTS.md`).
 - Bước: (1) liệt kê 10 điều agent hay sai trên repo này (Hilt trong commonMain? `NavHost`? quên `values-vi`?); (2) với mỗi điều, quyết định: ghi vào context file, hay đặt thành hook/deny (luật cứng); (3) ghi lệnh test nhanh nhất cho 3 module hay đụng; (4) definition of done.
 - Kiểm chứng: cho Claude task "add a field to the settings screen" ở session mới; nó có chạy đúng lệnh test, đúng convention không.
 - So kit: `ai-sdlc-kit/AGENTS.md.template`, `CLAUDE.md.template`, README cột "Vì sao".
@@ -647,7 +676,7 @@ Mỗi tuần khoảng 7 giờ: 5 buổi x 1 giờ trong tuần + 1 buổi cuối
 ## 13. Interview Q&A (English)
 
 ### Q1. How do you use AI in your development workflow?
-**A:** By phase, not by tool. For requirements I have the agent turn a request into acceptance criteria and edge cases, and I approve the spec. For design it drafts options and an ADR; I decide. For implementation I give small tasks with a definition of done that includes a test command, use plan mode for anything over a few files, and require real command output as evidence. For tests I often have a separate agent write tests from the spec before implementation. Review has an AI first pass in CI, then a human. Release notes and crash triage are automated but a human publishes and confirms root cause. I measure rework rate and cycle time so I know whether it helps.
+**A:** By phase, not by tool. For requirements I have the agent turn a request into acceptance criteria and edge cases, and I approve the spec. For design it drafts options and an ADR; I decide. For implementation I give small tasks with a definition of done that includes a test command, use plan mode for anything over a few files, and require real command output as evidence. For tests I often have a separate agent write tests from the spec before implementation. Review has an AI first pass in CI, then a human. Release notes and crash triage are automated but a human publishes and confirms root cause. I measure an internal rework rate on AI-assisted PRs (not DORA's deployment rework rate) and cycle time so I know whether it helps.
 **Follow-ups:** Which phase gives you the most value? Where do you never use it? How do you know it helps?
 **Điểm interviewer muốn nghe:** Có khung theo pha, có điểm người duyệt, có đo.
 
@@ -747,7 +776,7 @@ Mỗi tuần khoảng 7 giờ: 5 buổi x 1 giờ trong tuần + 1 buổi cuối
 **Điểm interviewer muốn nghe:** Đo, routing, caching, batch, trần.
 
 ### Q21. How do you measure whether AI tooling is helping the team?
-**A:** A few metrics with a baseline: PR cycle time, review time and rounds, rework rate on AI-assisted PRs, change failure rate and crash-free users, defect escapes, cost per PR, and a short developer survey. I label AI-assisted PRs so I can compare. DORA 2025 found AI raises throughput but can raise instability, and METR showed perception differs from reality, so I don't rely on how fast it feels.
+**A:** A few metrics with a baseline: PR cycle time, review time and rounds, an internal rework rate on AI-assisted PRs (distinct from DORA's deployment rework rate), change failure rate and crash-free users, defect escapes, cost per PR, and a short developer survey. I label AI-assisted PRs so I can compare. DORA 2025 found AI raises throughput but can raise instability, and METR showed perception differs from reality, so I don't rely on how fast it feels.
 **Follow-ups:** What would make you roll back a tool? How do you avoid gaming the metrics?
 **Điểm interviewer muốn nghe:** Baseline, nhãn PR, chất lượng song song tốc độ.
 

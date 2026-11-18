@@ -32,5 +32,6 @@
 ## Đã kiểm tra
 - `settings.json` là JSON hợp lệ; 3 hook chạy đúng (chặn `local.properties`, `*.jks`; cho qua `.kt`; ghi CSV).
 - 3 subagent và 5 skill có frontmatter `name` + `description`.
+- (Ghi chú 18/11/2026: đã có major mới hơn: checkout v7, setup-java v6, setup-gradle v6; bản trong kit vẫn chạy được, khi nâng thì đọc release notes, đặc biệt thay đổi về fork PR của checkout v7. Xem `20` mục 10.3.)
 - 3 workflow YAML hợp lệ; version action (`checkout@v6`, `setup-java@v5`, `setup-gradle@v5`, `claude-code-action@v1`) tồn tại.
 - `kotlin-agent-loop` compile được (Kotlin 2.2.20, JDK 17 toolchain). Chưa chạy với API key thật.

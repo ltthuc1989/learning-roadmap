@@ -2,7 +2,7 @@
 
 > Mục tiêu: nói chuyện được với backend engineer như đồng nghiệp ngang hàng (API contract, DB, queue, cloud, observability), đọc được code Spring Boot/Ktor/Node của họ, và tự dựng được một backend nhỏ (Ktor hoặc Supabase) cho side project Ledger với cursor pagination, idempotency key, JWT, Postgres, Docker. Không phải trở thành backend specialist. | Mức cần đạt: Senior: hiểu REST đúng chuẩn từ góc client, giải thích được status code, pagination, idempotency, JWT; biết Postgres index và N+1 là gì. Staff: thiết kế contract-first với OpenAPI, chọn BFF/GraphQL/gRPC có lý do, hiểu eventual consistency và ảnh hưởng tới UI, nói được trade-off Supabase vs tự viết. Lead: điều phối backward compatibility, deprecation, feature flag xuyên tầng, incident với backend; ước lượng và nói chuyện cost/SLO với backend lead. | Thời gian gợi ý: tuần 8, ~12 giờ (đọc 5h, hands-on 7h)
 
-Ghi chú: JD mobile 2026 ghi "REST" ở 10/15 JD, "translate tech to business" và "Sev1/Sev2 incident" ở phần lead. Interviewer backend-side thường hỏi mobile lead để xem bạn có "biết điều" khi đòi API không. Bạn tự nhận network chưa sâu; mục 1 ở đây bổ sung góc API design, phần HTTP/TLS/OkHttp sâu nằm trong `07-Network.md`. Code Ktor viết cho Ktor 3.x; chỗ nào tác giả không chắc 100% cú pháp hiện hành đã ghi "cần kiểm tra tại https://ktor.io/docs".
+Ghi chú: JD mobile 2026 ghi "REST" ở 10/15 JD, "translate tech to business" và "Sev1/Sev2 incident" ở phần lead. Interviewer backend-side thường hỏi mobile lead để xem bạn có "biết điều" khi đòi API không. Bạn tự nhận network chưa sâu; mục 1 ở đây bổ sung góc API design, phần HTTP/TLS/OkHttp sâu nằm trong `07-Network.md`. Code Ktor viết và đối chiếu với docs Ktor 3.6.1 (bản mới nhất trên Maven Central, phát hành 29/10/2026; kiểm tra 18/11/2026); mỗi mục có link tới đúng trang docs.
 
 ## 0. Bản đồ chủ đề
 
@@ -50,7 +50,7 @@ Bạn phải tự trả lời được gì: mục 1 và 6 không cần nhìn tà
 }
 ```
 
-Client map `code` sang hành động (hiển thị, logout, retry), không parse `message`. `requestId` để báo cho backend khi debug. Chuẩn tham khảo: RFC 9457 Problem Details (`application/problem+json`), cần kiểm tra tại https://www.rfc-editor.org.
+Client map `code` sang hành động (hiển thị, logout, retry), không parse `message`. `requestId` để báo cho backend khi debug. Chuẩn tham khảo: RFC 9457 "Problem Details for HTTP APIs" (Standards Track, 7/2023, thay RFC 7807), media type `application/problem+json`, các member chuẩn ở §3.1: `type` (URI), `title`, `status`, `detail`, `instance`, cho phép thêm extension member như `code`, `requestId` (§3.2): https://www.rfc-editor.org/rfc/rfc9457#section-3.1.
 
 **Lỗi hay gặp / trade-off**
 - Trả 200 với `{"success": false}`: client phải parse body để biết lỗi; HTTP cache và interceptor không hoạt động đúng.
@@ -95,13 +95,15 @@ Client map `code` sang hành động (hiển thị, logout, retry), không parse
 - Giải: client sinh `Idempotency-Key` (UUID) cho mỗi "ý định" tạo và gửi lại cùng key khi retry. Server lưu key theo user; nếu đã thấy key thì trả lại kết quả cũ (cùng status, cùng body) thay vì tạo mới. Key có TTL (ví dụ 24h). Nếu cùng key mà body khác: 422 (client bug).
 - Trên client: key sinh lúc user bấm "Lưu", lưu trong outbox (Room) cùng payload; retry lấy key từ outbox. Đây là nền của offline-first trong `06-Mobile-System-Design.md`.
 - Implement: unique index `(user_id, idempotency_key)` + `INSERT ... ON CONFLICT DO NOTHING` rồi đọc lại; hoặc bảng `idempotency_keys` lưu response (tổng quát hơn, dùng cho mọi endpoint). Code ở 2.4.
+- **Chuẩn IETF đang hình thành**: `draft-ietf-httpapi-idempotency-key-header-08` (22/10/2026, vẫn là Internet-Draft của HTTPAPI WG, chưa phải RFC; kiểm tra 18/11/2026). Header là Structured Field kiểu String: `Idempotency-Key: "8e03978e-40d5-43e8-bc93-6894a57f9324"` (§2.1). Mã lỗi khuyến nghị ở §2.7: thiếu key với operation yêu cầu key → **400**; dùng lại key với payload khác (so qua "idempotency fingerprint", §2.4) → **422**; retry trong khi request gốc vẫn đang xử lý → **409**; body lỗi theo RFC 9457. Code mẫu ở 2.4 trả 400 khi thiếu key, khớp draft. Stripe (mô hình gốc, API v1): key tối đa 255 ký tự (gợi ý UUID v4); status + body của request đầu được lưu và replay, **kể cả 500**; tham số khác request gốc thì báo lỗi; key có thể bị xóa khi đã ít nhất 24 giờ; request fail validation hoặc đụng request đồng thời thì không lưu kết quả nên retry được.
 
 **Lỗi hay gặp / trade-off**
 - Key sinh mỗi lần retry: vô nghĩa.
 - Key không scope theo user: user A gửi key của user B đọc được dữ liệu B.
 
 **Đọc thêm:**
-- https://stripe.com/docs/api/idempotent_requests (mô hình được nhiều backend copy)
+- https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/ (bản -08, §2.7 Error Handling)
+- https://docs.stripe.com/api/idempotent_requests (mô hình được nhiều backend copy)
 - `06-Mobile-System-Design.md` (outbox pattern)
 
 ### 1.5 ETag và conditional request
@@ -120,7 +122,7 @@ Client map `code` sang hành động (hiển thị, logout, retry), không parse
 
 ### 1.6 Rate limiting headers
 
-- Server trả `429` kèm `Retry-After: 30` (giây) và thường `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (tên header chưa có chuẩn chung, IETF có draft `RateLimit-*`, cần kiểm tra tại https://www.ietf.org). Client: đọc `Retry-After`, không retry trước đó, lùi hàng đợi, hiển thị trạng thái nhẹ nhàng.
+- Server trả `429` kèm `Retry-After: 30` (giây) và thường `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (họ `X-RateLimit-*` là quy ước, không có RFC; Ktor RateLimit plugin gửi đúng ba header này). Hướng chuẩn hóa: `draft-ietf-httpapi-ratelimit-headers-11` (23/5/2026, vẫn là Internet-Draft, kiểm tra 18/11/2026) định nghĩa hai field Structured Fields: `RateLimit-Policy: "default";q=100;w=60` (quota `q` trong cửa sổ `w` giây, §3) và `RateLimit: "default";r=50;t=30` (còn `r` đơn vị, reset sau `t` giây, §4); bản draft cũ dùng ba header `RateLimit-Limit/Remaining/Reset`, nên đừng hardcode tên nếu backend theo draft. Client: đọc `Retry-After`, không retry trước đó, lùi hàng đợi, hiển thị trạng thái nhẹ nhàng.
 - Scope rate limit: theo user (sau auth), theo IP (trước auth), theo endpoint nhạy cảm (login, OTP). Mobile lead cần biết limit để thiết kế sync (batch thay vì 200 call).
 
 **Lỗi hay gặp / trade-off**
@@ -129,7 +131,9 @@ Client map `code` sang hành động (hiển thị, logout, retry), không parse
 
 **Đọc thêm:**
 - https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429
-- https://ktor.io/docs (server rate limit plugin)
+- https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/
+- RFC 9110 §10.2.3 `Retry-After` (giây hoặc HTTP-date): https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3
+- https://ktor.io/docs/server-rate-limit.html (Ktor dùng token bucket, tự gửi `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, và 429 + `Retry-After` khi hết token)
 
 ### 1.7 Auth: JWT access/refresh, PKCE
 
@@ -151,8 +155,10 @@ Client map `code` sang hành động (hiển thị, logout, retry), không parse
 - OpenAPI (YAML/JSON) mô tả endpoint, schema, response, auth. Là hợp đồng để: sinh client Kotlin (openapi-generator), sinh mock server, review thay đổi trong PR (diff của spec), kiểm tra breaking change tự động.
 - Mobile lead nên đòi: spec là source of truth, nằm trong repo backend, có CI check backward compatibility, có ví dụ response thật cho mỗi endpoint.
 
+Ví dụ dưới viết theo **OpenAPI 3.1.1** (https://spec.openapis.org/oas/v3.1.1.html). Khác biệt hay gặp với 3.0.x: Schema Object là JSON Schema 2020-12, nên `nullable: true` của 3.0 **không còn**, thay bằng `type: [string, "null"]`; `exclusiveMinimum` là số thay vì boolean; `examples` là mảng. Mỗi response bắt buộc có `description` ở cả 3.0 và 3.1 (Response Object, fixed field REQUIRED). Kiểm tra openapi-generator và mock server bạn dùng đã hỗ trợ 3.1 chưa trước khi chuyển.
+
 ```yaml
-openapi: 3.0.3
+openapi: 3.1.1
 info: { title: Ledger API, version: 1.0.0 }
 paths:
   /v1/transactions:
@@ -163,6 +169,7 @@ paths:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
       responses:
         "200":
+          description: A page of transactions
           content:
             application/json:
               schema:
@@ -170,7 +177,7 @@ paths:
                 required: [items]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/Transaction" } }
-                  nextCursor: { type: string, nullable: true }
+                  nextCursor: { type: [string, "null"] }   # 3.0.x: { type: string, nullable: true }
     post:
       parameters:
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
@@ -191,7 +198,7 @@ components:
         id: { type: string, format: uuid }
         amountMinor: { type: integer, format: int64 }
         currency: { type: string, minLength: 3, maxLength: 3 }
-        note: { type: string, nullable: true }
+        note: { type: [string, "null"] }
         occurredAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
     CreateTransaction:
@@ -209,9 +216,18 @@ security: [ { bearer: [] } ]
 - Spec sinh từ code sau khi code xong: spec luôn trễ, mobile không mock sớm được.
 - Sinh client tự động rồi dùng thẳng trong domain layer: coupling với wire format; bọc lại bằng mapper.
 
+**Kiểm tra breaking change tự động bằng oasdiff** (https://github.com/oasdiff/oasdiff, bản v1.39.0; tài liệu lệnh `breaking` ở https://github.com/oasdiff/oasdiff/blob/main/docs/BREAKING-CHANGES.md): so spec ở `main` với spec trong PR, fail CI nếu có thay đổi mức ERR (xóa field response, thêm required param, đổi kiểu...):
+
+```bash
+git show origin/main:api/openapi.yaml > /tmp/base.yaml
+oasdiff breaking /tmp/base.yaml api/openapi.yaml --fail-on ERR       # exit 1 nếu có breaking
+# --fail-on WARN chặt hơn; --fail-on MISSING-VERSION-BUMP: chỉ fail khi breaking mà không tăng major info.version
+```
+
 **Đọc thêm:**
-- https://spec.openapis.org
+- https://spec.openapis.org/oas/v3.1.1.html#schema-object và #response-object
 - https://openapi-generator.tech (sinh client Kotlin)
+- https://github.com/oasdiff/oasdiff
 
 ### 1.9 BFF pattern và vì sao mobile team thích
 
@@ -242,7 +258,7 @@ security: [ { bearer: [] } ]
 
 ## 2. Dựng backend nhỏ bằng Kotlin với Ktor 3.x
 
-Mục tiêu: backend 3 endpoint cho Ledger (`GET /v1/transactions` cursor pagination + ETag, `POST /v1/transactions` idempotency, `GET /v1/transactions/{id}`), JWT verify, Postgres qua JDBC + HikariCP, Flyway migration, Docker compose, 2 test với `testApplication`. Code dưới đây viết cho Ktor 3.x. Version số cụ thể để trống có chú thích; lấy mới nhất tại https://ktor.io/docs và Maven Central.
+Mục tiêu: backend 3 endpoint cho Ledger (`GET /v1/transactions` cursor pagination + ETag, `POST /v1/transactions` idempotency, `GET /v1/transactions/{id}`), JWT verify, Postgres qua JDBC + HikariCP, Flyway migration, Docker compose, 2 test với `testApplication`. Code dưới đây viết cho Ktor 3.6.1. Version lib lấy từ Maven Central ngày 18/11/2026; khi làm bài, kiểm tra lại tại https://ktor.io/docs/releases.html và `https://repo1.maven.org/maven2/io/ktor/ktor-server-core-jvm/maven-metadata.xml`.
 
 ### 2.1 Project layout và Gradle
 
@@ -285,12 +301,12 @@ plugins {
 group = "com.ledger"
 repositories { mavenCentral() }
 
-// Điền version thật: Ktor 3.x mới nhất tại https://ktor.io/docs, các lib khác tại Maven Central.
-val ktorVersion = "3.x.y"
-val postgresVersion = "42.7.x"
-val hikariVersion = "6.x.y"
-val flywayVersion = "11.x.y"
-val logbackVersion = "1.5.x"
+// Version mới nhất trên Maven Central, kiểm tra 18/11/2026. Dự án thật: đưa vào libs.versions.toml.
+val ktorVersion = "3.6.1"        // 29/10/2026
+val postgresVersion = "42.7.14"
+val hikariVersion = "7.1.0"
+val flywayVersion = "13.12.2"    // flyway-core và flyway-database-postgresql cùng version
+val logbackVersion = "1.6.7"
 
 dependencies {
     implementation("io.ktor:ktor-server-core:$ktorVersion")
@@ -341,12 +357,14 @@ jwt {
 ```
 
 **Lỗi hay gặp / trade-off**
-- Để version dạng "3.x.y" trong build thật: Gradle không resolve. Điền version cụ thể trước khi build.
+- Trộn version Ktor giữa các artifact (ví dụ server 3.6.1, test-host 3.5.x): lỗi `NoSuchMethodError` lúc test. Dùng một biến `ktorVersion` hoặc BOM `io.ktor:ktor-bom`.
 - Commit `application.conf` chứa secret thật: mọi giá trị nhạy cảm phải qua `${?VAR}` và biến môi trường.
 
 **Đọc thêm:**
-- https://ktor.io/docs (Creating a server, Configuration file)
-- https://docs.gradle.org (application plugin)
+- https://ktor.io/docs/server-create-a-new-project.html
+- https://ktor.io/docs/server-configuration-file.html (HOCON/YAML, override bằng biến môi trường)
+- https://ktor.io/docs/releases.html
+- https://docs.gradle.org/current/userguide/application_plugin.html
 
 ### 2.2 Application, plugins, content negotiation, JWT auth
 
@@ -389,7 +407,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 // Dev/test: HMAC với secret chung. Production: token do IdP (Supabase/Firebase/Keycloak) cấp,
-// verify bằng public key qua JWKS (JwkProvider), cần kiểm tra tại https://ktor.io/docs (JWT auth, JWKS).
+// verify RS256 bằng public key qua JWKS (JwkProvider), xem đoạn "Production: RS256 + JWKS" bên dưới.
 class JwtConfig(private val secret: String, val issuer: String, val audience: String) {
     private val algorithm = Algorithm.HMAC256(secret)
     val verifier: JWTVerifier = JWT.require(algorithm).withIssuer(issuer).withAudience(audience).build()
@@ -403,6 +421,33 @@ class JwtConfig(private val secret: String, val issuer: String, val audience: St
 }
 ```
 
+**Production: RS256 + JWKS** (theo https://ktor.io/docs/server-jwt.html#configure-verifier; `ktor-server-auth-jwt` 3.6.1 đã kéo theo `com.auth0:java-jwt` 4.6.0 và `com.auth0:jwks-rsa` 0.24.1, không cần thêm dependency):
+
+```kotlin
+import com.auth0.jwk.JwkProviderBuilder
+import java.net.URL
+import java.util.concurrent.TimeUnit
+
+// issuer ví dụ Supabase: "https://<project>.supabase.co/auth/v1"; Firebase: "https://securetoken.google.com/<project-id>"
+val jwkProvider = JwkProviderBuilder(URL("$issuer/.well-known/jwks.json"))   // hoặc JwkProviderBuilder(issuer)
+    .cached(10, 24, TimeUnit.HOURS)       // cache tối đa 10 key trong 24 giờ
+    .rateLimited(10, 1, TimeUnit.MINUTES) // tối đa 10 lần fetch JWKS mỗi phút khi gặp kid lạ
+    .build()
+
+install(Authentication) {
+    jwt("user") {
+        realm = "ledger"
+        verifier(jwkProvider, issuer) {   // chọn public key theo header `kid`, kiểm tra chữ ký RS256 + iss
+            acceptLeeway(3)               // cho lệch đồng hồ 3 giây khi check exp/nbf
+            withAudience(audience)
+        }
+        validate { cred -> cred.payload.subject?.let { JWTPrincipal(cred.payload) } }
+    }
+}
+```
+
+Điểm phỏng vấn: server chỉ giữ public key (xoay key bằng JWKS, không redeploy); `kid` lạ thì fetch lại JWKS nhưng bị rate-limit để kẻ tấn công không biến API thành máy DDoS IdP; JWKS path khác nhau giữa IdP (Firebase dùng endpoint x509 riêng), đọc docs IdP trước khi hardcode.
+
 ```kotlin
 // Plugins.kt
 package com.ledger
@@ -413,6 +458,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.application.log
 import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.principal
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.plugins.BadRequestException
@@ -445,9 +491,14 @@ fun Application.configurePlugins(jwt: JwtConfig) {
     }
     install(RateLimit) {
         register(RateLimitName("api")) {
-            rateLimiter(limit = 120, refillPeriod = 60.seconds)
-            // Theo IP cho đơn giản. Theo user cần lấy principal sau auth; cách làm cần kiểm tra tại ktor.io/docs.
+            rateLimiter(limit = 120, refillPeriod = 60.seconds)   // token bucket: 120 token, refill mỗi 60s
+            // Theo IP: chỉ đúng khi không sau proxy/NAT (cần plugin ForwardedHeaders/XForwardedHeaders).
             requestKey { call -> call.request.origin.remoteHost }
+        }
+        register(RateLimitName("per-user")) {
+            rateLimiter(limit = 60, refillPeriod = 60.seconds)
+            // Principal chỉ có khi rateLimit(...) nằm BÊN TRONG authenticate("user") { } ở routing
+            requestKey { call -> call.principal<JWTPrincipal>()?.payload?.subject ?: "anonymous" }
         }
     }
     install(Authentication) {
@@ -476,8 +527,12 @@ Giải thích cho người đọc backend lần đầu:
 - Secret JWT hardcode trong `application.conf` commit lên Git: dùng `${?JWT_SECRET}` và secret manager.
 
 **Đọc thêm:**
-- https://ktor.io/docs (Plugins, Content negotiation, JWT authentication, Status pages, Rate limiting)
-- https://github.com/auth0/java-jwt
+- https://ktor.io/docs/server-plugins.html
+- https://ktor.io/docs/server-serialization.html
+- https://ktor.io/docs/server-jwt.html#configure-verifier và #validate-payload
+- https://ktor.io/docs/server-status-pages.html
+- https://ktor.io/docs/server-rate-limit.html#rate-limit-authenticated-users
+- https://github.com/auth0/java-jwt, https://github.com/auth0/jwks-rsa-java
 
 ### 2.3 DTO, cursor, repository interface
 
@@ -677,7 +732,7 @@ CREATE TABLE transactions (
 CREATE INDEX idx_transactions_user_created ON transactions (user_id, created_at DESC, id DESC);
 ```
 
-Vì sao JDBC thuần thay vì ORM: ba endpoint, SQL rõ ràng, bạn thấy đúng câu query chạy, dễ giải thích trong phỏng vấn. Khi project lớn, cân nhắc Exposed (DSL/DAO Kotlin của JetBrains; API và package đã đổi qua các bản lớn, cần kiểm tra tại https://github.com/JetBrains/Exposed) hoặc jOOQ. JDBC là blocking: trong route handler bọc bằng `withContext(Dispatchers.IO)` để không chiếm thread của Netty event loop.
+Vì sao JDBC thuần thay vì ORM: ba endpoint, SQL rõ ràng, bạn thấy đúng câu query chạy, dễ giải thích trong phỏng vấn. Khi project lớn, cân nhắc Exposed (DSL/DAO Kotlin của JetBrains; 1.0.0 stable ra 22/1/2026, mới nhất 1.6.1 trên Maven Central; từ 1.0 mọi package đổi sang `org.jetbrains.exposed.v1.*`, ví dụ `org.jetbrains.exposed.sql.Table` thành `org.jetbrains.exposed.v1.core.Table`, nên code mẫu trên mạng trước 2026 thường sai import: https://www.jetbrains.com/help/exposed/migration-guide-1-0-0.html, kiểm tra 18/11/2026) hoặc jOOQ. JDBC là blocking: trong route handler bọc bằng `withContext(Dispatchers.IO)` để không chiếm thread của Netty event loop.
 
 **Lỗi hay gặp / trade-off**
 - `LIMIT` không có `+1`: không biết có trang sau, phải query count (đắt).
@@ -726,8 +781,9 @@ fun Application.configureRouting(repo: TransactionRepository, jwt: JwtConfig) {
             call.respond(TokenResponse(accessToken = jwt.issue(req.userId)))
         }
 
-        rateLimit(RateLimitName("api")) {
+        rateLimit(RateLimitName("api")) {                   // theo IP, chặn trước cả khi verify token
             authenticate("user") {
+              rateLimit(RateLimitName("per-user")) {            // trong authenticate: requestKey đọc được principal
                 route("/v1/transactions") {
                     get {
                         val userId = call.userId()
@@ -770,6 +826,7 @@ fun Application.configureRouting(repo: TransactionRepository, jwt: JwtConfig) {
                         call.respond(tx)
                     }
                 }
+              }
             }
         }
     }
@@ -786,7 +843,9 @@ private fun ApplicationCall.userId(): String =
 - Trả 201 cho cả replay: client retry thấy "tạo mới" lần nữa, dù không sao về dữ liệu nhưng log sai.
 
 **Đọc thêm:**
-- https://ktor.io/docs (Routing, Requests, Responses)
+- https://ktor.io/docs/server-routing.html
+- https://ktor.io/docs/server-requests.html
+- https://ktor.io/docs/server-responses.html
 - https://stripe.com/docs/api/idempotent_requests
 
 ### 2.5 Test với testApplication
@@ -856,7 +915,7 @@ class TransactionsRouteTest {
     @Test
     fun `GET without token returns 401`() = testApplication {
         // Config rỗng để testApplication không load application.conf và không cố kết nối DB.
-        // Cú pháp environment/config: cần kiểm tra tại https://ktor.io/docs (Testing).
+        // Cú pháp theo https://ktor.io/docs/server-testing.html#environment (Ktor 3.6.1)
         environment { config = MapApplicationConfig() }
         application {
             configurePlugins(jwt)
@@ -910,7 +969,7 @@ Giải thích: `testApplication` chạy app trong process, không mở port; `cl
 - Assert theo thứ tự list không có clock cố định: flaky. In-memory repo trên dùng clock tăng dần.
 
 **Đọc thêm:**
-- https://ktor.io/docs (Testing)
+- https://ktor.io/docs/server-testing.html (mục #environment, #add-modules)
 - https://testcontainers.com (Postgres trong test)
 
 ### 2.6 Docker image và docker-compose với Postgres
@@ -1002,7 +1061,31 @@ create policy "insert own" on transactions for insert with check (auth.uid() = u
 create policy "update own" on transactions for update using (auth.uid() = user_id);
 ```
 
-Client KMP: thư viện `supabase-kt` (Auth, Postgrest, Realtime, Storage) hỗ trợ Android và iOS; cú pháp `createSupabaseClient` và query builder cần kiểm tra tại https://supabase.com/docs/reference/kotlin. Cursor pagination qua PostgREST: filter `created_at < cursor` + order + limit; idempotency: unique constraint + bắt lỗi 409/23505 rồi đọc lại; logic phức tạp hơn đặt trong Edge Function hoặc Postgres function (RPC).
+Client KMP: thư viện `supabase-kt` (Auth, Postgrest, Realtime, Storage) hỗ trợ Android và iOS. Gradle dùng BOM `io.github.jan-tennert.supabase:bom` + `postgrest-kt`, `auth-kt`; mỗi target phải thêm một Ktor client engine (supabase-kt 3.x cần Ktor 3); Android minSdk 26 (https://supabase.com/docs/reference/kotlin/installing). Client và query theo docs chính chủ (https://supabase.com/docs/reference/kotlin/initializing, /select, /lt, /order, /limit; kiểm tra 18/11/2026):
+
+```kotlin
+// supabase-kt 3.x
+val supabase = createSupabaseClient(
+    supabaseUrl = "https://xyzcompany.supabase.co",
+    supabaseKey = "your-publishable-key", // publishable key, quyền thật do RLS ở trên quyết định
+) {
+    install(Auth)
+    install(Postgrest)
+}
+
+@Serializable
+data class Transaction(val id: String, val amount: Long, @SerialName("created_at") val createdAt: String)
+
+// Cursor pagination: trang sau lấy các row cũ hơn cursor
+suspend fun page(cursor: String, size: Long = 20): List<Transaction> =
+    supabase.from("transactions").select {
+        filter { lt("created_at", cursor) }
+        order(column = "created_at", order = Order.DESCENDING)
+        limit(count = size)
+    }.decodeList<Transaction>()
+```
+
+Cursor pagination qua PostgREST: filter `created_at < cursor` + order + limit như trên (thực tế nên dùng cursor kép `(created_at, id)` để không mất row trùng timestamp); idempotency: unique constraint + bắt lỗi 409/23505 rồi đọc lại; logic phức tạp hơn đặt trong Edge Function hoặc Postgres function (RPC).
 
 **Firebase**: Auth (nhiều provider), Firestore (document DB, realtime listener, offline cache sẵn trên client), Cloud Functions (Node/TypeScript, hoặc Python). Bảo mật bằng Security Rules. Hợp khi dữ liệu dạng document, cần realtime và offline sẵn, team không muốn SQL. Giá: query hạn chế (không join, aggregate giới hạn), cost theo read/write, khó export, vendor lock-in.
 
@@ -1110,7 +1193,9 @@ ORDER BY created_at DESC, id DESC LIMIT 20;
 - `OFFSET` lớn: Postgres vẫn đọc và bỏ các dòng trước đó.
 
 **Đọc thêm:**
-- https://www.postgresql.org/docs (Indexes, EXPLAIN, Transaction Isolation)
+- https://www.postgresql.org/docs/current/transaction-iso.html (bảng `#MVCC-ISOLEVEL-TABLE`: anomaly nào bị chặn ở mỗi level; Postgres không có dirty read kể cả khi khai báo READ UNCOMMITTED, và REPEATABLE READ của Postgres còn chặn cả phantom read)
+- https://www.postgresql.org/docs/current/using-explain.html (#USING-EXPLAIN-ANALYZE: `actual time`, `rows`, `loops`; nhớ EXPLAIN ANALYZE thực sự chạy câu lệnh, bọc `BEGIN; ... ROLLBACK;` khi thử với UPDATE/DELETE)
+- https://www.postgresql.org/docs/current/indexes-multicolumn.html (B-tree nhiều cột hiệu quả nhất khi có điều kiện trên các cột đầu bên trái)
 - https://use-the-index-luke.com (sách online miễn phí về index, rất đáng đọc 2 chương đầu)
 
 ### 3.2 Khi nào NoSQL (Firestore, DynamoDB) hợp
@@ -1132,7 +1217,18 @@ ORDER BY created_at DESC, id DESC LIMIT 20;
 
 - Redis là in-memory key-value với cấu trúc dữ liệu (string, hash, list, set, sorted set), TTL theo key, rất nhanh. Dùng cho: cache-aside (đọc cache, miss thì đọc DB rồi ghi cache với TTL), session, rate limit, lock phân tán ngắn, pub/sub nhẹ, hàng đợi đơn giản.
 - Cache-aside: vấn đề là invalidation; cách đơn giản là TTL ngắn + xoá key khi ghi. Cache stampede (nhiều request cùng miss) giải bằng lock hoặc "early refresh".
-- Rate limit token bucket/fixed window: `INCR key` + `EXPIRE key 60` lần đầu; nếu > limit thì 429. Sliding window dùng sorted set. Với mobile: backend thường limit theo `user_id` hoặc `device_id`.
+- Rate limit: `INCR key` + `EXPIRE key 60` lần đầu là **fixed window** (đếm trong cửa sổ cố định), không phải token bucket. Redis docs (https://redis.io/docs/latest/commands/incr/#pattern-rate-limiter) đưa hai biến thể: (1) key theo giây `ip:ts`, `INCR` + `EXPIRE` trong `MULTI/EXEC`; (2) một counter, `EXPIRE` chỉ khi `INCR` trả 1, và cảnh báo race condition nếu `INCR` chạy mà `EXPIRE` không chạy (key không bao giờ hết hạn), sửa bằng Lua script qua `EVAL`. Nhược điểm fixed window: dồn gấp đôi limit ở ranh giới hai cửa sổ. **Sliding window log**: sorted set mỗi request một member với score là timestamp, `ZREMRANGEBYSCORE` bỏ phần cũ rồi `ZCARD`. **Token bucket** (cho phép burst, refill đều; Ktor RateLimit dùng thuật toán này): lưu `tokens` + `last_refill` trong hash, tính refill và trừ token trong một Lua script để atomic. Với mobile: backend thường limit theo `user_id` hoặc `device_id`.
+
+```text
+# Fixed window 100 request/phút cho user u1 (atomic nhờ MULTI/EXEC)
+MULTI
+INCR rl:u1:202611181042        # key = user + phút hiện tại
+EXPIRE rl:u1:202611181042 120  # dư 1 cửa sổ để key tự dọn
+EXEC                           # kết quả INCR > 100 -> trả 429 + Retry-After = giây còn lại của phút
+```
+
+- **Persistence** (https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/): RDB (snapshot định kỳ, khởi động nhanh, mất dữ liệu từ snapshot cuối), AOF (ghi log mọi lệnh ghi, `appendfsync everysec` mặc định mất tối đa khoảng 1 giây), kết hợp RDB + AOF, hoặc tắt hẳn khi chỉ là cache.
+- **License** (https://redis.io/legal/licenses/, kiểm tra 18/11/2026): Redis 7.2.x trở về trước BSD-3; 7.4.x đến 7.8.x dual RSALv2/SSPLv1 (không phải OSI open source); từ **Redis 8** tri-license RSALv2/SSPLv1/**AGPLv3**. **Valkey** là fork của Linux Foundation từ Redis 7.2.4, giữ BSD-3 (https://www.linuxfoundation.org/press/linux-foundation-launches-open-source-valkey-community); nhiều cloud managed cache đã hỗ trợ Valkey. Bank thường hỏi license khi duyệt dependency: AGPLv3 có nghĩa vụ công bố source nếu sửa và cung cấp qua mạng.
 - Ảnh hưởng tới mobile: dữ liệu từ cache có thể cũ vài giây; UI "vừa tạo xong mà list chưa có" là do cache hoặc replica, không phải bug client. Thiết kế optimistic UI: thêm item local ngay, sync sau.
 
 **Lỗi hay gặp / trade-off**
@@ -1140,7 +1236,9 @@ ORDER BY created_at DESC, id DESC LIMIT 20;
 - Redis là nguồn sự thật: mất dữ liệu khi restart nếu không cấu hình persistence.
 
 **Đọc thêm:**
-- https://redis.io/docs
+- https://redis.io/docs/latest/commands/incr/#pattern-rate-limiter
+- https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/
+- https://redis.io/legal/licenses/
 - system-design-primer (mục caching)
 
 ### 3.4 Message queue (Kafka, RabbitMQ) và eventual consistency cho mobile
@@ -1149,6 +1247,7 @@ ORDER BY created_at DESC, id DESC LIMIT 20;
 - **RabbitMQ**: broker truyền thống, message bị xoá sau khi ack, routing linh hoạt, hợp task queue. **Kafka**: log phân tán theo partition, giữ message theo thời gian, consumer tự giữ offset, throughput lớn, hợp event streaming và replay. Chọn theo: cần replay/nhiều consumer độc lập thì Kafka; cần task queue đơn giản thì RabbitMQ (hoặc SQS/Pub/Sub trên cloud).
 - **Hệ quả cho mobile**: API trả 202 Accepted "đã nhận", kết quả đến sau (eventual consistency). UI phải có trạng thái `PENDING`, `PROCESSING`, `DONE`, `FAILED`; cập nhật bằng push (FCM) hoặc polling có backoff; idempotent khi nhận trùng sự kiện (at-least-once delivery là bình thường); thứ tự sự kiện không đảm bảo giữa partition: dùng `version`/timestamp để bỏ sự kiện cũ.
 - Ví dụ Ledger: tạo giao dịch ghi Postgres ngay (strong) nhưng tính "tổng tháng" và gợi ý AI qua worker (eventual); UI hiển thị tổng tính local trước.
+- **Delivery semantics chính chủ**: Kafka docs mục "Message Delivery Semantics" định nghĩa at-most-once, at-least-once, exactly-once và nói rõ "Kafka guarantees at-least-once delivery by default"; exactly-once chỉ trong phạm vi đọc-xử lý-ghi trên Kafka topic nhờ idempotent producer + transaction, consumer phải đặt `isolation.level=read_committed` (mặc định `read_uncommitted` thấy cả message của transaction bị abort) (https://kafka.apache.org/44/design/design/#message-delivery-semantics và #using-transactions). RabbitMQ: **publisher confirms** để producer biết broker đã nhận, **consumer ack thủ công** để message chỉ bị xóa sau khi xử lý xong (https://www.rabbitmq.com/docs/confirms); message bị reject/nack với `requeue=false`, hết TTL hoặc vượt độ dài queue sẽ sang **dead letter exchange** khi queue khai báo `x-dead-letter-exchange` (https://www.rabbitmq.com/docs/dlx). Kết luận cho mobile: vì mặc định là at-least-once, event push/notification phải có id để client dedupe.
 
 **Lỗi hay gặp / trade-off**
 - Client coi 202 như 201 và kỳ vọng dữ liệu có ngay trong GET tiếp theo.
@@ -1156,12 +1255,16 @@ ORDER BY created_at DESC, id DESC LIMIT 20;
 
 **Đọc thêm:**
 - DDIA 2nd ed, chương về stream processing
-- https://kafka.apache.org/documentation và https://www.rabbitmq.com/docs
+- https://kafka.apache.org/44/design/design/#message-delivery-semantics
+- https://www.rabbitmq.com/docs/confirms, https://www.rabbitmq.com/docs/dlx, https://www.rabbitmq.com/docs/reliability
 
 ### 3.5 File storage: S3/GCS, signed URL, resumable upload
 
 - Không upload file qua API server; server cấp **signed URL** (pre-signed, có hạn vài phút, giới hạn method và content-type) để client PUT thẳng lên S3/GCS, rồi client báo server "đã upload key X" (hoặc bucket bắn event). Download tương tự với signed GET hoặc qua CDN (CloudFront/Cloud CDN) với URL ký.
 - **Resumable upload** cho file lớn trên mạng di động: S3 multipart upload (chia part, upload lại part hỏng, complete), GCS resumable upload session (một URL session, gửi theo byte range, hỏi lại offset khi đứt). Client lưu session/uploadId trong Room để tiếp tục sau khi app bị kill (WorkManager).
+- **Con số S3 multipart** (https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html, kiểm tra 18/11/2026): object tối đa **48.8 TiB**; tối đa **10,000 part**, part number 1 đến 10,000; part từ **5 MiB đến 5 GiB**, part cuối không có giới hạn tối thiểu; AWS khuyên cân nhắc multipart từ khoảng 100 MB. Hệ quả cho mobile: file 2 GB với part 8 MiB là 256 part, mỗi part một presigned `UploadPart` URL; mất mạng chỉ upload lại part hỏng; nhớ gọi `CompleteMultipartUpload` (gửi danh sách part number + ETag) và đặt lifecycle rule `AbortIncompleteMultipartUpload` để part rác không tính tiền mãi.
+- **Presigned PUT** (https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html): server ký URL với key do server chọn, `Content-Type` cố định và thời hạn ngắn; client `PUT` body thẳng lên URL; ai có URL đều upload được trong thời hạn đó nên coi URL như secret.
+- **GCS resumable** (https://cloud.google.com/storage/docs/performing-resumable-uploads): khởi tạo bằng `POST .../o?uploadType=resumable`, lưu session URI ở header `Location`; mỗi chunk là `PUT` có `Content-Range`, chunk (trừ chunk cuối) phải là bội số **256 KiB**, docs khuyên tối thiểu 8 MiB; chunk thành công nhận **`308 Resume Incomplete`** kèm header `Range` cho biết byte đã lưu, chunk sau bắt đầu từ sau giá trị này (không phải từ byte bạn nghĩ đã gửi); hỏi trạng thái bằng `PUT` rỗng với `Content-Range: bytes */TOTAL`; session URI hết hạn sau **một tuần**.
 - Bảo mật: bucket private, không public-read; signed URL ngắn hạn; validate content-type và size server-side; quét virus nếu nhận file từ user; không để client tự đặt key tuỳ ý (path traversal, ghi đè).
 
 **Lỗi hay gặp / trade-off**
@@ -1169,8 +1272,9 @@ ORDER BY created_at DESC, id DESC LIMIT 20;
 - Signed URL hạn 24h gửi trong chat: ai có link cũng tải được.
 
 **Đọc thêm:**
-- https://docs.aws.amazon.com/AmazonS3 (presigned URLs, multipart upload)
-- https://cloud.google.com/storage/docs (signed URLs, resumable uploads)
+- https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html và https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html
+- https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html
+- https://cloud.google.com/storage/docs/performing-resumable-uploads (#upload-data, #status-check)
 
 ## 4. Cloud và ops ở mức hội thoại
 
@@ -1179,7 +1283,7 @@ ORDER BY created_at DESC, id DESC LIMIT 20;
 | Nhu cầu | AWS | GCP | Firebase/khác |
 |---|---|---|---|
 | API edge, auth, throttle | API Gateway | API Gateway / Cloud Endpoints | Firebase Hosting rewrite tới Functions |
-| Serverless function | Lambda | Cloud Functions / Cloud Run (container) | Cloud Functions for Firebase |
+| Serverless function | Lambda | Cloud Run functions (tên cũ Cloud Functions 2nd gen; 1st gen nay là "Cloud Run functions (1st gen)") / Cloud Run (container) | Cloud Functions for Firebase |
 | Container service | ECS (Fargate) / EKS (Kubernetes) | Cloud Run / GKE | |
 | Postgres managed | RDS / Aurora | Cloud SQL / AlloyDB | Supabase |
 | Object storage | S3 | GCS | Firebase Storage (trên GCS) |
@@ -1192,12 +1296,13 @@ ORDER BY created_at DESC, id DESC LIMIT 20;
 Cách nói: "Our mobile API runs on ECS behind API Gateway with RDS Postgres; files go to S3 via presigned URLs through CloudFront; CloudWatch alarms page the on-call." Nói được một câu như vậy là đủ để backend tin bạn hiểu hệ thống.
 
 **Lỗi hay gặp / trade-off**
-- Lambda cho API nhạy latency: cold start vài trăm ms trên JVM; cân nhắc container (Fargate/Cloud Run) hoặc giữ ấm.
+- Lambda cho API nhạy latency: cold start JVM có thể mất vài giây vì load framework và khởi tạo. **SnapStart** (Java 11+, Python 3.12+, .NET 8+) chụp snapshot Firecracker microVM sau init lúc publish version, AWS ghi "as low as sub-second startup performance"; chỉ áp dụng cho published version/alias (không cho `$LATEST`), không dùng cùng provisioned concurrency, EFS hay ephemeral storage > 512 MB, và phải xử lý uniqueness (ID, seed random, kết nối mạng tạo lúc init) (https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html, kiểm tra 18/11/2026). Yêu cầu chặt hơn thì provisioned concurrency ("double-digit milliseconds"), hoặc container (Fargate/Cloud Run) chạy liên tục.
 - Mỗi dịch vụ một kiểu log/metric: không nối được request từ app tới DB; chuẩn hoá request id và OpenTelemetry.
 
 **Đọc thêm:**
-- https://docs.aws.amazon.com và https://cloud.google.com/docs
-- https://firebase.google.com/docs
+- https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html
+- https://cloud.google.com/run/docs/functions/comparison (Cloud Run functions vs 1st gen)
+- https://firebase.google.com/docs/functions
 
 ### 4.2 Docker vì sao, Kubernetes trong 10 dòng
 
@@ -1215,7 +1320,7 @@ Cách nói: "Our mobile API runs on ECS behind API Gateway with RDS Postgres; fi
 ### 4.3 CI/CD cho backend, observability, SLO/SLA, cost, security basics
 
 - **CI/CD backend**: build image, test (unit + Testcontainers), scan (dependency, container), push image theo SHA, deploy staging, smoke test, deploy production có rollback. Pipeline mobile tương tự ở `20-Git-CICD.md`. Điểm phối hợp: backend deploy trước app release; contract test chạy ở cả hai phía.
-- **Observability** ba trụ: **logs** (có `requestId`, structured JSON, không PII), **metrics** (RED: rate, errors, duration theo endpoint; USE cho tài nguyên), **traces** (một request đi qua gateway, service, DB; OpenTelemetry; `traceparent` header). Client gửi `X-Request-Id`/trace header để backend nối log với crash trên mobile. Tool: Datadog, CloudWatch, Grafana + Prometheus + Loki + Tempo, Sentry.
+- **Observability** ba trụ: **logs** (có `requestId`, structured JSON, không PII), **metrics** (RED: rate, errors, duration theo endpoint; USE cho tài nguyên), **traces** (một request đi qua gateway, service, DB; OpenTelemetry; header `traceparent` theo W3C Trace Context, dạng `traceparent: 00-<trace-id 32 hex>-<parent-id 16 hex>-<flags 2 hex>`, ví dụ `00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01`, kèm `tracestate` cho dữ liệu riêng của vendor: https://www.w3.org/TR/trace-context/#traceparent-header). Client gửi `X-Request-Id`/trace header để backend nối log với crash trên mobile. Tool: Datadog, CloudWatch, Grafana + Prometheus + Loki + Tempo, Sentry.
 - **SLO/SLA**: SLI là chỉ số đo (p95 latency, tỷ lệ 5xx, availability). SLO là mục tiêu nội bộ (ví dụ 99.9% request thành công, p95 < 300 ms). SLA là cam kết hợp đồng có phạt. Error budget = 1 - SLO; hết budget thì ưu tiên ổn định hơn feature. Mobile lead dùng ngôn ngữ này khi đòi "API feed p95 dưới 300 ms trên 4G" và khi thương lượng release.
 - **Cost awareness**: hỏi được "endpoint này tốn gì": compute (request x thời gian), DB (IOPS, storage), egress (băng thông ra ngoài, payload mobile tính tiền), third-party (push, SMS OTP, AI tokens). Mobile ảnh hưởng cost: polling mỗi 10 giây x 50k user, ảnh không nén, sync full thay vì delta.
 - **Security basics backend**: secret trong secrets manager (không env file commit), least privilege (IAM role theo service, DB user chỉ quyền cần), TLS mọi nơi, input validation, audit log. **OWASP API Security Top 10 (2023)** để nói chuyện với security team: API1 Broken Object Level Authorization (BOLA: đọc được resource của user khác qua id), API2 Broken Authentication, API3 Broken Object Property Level Authorization (lộ/ghi field thừa), API4 Unrestricted Resource Consumption (thiếu rate limit, size limit), API5 Broken Function Level Authorization (user gọi được endpoint admin), API6 Unrestricted Access to Sensitive Business Flows (bot lạm dụng flow), API7 Server Side Request Forgery, API8 Security Misconfiguration, API9 Improper Inventory Management (API cũ quên tắt), API10 Unsafe Consumption of APIs (tin API bên thứ ba). Với mobile, API1 và API4 là hai cái gặp nhiều nhất.
@@ -1226,7 +1331,8 @@ Cách nói: "Our mobile API runs on ECS behind API Gateway with RDS Postgres; fi
 
 **Đọc thêm:**
 - https://owasp.org/API-Security (OWASP API Security Top 10)
-- https://sre.google/sre-book/table-of-contents (chương SLO, monitoring); https://opentelemetry.io/docs
+- https://sre.google/sre-book/table-of-contents (chương SLO, monitoring)
+- https://www.w3.org/TR/trace-context/ và https://opentelemetry.io/docs/concepts/signals/traces/
 
 ## 5. Web cơ bản để nói chuyện với web team
 
@@ -1361,9 +1467,49 @@ Phía client: `ignoreUnknownKeys = true`, `coerceInputValues = true`, enum với
 
 ### 6.4 Deprecation policy
 
-- Thông báo: header `Deprecation`/`Sunset` (IETF, cần kiểm tra trạng thái RFC tại https://www.ietf.org), changelog, email cho team client, dashboard tỷ lệ app version còn gọi endpoint cũ.
+- Thông báo: header `Deprecation` (**RFC 9745**, Standards Track, 3/2025) và `Sunset` (**RFC 8594**, Informational, 5/2019), changelog, email cho team client, dashboard tỷ lệ app version còn gọi endpoint cũ. `Deprecation` là Structured Field kiểu Date (Unix timestamp có `@`), có thể ở quá khứ (đã deprecated) hoặc tương lai; `Sunset` là HTTP-date lúc resource dự kiến ngừng; link relation `deprecation` trỏ tới tài liệu migration. RFC 9745 §4: timestamp của `Sunset` "MUST NOT be earlier than" `Deprecation`. Ví dụ dưới: deprecated từ 31/12/2026 23:59:59 UTC (`@1798761599`), sunset 30/9/2027.
+
+```http
+HTTP/1.1 200 OK
+Deprecation: @1798761599
+Sunset: Thu, 30 Sep 2027 23:59:59 GMT
+Link: <https://api.example.com/docs/migrate-v1-v2>; rel="deprecation"; type="text/html"
+```
+
+Client nên log/metric khi thấy `Deprecation` để biết build nào còn gọi endpoint cũ, không hiển thị gì cho user.
 - Thời hạn: tối thiểu 2-3 release train mobile (thường 3-6 tháng), và chỉ tắt khi lưu lượng app cũ dưới ngưỡng thoả thuận (ví dụ 1-2%).
 - Forced update: app có cơ chế "min supported version" đọc từ server (Remote Config hoặc response header); dưới ngưỡng hiển thị màn hình cập nhật (Play In-App Updates). Đây là van an toàn để tắt API cũ.
+
+```kotlin
+// Play In-App Updates, IMMEDIATE (toàn màn hình, user phải cập nhật mới dùng tiếp). com.google.android.play:app-update-ktx
+private val appUpdateManager by lazy { AppUpdateManagerFactory.create(this) }
+private val updateLauncher = registerForActivityResult(StartIntentSenderForResult()) { result ->
+    if (result.resultCode != RESULT_OK) finish()            // user hủy: app dưới min version thì không cho dùng tiếp
+}
+
+fun checkForcedUpdate(minSupportedVersionCode: Int) {
+    appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
+        val mustUpdate = BuildConfig.VERSION_CODE < minSupportedVersionCode
+        if (mustUpdate && info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
+            info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
+            appUpdateManager.startUpdateFlowForResult(
+                info, updateLauncher, AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build())
+        }
+    }
+}
+
+override fun onResume() {                                    // tiếp tục flow nếu user rời app giữa chừng
+    super.onResume()
+    appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
+        if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
+            appUpdateManager.startUpdateFlowForResult(
+                info, updateLauncher, AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build())
+        }
+    }
+}
+```
+
+In-App Updates chỉ chạy với app cài từ Play Store và phải có bản mới trên Play; nên luôn có fallback màn hình "mở Play Store" khi API báo không có update (https://developer.android.com/guide/playcore/in-app-updates/kotlin-java).
 - Lead mobile chịu trách nhiệm: biết phân bố version, đẩy update, và nói "không" khi backend muốn tắt sớm.
 
 **Lỗi hay gặp / trade-off**
@@ -1371,7 +1517,8 @@ Phía client: `ignoreUnknownKeys = true`, `coerceInputValues = true`, enum với
 - Forced update quá dễ dùng: team lạm dụng thay vì giữ tương thích; user bỏ app sau vài lần bị ép.
 
 **Đọc thêm:**
-- https://developer.android.com/guide/playcore/in-app-updates
+- https://www.rfc-editor.org/rfc/rfc9745 (Deprecation header) và https://www.rfc-editor.org/rfc/rfc8594 (Sunset header)
+- https://developer.android.com/guide/playcore/in-app-updates/kotlin-java
 - https://cloud.google.com/apis/design/versioning
 
 ### 6.5 Incident coordination
@@ -1471,7 +1618,7 @@ Phía client: `ignoreUnknownKeys = true`, `coerceInputValues = true`, enum với
 **Điểm interviewer muốn nghe:** Tiêu chí, denormalize có chủ đích, không chọn vì "scale".
 
 ### Q17. How is Redis used for caching and rate limiting, and what does that mean for the app?
-**A:** Cache-aside: read Redis, on a miss read the database and write back with a TTL; invalidate by deleting keys on writes and by keeping TTLs short; protect against stampedes with a lock or early refresh. Rate limiting: increment a counter per user per window with an expiry, or a sorted set for a sliding window, and return 429 with Retry-After above the limit. For the app it means reads can be seconds stale, so a freshly created item may not appear in the next list call; I design optimistic UI with local insertion and reconcile on sync rather than treating it as a bug.
+**A:** Cache-aside: read Redis, on a miss read the database and write back with a TTL; invalidate by deleting keys on writes and by keeping TTLs short; protect against stampedes with a lock or early refresh. Rate limiting: INCR plus EXPIRE on a key per user per window is a fixed window, simple but it allows up to twice the limit across a window boundary; a sorted set gives a sliding window log; a token bucket kept in a hash and updated by a Lua script allows controlled bursts. Above the limit the server returns 429 with Retry-After. For the app it means reads can be seconds stale, so a freshly created item may not appear in the next list call; I design optimistic UI with local insertion and reconcile on sync rather than treating it as a bug.
 **Follow-ups:** How do you invalidate a list cache after an insert? Where is the limit enforced for unauthenticated calls?
 **Điểm interviewer muốn nghe:** Cache-aside, TTL, stampede, 429, hệ quả trên UI.
 
@@ -1526,18 +1673,18 @@ Phía client: `ignoreUnknownKeys = true`, `coerceInputValues = true`, enum với
 **Điểm interviewer muốn nghe:** Backend sửa trước, flag, dữ liệu theo version, postmortem có action.
 
 ### Q28. How do you deprecate an endpoint that old app versions still call?
-**A:** Announce with Deprecation and Sunset headers, a changelog and direct notice to client teams; build a dashboard of traffic per app version on the endpoint; keep it for at least two or three mobile release trains and until traffic falls below an agreed threshold; raise the minimum supported app version so that remaining users get the in-app update prompt; then turn it off with a short grace period and an alert. The mobile lead owns the version distribution and the update push, and says no when backend wants to cut earlier.
+**A:** Announce with the Deprecation header from RFC 9745 and the Sunset header from RFC 8594, plus a deprecation link to the migration guide, a changelog and direct notice to client teams; build a dashboard of traffic per app version on the endpoint; keep it for at least two or three mobile release trains and until traffic falls below an agreed threshold; raise the minimum supported app version so that remaining users get the in-app update prompt; then turn it off with a short grace period and an alert. The mobile lead owns the version distribution and the update push, and says no when backend wants to cut earlier.
 **Follow-ups:** How do you implement the minimum version check in the app? What if a bank regulator requires longer support?
 **Điểm interviewer muốn nghe:** Quy trình có thời hạn, dashboard, forced update, quyền nói không.
 
 ## Hands-on / Bài tập
 
 ### Bài 1: Backend 3 endpoint cho Ledger (tuần 8, 3 ngày theo `03`)
-1. Tạo project `ledger-api` theo layout 2.1. Điền version thật cho Ktor 3.x và các lib (kiểm tra ktor.io/docs và Maven Central). Build xanh với `./gradlew build`.
+1. Tạo project `ledger-api` theo layout 2.1 với version ở 2.1 (Ktor 3.6.1; kiểm tra lại https://ktor.io/docs/releases.html). Build xanh với `./gradlew build`.
 2. Copy code 2.2-2.4, chạy `docker compose up --build`, kiểm tra bằng 3 lệnh curl ở 2.6. Xem log Flyway tạo bảng.
 3. Chạy `EXPLAIN ANALYZE` cho query list với 1,000 dòng seed (viết script SQL seed) và xác nhận Index Scan.
 4. Viết 2 test ở 2.5 và chạy `./gradlew test`. Thêm test thứ 3: cùng Idempotency-Key với body khác trả 422 (phải thêm cột `request_hash` và so sánh).
-5. Thay dev token bằng verify token thật từ Supabase Auth hoặc Firebase Auth qua JWKS (cú pháp JwkProvider cần kiểm tra tại ktor.io/docs). Xoá endpoint `/v1/dev/token`.
+5. Thay dev token bằng verify token thật từ Supabase Auth hoặc Firebase Auth qua JWKS (dùng đoạn "Production: RS256 + JWKS" ở 2.2, theo https://ktor.io/docs/server-jwt.html#configure-verifier). Xoá endpoint `/v1/dev/token`.
 6. Nối client Ktor trong `kmp-template-impl`: gọi list với cursor, gửi Idempotency-Key từ outbox khi tạo, xử lý 304 với ETag.
 7. Deploy một nơi miễn phí nếu tiện (Cloud Run, Fly.io, Railway; kiểm tra điều kiện free tier hiện hành).
 
@@ -1580,7 +1727,7 @@ Phía client: `ignoreUnknownKeys = true`, `coerceInputValues = true`, enum với
 
 ## Đọc thêm tổng hợp
 
-1. https://ktor.io/docs (server: routing, plugins, auth JWT, testing, rate limit)
+1. Ktor server docs: https://ktor.io/docs/server-routing.html, https://ktor.io/docs/server-plugins.html, https://ktor.io/docs/server-jwt.html, https://ktor.io/docs/server-testing.html, https://ktor.io/docs/server-rate-limit.html
 2. https://supabase.com/docs (Auth, RLS, Edge Functions, Kotlin client)
 3. https://www.postgresql.org/docs (indexes, EXPLAIN, transactions, INSERT ON CONFLICT)
 4. https://use-the-index-luke.com (index và pagination, 2-3 chương đầu)
