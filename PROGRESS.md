@@ -57,6 +57,8 @@ Tự chấm thang L0-L5 (`24` mục 0.1): đầu tháng ___ / cuối tháng ___
 - [ ] Tuần 7 (L4): Lab 3.1 script headless, 3.2 AI PR review, 3.3 @claude, 3.4 agent loop Kotlin tự viết, 3.5 caching/routing, 3.6 release notes workflow
 - [ ] Tuần 8 (L5): Lab 4.1 bảng số đo + thí nghiệm 6 task, 4.2 threat model, 4.3 policy + rollout 30 ngày, 4.4 demo 2 phút + bài viết
 - [ ] Learning log (`docs/ai-learning-log.md` trong repo) có ≥ 15 entry
+- [ ] Runbook `26` (lịch ở `26` mục 14): tuần 5 lab 26.1-26.3 · tuần 6 lab 26.4, 26.5, 26.7 · tuần 7 lab 26.6, 26.8 · tuần 8 lab 26.9, 26.10
+- [ ] Mỗi artifact có golden set trong `evals/` và log v1 → v2; reviewer có số recall/precision/báo nhầm
 Số đo cuối tháng: rework rate ___ → ___ ; số vòng sửa trung bình ___ → ___ ; chi phí/tuần ___
 
 ## Tuần 5 (16/11 - 22/11)

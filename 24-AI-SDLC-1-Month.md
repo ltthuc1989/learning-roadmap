@@ -3,6 +3,7 @@
 > Mục tiêu: sau 4 tuần, bạn **thiết kế, vận hành và đo được** một quy trình phát triển có AI cho team mobile, giải thích được vì sao từng phần tồn tại, và chứng minh bằng repo thật. Đây là câu trả lời cho dòng JD "Experience with AI-assisted development, workflow automation, or AI tools is a must".
 > Thời lượng: 30% tổng thời gian học, khoảng 1 giờ mỗi ngày trong tuần + 2-3 giờ cuối tuần, tổng ~28 giờ. 70% còn lại vẫn theo `03-Roadmap-12-Weeks.md`.
 > Phạm vi: AI **trong quy trình làm phần mềm** (spec, code, review, test, CI/CD, release, vận hành, tài liệu, migration). AI **trong sản phẩm** (Gemini Nano, ML Kit) ở `10-AI-for-Mobile-Lead.md` mục 2, không lặp lại ở đây.
+> **Muốn biết làm gì, theo thứ tự nào: đọc `26-AI-SDLC-Step-by-Step.md` trước.** File này giải thích cơ chế; file 26 là runbook từng pha, kèm sách theo pha và cách tối ưu skill/agent bằng eval.
 > Đi kèm: `ai-sdlc-kit/` (đáp án tham khảo, chỉ mở sau khi tự làm lab), `25-AI-SDLC-Company-Playbooks.md` (quy trình của các công ty lớn và cách áp dụng theo quy mô).
 > Facts kiểm tra ngày 11/11/2026 từ docs chính thức (code.claude.com, platform.claude.com, docs.github.com, developer.android.com) và báo cáo DORA 2025, Stack Overflow 2026, METR, OWASP. Công cụ AI đổi hằng tháng: mọi tên lệnh, giá, version hãy kiểm tra lại tại link đi kèm trước khi nói trong phỏng vấn.
 
@@ -369,6 +370,8 @@ flowchart LR
 ```
 Ba điểm người **bắt buộc** có mặt: duyệt spec, duyệt plan, approve PR. Còn lại agent làm, người kiểm.
 
+Phiên bản chi tiết từng bước (10 pha, mỗi pha có mục đích, sách cần đọc, spec + rubric + golden set cho artifact, lab) nằm ở `26-AI-SDLC-Step-by-Step.md`. Lab 2.6 ở mục 11 được thay bằng chuỗi lab 26.1-26.7.
+
 ### 6.3 Biết nhiều công cụ ở mức so sánh (đi sâu 1, hiểu 5)
 | Công cụ | Điểm mạnh | File context | Ghi chú 11/2026 |
 |---|---|---|---|
@@ -534,7 +537,7 @@ Các công ty như Google, Amazon, GitHub, Shopify, Uber, Airbnb, Spotify đã c
 
 ## 11. Lộ trình 4 tuần
 
-Mỗi tuần khoảng 7 giờ: 5 buổi x 1 giờ trong tuần + 1 buổi cuối tuần 2-3 giờ. Quy tắc: **lab nào cũng tự làm trước, mở `ai-sdlc-kit/` sau**. Làm trên `kmp-template-impl` (hoặc side project ở `16`), mỗi lab 1 nhánh git, 1 entry learning log.
+Mỗi tuần khoảng 7 giờ: 5 buổi x 1 giờ trong tuần + 1 buổi cuối tuần 2-3 giờ. Quy tắc: **lab nào cũng tự làm trước, mở `ai-sdlc-kit/` sau**. Làm trên một project thực hành của riêng bạn, mỗi lab 1 nhánh git, 1 entry learning log. Bản tham chiếu đã áp dụng thật và có số đo nằm ở **Talk Buddies** (`/Volumes/Entertainment/ComposeProject/talk-buddies`, repo `talk-buddy-app`): `docs/ai-workflow/README.md` giải thích từng quyết định, các cách đã bỏ, thứ tự dựng lại trên project khác; `docs/ai-workflow/verification-log.md` ghi thí nghiệm và kết quả. Đọc bản tham chiếu sau khi tự làm lab tương ứng, giống `ai-sdlc-kit/`.
 
 ### Tuần 1: Nền tảng (mục 1-4), đạt L2
 

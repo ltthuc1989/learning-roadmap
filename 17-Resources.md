@@ -24,6 +24,11 @@
 | **System Design Interview, vol. 1**, Alex Xu (2020) | Vòng system design có phần backend | Ch. 1-4 (scale from zero, back-of-envelope, framework), ch. rate limiter, notification system, news feed, chat |
 | **Effective Kotlin, 2nd ed.**, Marcin Moskała | Làm code review tốt hơn | Items về readability, safety, efficiency |
 | **Accelerate**, Forsgren, Humble, Kim (2018) | Nói về CI/CD và DORA metrics ở vai lead | Ch. 1-4 |
+| **Unit Testing Principles, Practices, and Patterns**, Vladimir Khorikov (Manning, 2020) | Rubric chấm test (cả test do agent viết) | Ch. 4 The four pillars of a good unit test, Ch. 5 Mocks and test fragility |
+| **Looks Good to Me: Constructive Code Reviews**, Adrienne Braganza (Manning, 2024) | Văn hoá và quy trình review, nền cho reviewer agent | Toàn bộ |
+| **Prompt Engineering for LLMs**, Berryman & Ziegler (O'Reilly, 2024) | Viết và đánh giá prompt có hệ thống | Ch. 6 Assembling the Prompt, Ch. 8 Taming the Model, Ch. 10 Evaluating LLM Applications |
+| **Beyond Vibe Coding**, Addy Osmani (O'Reilly, 2025) | Quy trình AI-assisted dev tổng thể | Ch. 2, 4, 8 |
+| Google eng-practices (miễn phí): https://google.github.io/eng-practices/ | Small CLs, CL descriptions, chuẩn review | Toàn bộ, 2 giờ. Sách theo từng pha AI-SDLC: `26` mục 16 |
 
 ### Nguồn miễn phí thay sách
 

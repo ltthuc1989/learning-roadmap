@@ -49,6 +49,7 @@
 | `23-English-for-Tech-Interviews.md` | 3 cấu trúc trả lời, 150 cụm từ theo vòng, 60 từ hay phát âm sai, luyện với AI voice, rubric | Tuần 1 trở đi | trung |
 | `24-AI-SDLC-1-Month.md` | Lộ trình 1 tháng AI trong quy trình phát triển: cách học AI, agent loop, context engineering, permissions/hooks, skill/subagent/MCP, AI qua từng pha SDLC, workflow automation, đo lường, bảo mật, 21 lab, 40 Q&A | Tuần 5-8 (30% thời gian) | dài |
 | `25-AI-SDLC-Company-Playbooks.md` | Quy trình AI-SDLC của Google, Amazon, GitHub, Meta, Uber, Airbnb, Spotify, Stripe, Grab...; sự cố công khai; quy trình chuẩn 7 pha; áp dụng theo quy mô; rollout 30 ngày | Tuần 8 | trung |
+| `26-AI-SDLC-Step-by-Step.md` | **Runbook làm theo**: 10 pha (intake, spec, plan, implement, test, PR, review, CI, release, retro), mỗi pha có mục đích, từng bước, sách + chương cần đọc, spec/rubric/golden set để tự viết skill/agent, cách người khác làm, lab; vòng tối ưu prompt/skill bằng eval; 15 Q&A | Tuần 5-8, đọc trước `24` | dài |
 | `ai-sdlc-kit/` | Đáp án tham khảo cho các lab: AGENTS.md/CLAUDE.md, settings + hooks, 3 subagent, 5 skill, 3 GitHub Actions, 2 script headless, agent loop Kotlin; README giải thích vì sao từng file được thiết kế như vậy | Sau khi tự làm lab | |
 | `PROGRESS.md` | Nhật ký tuần, câu hỏi thật gặp khi phỏng vấn | Mỗi tuần | |
 | `tools/make_anki.py` | Sinh thẻ Anki từ mọi Q&A | Chủ nhật | |

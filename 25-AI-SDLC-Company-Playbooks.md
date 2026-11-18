@@ -122,7 +122,7 @@
 
 ## 3. Quy trình chuẩn tham khảo (tổng hợp từ các công ty trên)
 
-Ghép AWS AI-DLC, GitHub Spec Kit, Spotify/Stripe (verifier và sandbox), Uber/Atlassian (AI review), Meta (lọc và review theo rủi ro) thành một quy trình bạn có thể đề xuất ở bất kỳ công ty nào, rồi cắt bớt theo quy mô ở mục 4.
+Ghép AWS AI-DLC, GitHub Spec Kit, Spotify/Stripe (verifier và sandbox), Uber/Atlassian (AI review), Meta (lọc và review theo rủi ro) thành một quy trình bạn có thể đề xuất ở bất kỳ công ty nào, rồi cắt bớt theo quy mô ở mục 4. Bản làm theo từng bước của quy trình này (cho cá nhân và team) ở `26-AI-SDLC-Step-by-Step.md`.
 
 ### 3.1 Bảy pha và cổng duyệt
 
